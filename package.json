@@ -1,0 +1,106 @@
+{
+  "name": "geulttukttak2",
+  "productName": "태권 글뚝딱",
+  "version": "2.2.3",
+  "private": true,
+  "description": "태권 글뚝딱 버전 2 — 태권도 블로그 작가 (설치형)",
+  "main": "out/main/index.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs && electron .",
+    "start": "electron .",
+    "test": "tsx --test tests/unit/*.test.ts tests/integration/*.test.ts",
+    "lint": "tsc --noEmit",
+    "dist": "node scripts/build.mjs && electron-builder --win nsis",
+    "dist:mac": "node scripts/build.mjs && electron-builder --mac dir --arm64 --x64"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "openai": "^7.36.0",
+    "zod": "^4.6.7",
+    "fflate": "^0.8.3",
+    "@fontsource/noto-sans-kr": "^5.3.1",
+    "@fontsource/black-han-sans": "^5.3.0"
+  },
+  "dependencies": {
+    "playwright-core": "^1.64.1"
+  },
+  "author": "용감한개발자",
+  "build": {
+    "appId": "kr.ddalkak.geulttukttak2",
+    "productName": "태권 글뚝딱",
+    "copyright": "© 2026 그로우모먼트",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**",
+      "!out/**/*.map",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/fonts",
+        "to": "fonts"
+      },
+      {
+        "from": "LICENSES.md",
+        "to": "LICENSES.md"
+      }
+    ],
+    "asarUnpack": [
+      "node_modules/playwright-core/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "태권글뚝딱-설치-${version}.${ext}",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "include": "build/installer.nsh",
+      "shortcutName": "태권 글뚝딱",
+      "createDesktopShortcut": true,
+      "runAfterFinish": true,
+      "language": "1042"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.productivity",
+      "identity": null,
+      "artifactName": "태권글뚝딱-맥-${version}-${arch}.${ext}"
+    }
+  }
+}

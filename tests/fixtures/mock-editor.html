@@ -1,0 +1,67 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>모의 편집기 (시험 전용 — 실제 네이버 아님)</title>
+<style>p{min-height:1em;margin:2px 0}.se-component.se-image{border:2px solid #4a4;padding:4px;margin:4px 0}.bold{font-weight:bold}.se-popup{display:none}</style>
+</head><body>
+<!-- 네이버 스마트에디터의 클래스 이름만 흉내 낸 시험용 화면. 실제 편집기 동작을 보장하지 않음 -->
+<div class="se-popup"><div class="se-popup-alert">작성 중인 글이 있습니다. <button class="se-popup-button-cancel">취소</button></div></div>
+<div class="se-documentTitle"><div class="se-module-text se-is-empty"><p class="se-text-paragraph" contenteditable="true"><span class="se-placeholder">제목</span></p></div></div>
+<div id="toolbar"><button class="se-image-toolbar-button">사진</button><button class="se-bold-toolbar-button">굵게</button><button class="se-map-toolbar-button">장소</button></div>
+<div id="mapPopup" style="display:none"><input class="react-autosuggest__input"><button class="se-place-search-button">검색</button><ul id="results"></ul><button id="mapOk">확인</button><button class="se-popup-close-button">닫기</button></div>
+<div class="se-component se-text" id="body"><div class="se-module-text se-is-empty"><p class="se-text-paragraph" contenteditable="true"><span class="se-placeholder">글감과 함께 나의 일상을 기록해보세요!</span></p></div></div>
+<input type="file" id="file" style="display:none">
+<script>
+  const q = new URLSearchParams(location.search);
+  if (q.get('popup')) document.querySelector('.se-popup').style.display = 'block';
+  document.querySelector('.se-popup-button-cancel').onclick = () => { document.querySelector('.se-popup').style.display = 'none'; };
+  if (q.get('existing')) { document.querySelector('.se-documentTitle p').textContent = '쓰던 글'; document.querySelector('.se-documentTitle .se-module-text').classList.remove('se-is-empty'); }
+  // 글자를 넣으면 안내 글자 · 빈 칸 표시 없어짐 (네이버처럼)
+  document.addEventListener('focusin', (e) => { const ph = e.target.querySelector && e.target.querySelector('.se-placeholder'); if (ph) ph.remove(); const m = e.target.closest && e.target.closest('.se-module-text'); if (m) m.classList.remove('se-is-empty'); });
+  let caret = null;
+  document.addEventListener('mousedown', (e) => { const p = e.target.closest('#body p.se-text-paragraph'); if (p) caret = p; });
+  // 붙여넣기: 줄마다 문단 하나 (빈 줄도 빈 문단 — 네이버처럼)
+  window.__paste = (text) => {
+    const body = document.getElementById('body');
+    const first = body.querySelector('p');
+    const lines = text.split('\n');
+    first.textContent = lines[0];
+    first.closest('.se-module-text').classList.remove('se-is-empty');
+    let last = first;
+    for (const l of lines.slice(1)) { const p = document.createElement('p'); p.className = 'se-text-paragraph'; p.contentEditable = 'true'; p.textContent = l; last.after(p); last = p; }
+  };
+  document.querySelector('.se-image-toolbar-button').onclick = () => document.getElementById('file').click();
+  document.getElementById('file').onchange = (e) => {
+    const f = e.target.files[0];
+    if (!f || !caret) return;
+    // 실제처럼 업로드에 시간이 걸림
+    setTimeout(() => {
+      const d = document.createElement('div');
+      d.className = 'se-component se-image';
+      d.dataset.name = f.name;
+      d.textContent = `[이미지 ${f.name}]`;
+      caret.before(d);
+      e.target.value = '';
+    }, 300);
+  };
+  // 장소(지도): 검색하면 결과 하나 → [추가] → [확인] 하면 글 끝에 지도 카드
+  document.querySelector('.se-map-toolbar-button').onclick = () => { document.getElementById('mapPopup').style.display = 'block'; };
+  document.querySelector('.se-popup-close-button').onclick = () => { document.getElementById('mapPopup').style.display = 'none'; };
+  let picked = '';
+  document.querySelector('.se-place-search-button').onclick = () => {
+    const q = document.querySelector('.react-autosuggest__input').value;
+    document.getElementById('results').innerHTML = q === '없는도장' ? '' : `<li class="se-place-map-search-result-item"><span class="se-place-map-search-result-title">${q}</span><button class="se-place-add-button">추가</button></li>`;
+    const add = document.querySelector('.se-place-add-button');
+    if (add) add.onclick = () => { picked = q; };
+  };
+  document.getElementById('mapOk').onclick = () => {
+    if (!picked) return;
+    const d = document.createElement('div'); d.className = 'se-component se-placesMap'; d.dataset.place = picked; d.textContent = `[지도 ${picked}]`;
+    document.getElementById('body').after(d);
+    document.getElementById('mapPopup').style.display = 'none';
+  };
+  document.querySelector('.se-bold-toolbar-button').onclick = () => { if (caret) caret.classList.add('bold'); };
+  // 줄 지우기 (세 번 클릭 → Backspace)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Backspace' && caret && window.getSelection().toString().trim() === caret.textContent.trim() && caret.textContent) { caret.textContent = ''; e.preventDefault(); }
+  });
+</script>
+</body></html>
