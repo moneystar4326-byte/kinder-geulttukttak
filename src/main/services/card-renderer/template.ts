@@ -2,6 +2,7 @@
 // 글자가 넘치면 자동으로 줄이지 않고 overflow 로 알려 문구를 줄이게 함 (measure 스크립트)
 import { pathToFileURL } from 'node:url';
 import type { CardCopy, CardSize, CardStyle } from '../../../shared/types';
+import { IND, isDaycare } from '../../../shared/industry';
 
 export interface CardLayerInput {
   copy: CardCopy;
@@ -26,18 +27,22 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const color = (c: string, d: string) => (/^#[0-9a-f]{6}$/i.test(c) ? c : d);
 const furl = (f: string) => pathToFileURL(f).href;
 
+// 띠 모양 줄 장식 (검정 + 강조색 = 태권도 띠). 어린이집판은 강조색 한 줄 · 제목은 굵은 본문 글꼴 (2026-10-27 기획안 v0.2 8장)
+const stripe = (accent: string) => (isDaycare ? accent : `linear-gradient(180deg,#111 0 50%,${accent} 50% 100%)`);
+const titleFont = (style: CardStyle) => (style === '교육 잡지형' || isDaycare ? 'NotoKR;font-weight:900' : 'BHS');
+
 // 템플릿 배경: AI 그림 없이 CSS 모양만 (AI 생성이라고 표시하지 않음)
 function templateBg(style: CardStyle, main: string, accent: string, index: number) {
   const tilt = [-12, 8, -4][index] ?? 0;
   if (style === '교육 잡지형') return `
     <div class="bg" style="background:#F6F1E7"></div>
     <div class="shape" style="right:-160px;bottom:-120px;width:760px;height:760px;border-radius:50%;background:${main};opacity:.12"></div>
-    <div class="shape" style="left:${SAFE}px;bottom:${SAFE + 40}px;width:420px;height:22px;background:linear-gradient(180deg,#111 0 50%,${accent} 50% 100%);transform:rotate(${tilt}deg);border-radius:4px"></div>`;
+    <div class="shape" style="left:${SAFE}px;bottom:${SAFE + 40}px;width:420px;height:22px;background:${stripe(accent)};transform:rotate(${tilt}deg);border-radius:4px"></div>`;
   if (style === '따뜻한 일러스트') return `
     <div class="bg" style="background:linear-gradient(170deg,#FFF6EC 0%,#FDE7D3 100%)"></div>
     <div class="shape" style="left:-120px;bottom:-160px;width:640px;height:640px;border-radius:50%;background:${accent};opacity:.14"></div>
     <div class="shape" style="right:-80px;bottom:120px;width:420px;height:420px;border-radius:50%;background:${main};opacity:.12"></div>
-    <div class="shape" style="right:${SAFE + 20}px;bottom:${SAFE + 60}px;width:360px;height:26px;background:linear-gradient(180deg,#111 0 50%,${accent} 50% 100%);transform:rotate(${tilt}deg);border-radius:6px"></div>`;
+    <div class="shape" style="right:${SAFE + 20}px;bottom:${SAFE + 60}px;width:360px;height:26px;background:${stripe(accent)};transform:rotate(${tilt}deg);border-radius:6px"></div>`;
   return `
     <div class="bg" style="background:#FFFFFF"></div>
     <div class="shape" style="left:0;right:0;top:0;height:55%;background:linear-gradient(160deg,${main} 0%,${main}CC 100%)"></div>
@@ -48,7 +53,7 @@ function templateBg(style: CardStyle, main: string, accent: string, index: numbe
 export const SPLIT_IMAGE_RATIO = { '1080x1350': 0.6, '1080x1080': 0.56 } as const; // 정사각형은 가로 그림이 덜 잘리게 조금 더 크게
 function splitHtml(c: CardLayerInput) {
   const { w, h } = sizeOf(c.size);
-  const main = color(c.brand.main, '#1F4E9A'), accent = color(c.brand.accent, '#C8241C');
+  const main = color(c.brand.main, IND.brand.main), accent = color(c.brand.accent, IND.brand.accent);
   const imgH = Math.round(h * SPLIT_IMAGE_RATIO[c.size]);
   const logoH = logoHeight(c.logoScale);
   const foot = c.logoFile ? logoH + 40 : 104; // 로고가 커지면 글 상자가 그만큼 비켜 줌
@@ -67,10 +72,10 @@ function splitHtml(c: CardLayerInput) {
 html,body{width:${w}px;height:${h}px;overflow:hidden;background:${paper}}
 #c{position:relative;width:${w}px;height:${h}px;overflow:hidden;font-family:NotoKR,sans-serif;color:#1A1A1A;background:${paper}}
 #img{position:absolute;left:0;top:0;width:${w}px;height:${imgH}px;object-fit:cover;object-position:center ${sq ? '30%' : '40%'}}
-#band{position:absolute;left:0;right:0;top:${imgH}px;height:10px;background:linear-gradient(90deg,#111 0 50%,${accent} 50% 100%)}
+#band{position:absolute;left:0;right:0;top:${imgH}px;height:10px;background:${isDaycare ? `linear-gradient(90deg,${main} 0 50%,${accent} 50% 100%)` : `linear-gradient(90deg,#111 0 50%,${accent} 50% 100%)`}}
 #num{position:absolute;left:${SAFE}px;top:${imgH - 30}px;font:700 28px NotoKR;color:#fff;background:${accent};border-radius:999px;padding:8px 22px;box-shadow:0 4px 14px rgba(0,0,0,.2)}
 #box{position:absolute;left:${SAFE}px;right:${SAFE}px;top:${boxTop}px;max-height:${boxH}px;overflow:hidden}
-#title{font-family:${c.style === '교육 잡지형' ? 'NotoKR;font-weight:900' : 'BHS'};font-size:${titleSize}px;line-height:1.22;word-break:keep-all;overflow-wrap:anywhere;color:${c.style === '깔끔한 정보형' ? main : '#1A1A1A'}}
+#title{font-family:${titleFont(c.style)};font-size:${titleSize}px;line-height:1.22;word-break:keep-all;overflow-wrap:anywhere;color:${c.style === '깔끔한 정보형' ? main : '#1A1A1A'}}
 #rule{width:80px;height:7px;background:${accent};margin:20px 0 18px;border-radius:4px}
 #sub{font-size:${subSize}px;line-height:1.55;word-break:keep-all;overflow-wrap:anywhere;color:#333}
 #foot{position:absolute;left:${SAFE}px;right:${SAFE}px;bottom:${SAFE - 40}px;height:${c.logoFile ? logoH : 56}px;display:flex;align-items:center}
@@ -87,7 +92,7 @@ html,body{width:${w}px;height:${h}px;overflow:hidden;background:${paper}}
 export function cardHtml(c: CardLayerInput) {
   if (c.backgroundFile) return splitHtml(c);
   const { w, h } = sizeOf(c.size);
-  const main = color(c.brand.main, '#1F4E9A'), accent = color(c.brand.accent, '#C8241C');
+  const main = color(c.brand.main, IND.brand.main), accent = color(c.brand.accent, IND.brand.accent);
   const layout = layoutOf(c.style);
   const font = c.fontDir;
   const titleSize = c.size === '1080x1080' ? 76 : 84;
@@ -114,7 +119,7 @@ html,body{width:${w}px;height:${h}px;overflow:hidden;background:#fff}
 #box{position:absolute;left:${SAFE}px;right:${SAFE}px;${boxPos};max-height:${boxH}px;overflow:hidden;
   ${panel ? `background:rgba(255,255,255,.92);border-radius:28px;padding:44px 48px;box-shadow:0 10px 40px rgba(0,0,0,.12);` : 'padding:12px 0;'}}
 #num{display:inline-block;font:700 28px NotoKR;color:#fff;background:${accent};border-radius:999px;padding:6px 20px;margin-bottom:26px}
-#title{font-family:${c.style === '교육 잡지형' ? 'NotoKR;font-weight:900' : 'BHS'};font-size:${titleSize}px;line-height:1.22;word-break:keep-all;overflow-wrap:anywhere;color:${c.style === '깔끔한 정보형' ? main : textColor}}
+#title{font-family:${titleFont(c.style)};font-size:${titleSize}px;line-height:1.22;word-break:keep-all;overflow-wrap:anywhere;color:${c.style === '깔끔한 정보형' ? main : textColor}}
 #rule{width:96px;height:8px;background:${accent};margin:30px 0 26px;border-radius:4px}
 #sub{font-size:${subSize}px;line-height:1.55;font-weight:400;word-break:keep-all;overflow-wrap:anywhere;color:#333}
 #foot{position:absolute;left:${SAFE}px;right:${SAFE}px;bottom:${SAFE - 30}px;height:${footH}px;display:flex;align-items:center;justify-content:space-between}

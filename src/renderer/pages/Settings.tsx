@@ -6,6 +6,7 @@ import { AccountPanel } from '../components/Account';
 import { SetupGuide } from '../guide/SetupGuide';
 import { KeyGuide } from '../guide/KeyGuide';
 import { Speak } from '../guide/voice';
+import { IND, isDaycare } from '../../shared/industry';
 
 type SecretName = 'openai' | 'naverApiKey' | 'naverSecret' | 'naverCustomer' | 'kakao';
 
@@ -73,7 +74,7 @@ export function SettingsPage() {
 
       <div className="panel">
         <h2 className="h2-row">OpenAI (글 · 카드 그림) <Speak ids={['P02', 'P03']} /></h2>
-        <SecretRow name="openai" label="OpenAI API 키" hint="OpenAI 사이트에서 만든 키 (sk- 로 시작). 글 · 그림 사용료는 관장님 OpenAI 계정에서 쓴 만큼 나가요." />
+        <SecretRow name="openai" label="OpenAI API 키" hint={`OpenAI 사이트에서 만든 키 (sk- 로 시작). 글 · 그림 사용료는 ${IND.owner} OpenAI 계정에서 쓴 만큼 나가요.`} />
         <div className="row" style={{ marginBottom: 10 }}>
           <button className="btn primary" onClick={() => setGuideAt('A03')}>🔊 비서와 같이 키 만들기</button>
           <button className="btn link" onClick={() => open('https://growmoment.co.kr/guide')}>캡처로 보는 안내 (홈페이지)</button>
@@ -103,7 +104,7 @@ export function SettingsPage() {
         <SecretRow name="naverCustomer" label="Customer ID" hint="SA API 사용 관리 화면 위 'CUSTOMER_ID =' 옆 숫자" />
         <div className="row">
           <button className="btn" disabled={!info.secrets.naverApiKey || !info.secrets.naverSecret || !info.secrets.naverCustomer || testing !== null} onClick={() => runTest('naver')}>{testing === 'naver' ? '확인 중…' : '연결 확인'}</button>
-          <span className="hint">"태권도" 한 번 조회해요 (검색광고 API 호출 한도에 1회 포함).</span>
+          <span className="hint">"{IND.term}" 한 번 조회해요 (검색광고 API 호출 한도에 1회 포함).</span>
           <button className="btn link" onClick={() => open('https://naver.github.io/searchad-apidoc/')}>공식 API 문서</button>
         </div>
         <Msg m={tests.naver.m} />
@@ -111,7 +112,7 @@ export function SettingsPage() {
 
       <div className="panel">
         <h2 className="h2-row">카카오 로컬 (주변 학교 · 아파트 이름, 선택) <Speak ids={['P07', 'P08']} /></h2>
-        <p className="hint">제목 앞 "[○○초 근처 태권도]" 같은 동네 이름 후보를 모을 때만 써요. 없으면 도장 정보에서 직접 적으면 돼요.</p>
+        <p className="hint">제목 앞 "{isDaycare ? '[○○아파트 어린이집]' : '[○○초 근처 태권도]'}" 같은 동네 이름 후보를 모을 때만 써요. 없으면 {IND.place} 정보에서 직접 적으면 돼요.</p>
         <div className="row" style={{ marginBottom: 10 }}><button className="btn primary" onClick={() => setKeyGuide('kakao')}>🔊 비서와 같이 연결하기</button></div>
         <SecretRow name="kakao" label="카카오 REST API 키" hint="카카오 개발자 → 앱 → [플랫폼 키] → REST API 키. 앱의 [제품 설정 → 카카오맵] 사용 설정도 켜야 해요" />
         <div className="row">
@@ -124,7 +125,7 @@ export function SettingsPage() {
 
       <div className="panel">
         <h2 className="h2-row">네이버 블로그 로그인 (초안 입력용) <Speak ids={['P09', 'P10']} /></h2>
-        <p>네이버 전용 브라우저 창에서 관장님이 직접 로그인해요. 프로그램은 비밀번호를 받지 않고, 평소 크롬 로그인 정보도 가져오지 않아요.</p>
+        <p>네이버 전용 브라우저 창에서 {IND.owner}이 직접 로그인해요. 프로그램은 비밀번호를 받지 않고, 평소 크롬 로그인 정보도 가져오지 않아요.</p>
         <p className="hint">브라우저: {naver?.browser ?? info.browser ?? '찾지 못함 (크롬 또는 엣지 필요)'} · 창 {naver?.open ? '열림' : '닫힘'} · 로그인 {naver?.loggedIn == null ? '확인 전' : naver.loggedIn ? '됨' : '안 됨'}</p>
         <div className="row">
           <button className="btn" onClick={() => call('naver:openLogin').then(() => call('naver:status').then(setNaver)).catch((e) => msg.err(e))}>브라우저 열기 · 로그인</button>
@@ -149,7 +150,7 @@ export function SettingsPage() {
 
       <div className="panel">
         <h2 className="h2-row">백업 · 복원 <Speak ids={['P12']} /></h2>
-        <p className="hint">백업에는 글 · 카드 · 도장 정보 · 일반 설정이 들어가요. API 키와 네이버 로그인은 넣지 않아요.</p>
+        <p className="hint">백업에는 글 · 카드 · {IND.place} 정보 · 일반 설정이 들어가요. API 키와 네이버 로그인은 넣지 않아요.</p>
         <div className="row">
           <button className="btn" onClick={() => call('backup:create').then((f) => f && msg.ok(`백업했어요: ${f}`)).catch((e) => msg.err(e))}>백업 만들기</button>
           <button className="btn" onClick={() => call('backup:restore').catch((e) => msg.err(e))}>백업에서 복원</button>
@@ -176,7 +177,7 @@ function SecretaryPanel({ onGuide }: { onGuide: (stepId: string) => void }) {
   useEffect(() => { call<unknown[]>('article:list').then((r) => setPosts(r.length)).catch(() => setPosts(0)); }, []);
   const items = [
     { label: '계정 연결', done: !!license && license.state !== 'none', step: 'A01' },
-    { label: '도장 정보', done: info.hasProfile, step: 'A02' },
+    { label: `${IND.place} 정보`, done: info.hasProfile, step: 'A02' },
     { label: 'AI 연결 (OpenAI)', done: !!info.secrets.openai, step: 'A03' },
     { label: '첫 글 만들어 보기', done: (posts ?? 0) > 0, step: 'A10' },
   ];
@@ -185,7 +186,7 @@ function SecretaryPanel({ onGuide }: { onGuide: (stepId: string) => void }) {
   return (
     <div className="panel secretary">
       <h2>전담 비서</h2>
-      <p>{name ? `${name} 관장님, ` : '관장님, '}{left ? `블로그를 쓰실 준비 네 가지 중 ${4 - left}가지가 끝났어요. 남은 건 제가 같이 챙겨 드릴게요.` : '준비가 모두 끝났어요. 이제 수업 메모 한 줄이면 블로그 글이 나와요.'}</p>
+      <p>{name ? `${name} ${IND.owner}, ` : `${IND.owner}, `}{left ? `블로그를 쓰실 준비 네 가지 중 ${4 - left}가지가 끝났어요. 남은 건 제가 같이 챙겨 드릴게요.` : '준비가 모두 끝났어요. 이제 수업 메모 한 줄이면 블로그 글이 나와요.'}</p>
       <ul className="checklist">
         {items.map((i) => (
           <li key={i.label} className={i.done ? 'done' : ''}>

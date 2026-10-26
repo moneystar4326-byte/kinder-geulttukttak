@@ -2,6 +2,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import type { Db } from './db';
+import { IND } from '../shared/industry';
 
 export interface AppSettings {
   setupDone: boolean;
@@ -21,7 +22,7 @@ export const DEFAULTS: AppSettings = {
   setupDone: false,
   textModel: 'gpt-6.1-sol',
   imageModel: 'gpt-image-2.5-flare',
-  saveDir: path.join(os.homedir(), 'Documents', '태권 글뚝딱'),
+  saveDir: path.join(os.homedir(), 'Documents', IND.appName),
   typingSpeed: 20,
   imageAutoRetry: 1,
   monthlyImageLimit: 60,

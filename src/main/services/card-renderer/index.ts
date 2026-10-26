@@ -7,7 +7,8 @@ import type { Db } from '../../db';
 import type { Card, CardCopy, CardSet, DojoProfile } from '../../../shared/types';
 import { ApiError, toApiError } from '../errors';
 import type { CallOpts, ImageAI } from '../openai';
-import { backgroundPrompt, beltFor, refLead } from '../openai/image-prompt';
+import { ageFor, backgroundPrompt, beltFor, daycareBackgroundPrompt, daycareRefLead, refLead } from '../openai/image-prompt';
+import { IND, isDaycare } from '../../../shared/industry';
 import { cardHtml, copyHints, sizeOf, type Measure } from './template';
 
 export interface Shooter { shoot(html: string, w: number, h: number, outFile: string): Promise<Measure> }
@@ -47,8 +48,20 @@ export function createCardService(deps: CardDeps) {
     const refs = [prof?.dobokRefPath, prof?.coachRefPath, logoRef ? prof?.logoPath : undefined].filter((f): f is string => !!f && fs.existsSync(f));
     // 띠는 글 주제 · 제목으로 고름 (카드 3장 모두 같은 띠). 도복은 참고 사진 그대로
     const ver = db.getVersion(cs.articleVersionId);
-    const belt = beltFor([ver ? db.getArticle(ver.articleId)?.input.topic : '', ver?.title].filter(Boolean).join(' '));
-    const prompt = refLead(!!prof?.dobokRefPath && fs.existsSync(prof.dobokRefPath), !!prof?.coachRefPath && fs.existsSync(prof.coachRefPath), belt, logoRef) + backgroundPrompt(card.copy.scene, cs.style.style, 'split', undefined, belt, logoRef);
+    const input = ver ? db.getArticle(ver.articleId)?.input : undefined;
+    const hasUniform = !!prof?.dobokRefPath && fs.existsSync(prof.dobokRefPath);
+    const hasCoach = !!prof?.coachRefPath && fs.existsSync(prof.coachRefPath);
+    let prompt: string;
+    if (isDaycare) {
+      // 어린이집: 아이 나이는 글의 독자(영아 · 유아)와 주제로. 원복 로고는 원복 사진이 있을 때만
+      const age = ageFor([input?.audience, input?.topic, ver?.title].filter(Boolean).join(' '));
+      const logo = logoRef && hasUniform;
+      if (!logo && logoRef) refs.pop(); // 원복이 없으면 로고 참고 그림도 보내지 않음 (refs 의 마지막이 로고)
+      prompt = daycareRefLead(hasUniform, hasCoach, logo) + daycareBackgroundPrompt(card.copy.scene, cs.style.style, 'split', age, hasUniform, logo);
+    } else {
+      const belt = beltFor([input?.topic, ver?.title].filter(Boolean).join(' '));
+      prompt = refLead(hasUniform, hasCoach, belt, logoRef) + backgroundPrompt(card.copy.scene, cs.style.style, 'split', undefined, belt, logoRef);
+    }
     let lastErr: ApiError | null = null;
     for (let attempt = 0; attempt <= deps.autoRetry; attempt++) {
       try {
@@ -72,7 +85,7 @@ export function createCardService(deps: CardDeps) {
     const out = path.join(dir, 'card.png');
     const html = cardHtml({
       copy: card.copy, index: card.index, style: cs.style.style, size: cs.style.size,
-      brand: prof?.brand ?? { main: '#1F4E9A', accent: '#C8241C' }, dojoName: prof?.name ?? '',
+      brand: prof?.brand ?? IND.brand, dojoName: prof?.name ?? '',
       logoFile: prof?.logoPath && fs.existsSync(prof.logoPath) ? prof.logoPath : undefined, logoScale: prof?.logoScale,
       backgroundFile: card.backgroundPath && fs.existsSync(card.backgroundPath) ? card.backgroundPath : undefined,
       fontDir: deps.fontDir,

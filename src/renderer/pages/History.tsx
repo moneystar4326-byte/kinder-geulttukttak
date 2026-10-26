@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../App';
 import { call, type ArticleSummary } from '../api';
 import { fmtDate } from '../components/ui';
+import { kindLabel } from '../../shared/industry';
 
 const STATUS: Record<string, [string, string]> = {
   draft: ['입력 중', ''], generating: ['글 생성 중', 'warn'], validating: ['검증 중', 'warn'], review: ['검토 필요', 'warn'], ready: ['완료', 'ok'],
@@ -20,7 +21,7 @@ export function History() {
           const [label, cls] = STATUS[a.status] ?? [a.status, ''];
           return (
             <div className="list-row" key={a.id}>
-              <div className="t"><b>{a.title || a.topic || '(제목 없음)'}</b><span className="muted">{a.kind} · {fmtDate(a.updatedAt)}</span></div>
+              <div className="t"><b>{a.title || a.topic || '(제목 없음)'}</b><span className="muted">{kindLabel(a.kind)} · {fmtDate(a.updatedAt)}</span></div>
               {a.demo && <span className="badge demo">데모</span>}
               <span className={`badge ${cls}`}>{label}</span>
               <button className="btn small" onClick={() => go({ page: 'article', id: a.id })}>열기</button>

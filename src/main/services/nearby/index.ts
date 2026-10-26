@@ -3,7 +3,8 @@
 // 이름은 AI에 맡기지 않고 사용자가 골라 제목 머리말 · 키워드 후보로만 씀
 import { ApiError, fromHttp, toApiError } from '../errors';
 import type { NearbyArea } from '../../../shared/types';
-import { cleanAreaName } from '../../../shared/areas';
+import { cleanAreaName, daycarePrefix } from '../../../shared/areas';
+import { IND, isDaycare } from '../../../shared/industry';
 
 async function get(url: string, key: string, signal?: AbortSignal) {
   let r: Response;
@@ -38,7 +39,7 @@ export function shortName(name: string, kind: string, regionWords: string[] = []
 }
 
 export async function collectNearby(key: string, address: string, regionWords: string[], signal?: AbortSignal): Promise<NearbyArea[]> {
-  if (!address.trim()) throw new ApiError('bad-request', '도장 정보에 상세 주소를 먼저 적어 주세요 (주변 장소를 찾을 때만 써요)', '카카오');
+  if (!address.trim()) throw new ApiError('bad-request', `${IND.place} 정보에 상세 주소를 먼저 적어 주세요 (주변 장소를 찾을 때만 써요)`, '카카오');
   const addr = address.replace(/\s*(상가|\d+층).*$/, '');
   const geo = await get(`https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(addr)}`, key, signal);
   const doc = geo.documents?.[0];
@@ -66,7 +67,14 @@ export async function collectNearby(key: string, address: string, regionWords: s
 }
 
 // 제목 머리말 후보: 학교 · 아파트 · 역은 "○○ 근처 태권도" (도장 이름처럼 보이지 않게), 동네 이름은 "○○ 태권도"
+// 어린이집판: 동네 → 아파트("[○○아파트 어린이집]") → 직접 적은 이름 → 학교 · 역("○○ 근처") 순서 (2026-10-27 기획안 v0.2 9장)
 export function prefixOptions(region: string, areas: NearbyArea[]) {
+  if (isDaycare) {
+    const r = region.trim().split(/\s+/).pop()?.replace(new RegExp(`${IND.term}$`), '') ?? '';
+    const rank = (k: string) => (k === '아파트' ? 0 : k === '학교' || k === '지하철역' || k === '유치원' ? 2 : 1);
+    const sorted = [...areas].sort((a, b) => rank(a.kind) - rank(b.kind));
+    return [...new Set([...(r ? [`[${r} ${IND.term}]`] : []), ...sorted.map((a) => (a.kind === '아파트' && a.source === 'kakao' ? daycarePrefix(a.name, true) : rank(a.kind) === 2 ? `[${a.name} 근처 ${IND.term}]` : daycarePrefix(a.name, false)))])];
+  }
   const opts: string[] = [];
   const r = region.trim().split(/\s+/).pop() ?? '';
   if (r) opts.push(`[${r.replace(/태권도$/, '')} 태권도]`);

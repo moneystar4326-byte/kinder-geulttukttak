@@ -10,6 +10,7 @@ import {
   PARAGRAPH_JSON, ParagraphSchema, REVIEW_JSON, ReviewSchema, TITLES_JSON, TitlesSchema,
 } from '../../../shared/schemas';
 import type { ArticleDoc, ArticleInput, DojoProfile, ReviewFlag, RevisionKind } from '../../../shared/types';
+import { IND, isDaycare, type Writer } from '../../../shared/industry';
 import * as P from './prompts';
 
 export interface Usage { model: string; kind: string; reported: unknown }
@@ -23,8 +24,8 @@ export interface TextAI {
   revise(kind: Exclude<RevisionKind, 'titles' | 'paragraph'>, doc: ArticleDoc, o?: CallOpts, min?: number): Promise<ArticleDoc>;
   titles(doc: ArticleDoc, input: ArticleInput, o?: CallOpts): Promise<string[]>;
   paragraph(doc: ArticleDoc, sectionId: string, index: number, instruction: string, o?: CallOpts): Promise<string>;
-  cardOne(doc: ArticleDoc, title: string, index: number, current: { title: string; sub: string; scene: string }, others: string[], kind?: string, o?: CallOpts): Promise<{ title: string; sub: string }>;
-  cardCopies(doc: ArticleDoc, title: string, kind?: string, o?: CallOpts): Promise<{ title: string; sub: string; scene: string; afterSectionId: string }[]>;
+  cardOne(doc: ArticleDoc, title: string, index: number, current: { title: string; sub: string; scene: string }, others: string[], kind?: string, o?: CallOpts, writer?: Writer): Promise<{ title: string; sub: string }>;
+  cardCopies(doc: ArticleDoc, title: string, kind?: string, o?: CallOpts, writer?: Writer): Promise<{ title: string; sub: string; scene: string; afterSectionId: string }[]>;
   keywordIdeas(region: string, topic: string, kind: string, o?: CallOpts): Promise<string[]>;
   splitMemo(memo: string, kind: string, topic: string, o?: CallOpts): Promise<Record<string, string>>;
 }
@@ -55,10 +56,12 @@ export function normalizeDoc(raw: z.infer<typeof GeneratedArticleSchema>): Artic
 // 메모 말로 넣기 (2026-10-26): 받아쓰기 모델 + 힌트(태권도 낱말 + 그 도장의 이름 · 동네 · 주변 학교)
 // mini 는 첫마디 · 고유명사를 자주 틀려서(잡음 섞은 시험 98% vs 100%) 큰 모델로. 1분에 약 8원
 export const LISTEN_MODEL = 'gpt-4o-transcribe';
-const LISTEN_HINT = '태권도장 관장님의 수업 메모. 품새, 태극 1장, 승급심사, 승품단, 국기원, 유치부, 초등부, 미트, 겨루기, 앞차기, 돌려차기, 줄넘기, 사범님.';
+const LISTEN_HINT = isDaycare
+  ? '어린이집 원장님 · 선생님의 보육 메모. 영아반, 유아반, 만 0세, 만 1세, 만 2세, 누리과정, 적응기간, 낮잠, 배변훈련, 바깥놀이, 숲체험, 오감놀이, 생일잔치, 연장보육, 담임 선생님.'
+  : '태권도장 관장님의 수업 메모. 품새, 태극 1장, 승급심사, 승품단, 국기원, 유치부, 초등부, 미트, 겨루기, 앞차기, 돌려차기, 줄넘기, 사범님.';
 export const listenHint = (names: string[]) => {
   const extra = [...new Set(names.map((n) => n.trim()).filter(Boolean))].slice(0, 20).join(', ');
-  return (extra ? `${LISTEN_HINT} 도장 · 동네 이름: ${extra}.` : LISTEN_HINT).slice(0, 600);
+  return (extra ? `${LISTEN_HINT} ${IND.place} · 동네 이름: ${extra}.` : LISTEN_HINT).slice(0, 600);
 };
 export type Listen = (audio: Uint8Array, mime: string, o?: CallOpts & { hint?: string }) => Promise<string>;
 
@@ -106,12 +109,12 @@ export function createOpenAI(opts: { apiKey: string; textModel: string; imageMod
     async paragraph(doc, sectionId, index, instruction, o) {
       return (await json('paragraph', 'text', P.SYSTEM_RULES, P.paragraphPrompt(doc, sectionId, index, instruction), PARAGRAPH_JSON, ParagraphSchema, o)).paragraph.trim();
     },
-    async cardOne(doc, title, index, current, others, kind, o) {
-      const r = await json('card_one', 'text', P.SYSTEM_RULES, P.cardOnePrompt(doc, title, index, current, others, kind), CARD_ONE_JSON, CardOneSchema, o);
+    async cardOne(doc, title, index, current, others, kind, o, writer) {
+      const r = await json('card_one', 'text', P.SYSTEM_RULES, P.cardOnePrompt(doc, title, index, current, others, kind, writer), CARD_ONE_JSON, CardOneSchema, o);
       return { title: r.title.trim(), sub: r.sub.trim() };
     },
-    async cardCopies(doc, title, kind, o) {
-      return (await json('cards', 'text', P.SYSTEM_RULES, P.cardCopyPrompt(doc, title, kind), CARD_COPY_JSON, CardCopySchema, o)).cards;
+    async cardCopies(doc, title, kind, o, writer) {
+      return (await json('cards', 'text', P.SYSTEM_RULES, P.cardCopyPrompt(doc, title, kind, writer), CARD_COPY_JSON, CardCopySchema, o)).cards;
     },
     async splitMemo(memo, kind, topic, o) {
       const r = await json('memo', 'text', P.MEMO_RULES, P.memoPrompt(memo, kind, topic), MEMO_SPLIT_JSON, MemoSplitSchema, o);

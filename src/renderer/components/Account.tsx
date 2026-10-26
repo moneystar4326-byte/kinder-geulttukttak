@@ -75,7 +75,7 @@ export function LockBanner() {
       <p>{license.state === 'none' ? '홈페이지에 가입한 카카오 계정으로 이 PC를 연결하면 바로 쓸 수 있어요. 처음이면 14일 무료예요.' : license.message}</p>
       <p className="muted">지난 글 보기 · 복사 · 내보내기 · 네이버 초안은 그대로 쓸 수 있어요.</p>
       <div className="row">
-        {license.state === 'none' || ['other-device', 'other-dojang', 'broken'].includes((license as { why: string }).why)
+        {license.state === 'none' || ['other-device', 'other-dojang', 'broken', 'other-product'].includes((license as { why: string }).why)
           ? <button className="btn primary" disabled={!!busy} onClick={connect}>{busy === 'connect' ? '연결 기다리는 중…' : '계정 연결'}</button>
           : <button className="btn primary" disabled={!!busy} onClick={refresh}>{busy === 'refresh' ? '확인 중…' : '다시 확인'}</button>}
         {license.state === 'locked' && ['trial-ended', 'paid-ended'].includes(license.why) && <button className="btn" onClick={() => open(`${SITE}/my`)}>구독 신청 (마이페이지)</button>}

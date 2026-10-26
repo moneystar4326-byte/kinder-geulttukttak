@@ -1,12 +1,17 @@
 // 앱 전체가 같이 쓰는 데이터 모양
+import { isDaycare, type Writer } from './industry';
 
 export const ARTICLE_KINDS = ['수업 후기', '성장 이야기', '행사 안내', '모집 안내', '교육 정보'] as const;
 export type ArticleKind = (typeof ARTICLE_KINDS)[number];
 
-export const AUDIENCES = ['유치부', '초등 저학년', '초등 고학년', '중등 이상', '성인'] as const;
+// 어린이집판은 영아 · 유아 (2026-10-27 기획안 v0.2)
+export const AUDIENCES: readonly string[] = isDaycare ? ['영아 (만 0~2세)', '유아 (만 3~5세)'] : ['유치부', '초등 저학년', '초등 고학년', '중등 이상', '성인'];
 export const TONES = ['따뜻한 설명형', '전문적인 교육형'] as const;
 export type Tone = (typeof TONES)[number];
-export const ENDINGS = ['도장 소개로 마무리', '상담 안내로 마무리', '가정에서 해 볼 것으로 마무리', '마무리 인사만'] as const;
+// 순서가 뜻: 0 소개 · 1 상담 · 2 가정 · 3 인사 (quick.ts 가 번호로 고름)
+export const ENDINGS: readonly string[] = isDaycare
+  ? ['어린이집 소개로 마무리', '입소 상담 안내로 마무리', '가정에서 해 볼 것으로 마무리', '마무리 인사만']
+  : ['도장 소개로 마무리', '상담 안내로 마무리', '가정에서 해 볼 것으로 마무리', '마무리 인사만'];
 
 export interface DojoProfile {
   id: string;
@@ -36,6 +41,8 @@ export interface DojoProfile {
   tone: Tone;
   avoidWords: string; // 쉼표 구분
   nearbyAreas?: NearbyArea[]; // 주변 학교 · 아파트 · 역 (카카오 로컬 또는 직접 입력)
+  facilityType?: string; // 어린이집 유형 (국공립 · 민간 · 가정 …) — 어린이집판만
+  writers?: Writer[]; // 글쓴이 (원장님 · 선생님) — 어린이집판만
   updatedAt?: string;
 }
 
@@ -78,6 +85,8 @@ export interface ArticleInput {
   includeProfile: { philosophy: boolean; classFeatures: boolean; credentials: boolean; contact: boolean; address: boolean };
   withCards: boolean;
   titlePrefix?: string; // 예: [보라매초 근처 태권도] — 코드가 제목 앞에 붙임 (AI에 동네 이름을 맡기지 않음)
+  writer?: Writer; // 이 글을 쓰는 사람 (어린이집판). 고른 때의 이름 · 반을 그대로 담음
+  writerSign?: boolean; // 글 끝에 글쓴이 한 줄 (코드가 붙임)
 }
 
 export interface Section { id: string; heading?: string; paragraphs: string[] }

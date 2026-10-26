@@ -12,7 +12,10 @@
     "test": "tsx --test tests/unit/*.test.ts tests/integration/*.test.ts",
     "lint": "tsc --noEmit",
     "dist": "node scripts/build.mjs && electron-builder --win nsis",
-    "dist:mac": "node scripts/build.mjs && electron-builder --mac dir --arm64 --x64"
+    "dist:mac": "node scripts/build.mjs && electron-builder --mac dir --arm64 --x64",
+    "build:daycare": "node scripts/build.mjs --daycare",
+    "dev:daycare": "node scripts/build.mjs --daycare && electron .",
+    "dist:daycare": "node scripts/build.mjs --daycare && electron-builder --win nsis --config electron-builder.daycare.cjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

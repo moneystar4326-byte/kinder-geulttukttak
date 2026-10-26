@@ -2,7 +2,12 @@
 // 대본 원본: docs/음성안내/script.json (여기 script.json 은 그 복사본). 음성 파일은 public/voice/ 에 넣으면 재생, 없으면 글자만
 import { useEffect, useRef, useState } from 'react';
 import { call, local } from '../api';
-import script from './script.json';
+import tkdScript from './script.json';
+import daycareScript from './script.daycare.json';
+import { isDaycare } from '../../shared/industry';
+
+// 어린이집판 대본은 말만 바꾼 복사본이고 음성 파일이 없어 글자로만 안내 (태권도판 녹음에 "관장님"이 들어 있음 · 2026-10-27)
+const script: { groups: { items: unknown[] }[] } = isDaycare ? daycareScript : tkdScript;
 
 export type Line = { id: string; file?: string; say: string; buttons?: string[] };
 const LINES = new Map<string, Line>(script.groups.flatMap((g) => g.items as Line[]).map((i) => [i.id, i]));

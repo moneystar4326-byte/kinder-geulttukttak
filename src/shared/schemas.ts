@@ -1,6 +1,7 @@
 // AI 응답 · IPC 입력 검증 스키마
 import { z } from 'zod';
 import { ARTICLE_KINDS, TONES } from './types';
+import { IND } from './industry';
 
 export const GeneratedArticleSchema = z.object({
   titleCandidates: z.array(z.string().min(1)).length(3),
@@ -62,7 +63,7 @@ export const CARD_COPY_JSON = {
         type: 'object', additionalProperties: false, required: ['title', 'sub', 'scene', 'afterSectionId'],
         properties: {
           title: { type: 'string', description: '카드 제목 10~28자' },
-          sub: { type: 'string', description: '보조 문구 30~80자' },
+          sub: { type: 'string', description: '2문장 60~110자: 제목에 대한 답 + 글 속 구체 내용' },
           scene: { type: 'string', description: '배경 그림 장면 설명 (영어, 글자 없는 장면)' },
           afterSectionId: str,
         },
@@ -94,7 +95,7 @@ export const PARAGRAPH_JSON = {
 export const CardOneSchema = z.object({ title: z.string().min(1), sub: z.string().min(1) });
 export const CARD_ONE_JSON = {
   type: 'object', additionalProperties: false, required: ['title', 'sub'],
-  properties: { title: { type: 'string', description: '카드 제목 10~28자' }, sub: { type: 'string', description: '보조 문구 30~80자' } },
+  properties: { title: { type: 'string', description: '카드 제목 10~28자' }, sub: { type: 'string', description: '2문장 60~110자: 제목에 대한 답 + 글 속 구체 내용' } },
 } as const;
 
 export const TitlesSchema = z.object({ titleCandidates: z.array(z.string().min(1)).length(3) });
@@ -104,13 +105,14 @@ export const TITLES_JSON = {
 
 // ---------- IPC 입력 ----------
 const s = (max = 4000) => z.string().max(max);
+const Writer = z.object({ id: s(64), role: z.enum(['원장', '교사']), name: s(30), className: s(30).optional() });
 export const ProfileInput = z.object({
   id: s(64),
-  name: s(80).min(1, '도장명을 적어 주세요'),
+  name: s(80).min(1, `${IND.nameLabel}을 적어 주세요`),
   region: s(80).min(1, '소재 지역을 적어 주세요'),
   address: s(200).optional(),
-  audiences: z.array(s(30)).min(1, '교육 대상을 하나 이상 골라 주세요'),
-  philosophy: s().min(1, '교육 철학을 적어 주세요'),
+  audiences: z.array(s(30)).min(1, `${IND.audLabel}을 하나 이상 골라 주세요`),
+  philosophy: s().min(1, `${IND.philLabel}을 적어 주세요`),
   classFeatures: s(),
   hours: s(300).optional(),
   classes: s(2000).optional(),
@@ -132,6 +134,8 @@ export const ProfileInput = z.object({
   tone: z.enum(TONES),
   avoidWords: s(500),
   nearbyAreas: z.array(z.object({ name: s(60), kind: s(30), distance: z.number().optional(), source: z.enum(['kakao', 'manual']) })).optional(),
+  facilityType: s(30).optional(),
+  writers: z.array(Writer).max(30).optional(),
   updatedAt: s(40).optional(),
 });
 
@@ -155,6 +159,8 @@ export const ArticleInputSchema = z.object({
   includeProfile: z.object({ philosophy: z.boolean(), classFeatures: z.boolean(), credentials: z.boolean(), contact: z.boolean(), address: z.boolean() }),
   withCards: z.boolean(),
   titlePrefix: s(60).optional(),
+  writer: Writer.optional(),
+  writerSign: z.boolean().optional(),
 });
 
 export const DocSchema = z.object({

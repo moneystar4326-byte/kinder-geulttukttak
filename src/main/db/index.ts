@@ -3,6 +3,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 import type { Article, ArticleInput, ArticleStatus, ArticleSummary, ArticleVersion, Card, CardSet, DojoProfile, Job, JobState, KeywordRow } from '../../shared/types';
+import { IND } from '../../shared/industry';
 
 export const SCHEMA_VERSION = 1;
 
@@ -31,7 +32,7 @@ export function openDb(file: string) {
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   const ver = Number((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version);
-  if (ver > SCHEMA_VERSION) throw new Error(`이 자료는 더 새 버전(${ver})의 태권 글뚝딱에서 만들어졌어요. 프로그램을 업데이트해 주세요.`);
+  if (ver > SCHEMA_VERSION) throw new Error(`이 자료는 더 새 버전(${ver})의 ${IND.appName}에서 만들어졌어요. 프로그램을 업데이트해 주세요.`);
   for (let v = ver; v < MIGRATIONS.length; v++) {
     db.exec('BEGIN');
     try { db.exec(MIGRATIONS[v]); db.exec(`PRAGMA user_version = ${v + 1}`); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; }
@@ -41,7 +42,7 @@ export function openDb(file: string) {
   const run = (sql: string, ...a: any[]) => db.prepare(sql).run(...a);
 
   // ---------- 도장 프로필 (MVP는 기본 1개, 모델은 여러 개 가능) ----------
-  const rowToProfile = (r: any): DojoProfile => ({ ...p<any>(r.facts_json, {}), id: r.id, name: r.name, region: r.region, brand: p(r.brand_json, { main: '#1F4E9A', accent: '#C8241C' }), updatedAt: r.updated_at });
+  const rowToProfile = (r: any): DojoProfile => ({ ...p<any>(r.facts_json, {}), id: r.id, name: r.name, region: r.region, brand: p(r.brand_json, IND.brand), updatedAt: r.updated_at });
   function saveProfile(pr: DojoProfile) {
     const { id, name, region, brand, updatedAt: _u, ...facts } = pr;
     run(`INSERT INTO dojo_profiles (id,name,region,facts_json,brand_json,updated_at) VALUES (?,?,?,?,?,?)

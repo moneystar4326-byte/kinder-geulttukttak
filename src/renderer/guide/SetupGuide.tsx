@@ -8,13 +8,14 @@ import { Chips } from '../components/ui';
 import { AUDIENCES } from '../../shared/types';
 import type { LicenseStatus } from '../components/Account';
 import { Bubble, HelpBox, line, open } from './voice';
+import { IND, isDaycare } from '../../shared/industry';
 
 const OPENAI = 'https://platform.openai.com';
 type Step = { id: string; title: string; shot?: string; url?: string };
 export const STEPS: Step[] = [
   { id: 'A00', title: '시작' },
   { id: 'A01', title: '계정 연결' },
-  { id: 'A02', title: '도장 정보' },
+  { id: 'A02', title: `${IND.place} 정보` },
   { id: 'A03', title: 'AI 소개' },
   { id: 'A03b', title: '개인정보' },
   { id: 'A04', title: 'OpenAI 가입', shot: 'oa-1-home.jpg', url: `${OPENAI}/` },
@@ -133,7 +134,7 @@ function MiniProfile({ dojang, onSaved }: { dojang: string; onSaved: () => void 
   useEffect(() => {
     call<DojoProfile | null>('profile:get').then((cur) => setP(cur ?? {
       id: 'default', name: dojang, region: '', address: '', audiences: [], philosophy: '', classFeatures: '', hours: '', classes: '', promoDay: '', strengths: [], strengthsEtc: '', otherFacts: '', credentials: '', contact: '', consultLink: '', blogUrl: '',
-      brand: { main: '#1F4E9A', accent: '#C8241C' }, tone: '따뜻한 설명형', avoidWords: '최고, 무조건', nearbyAreas: [],
+      brand: IND.brand, tone: '따뜻한 설명형', avoidWords: '최고, 무조건', nearbyAreas: [],
     })).catch(() => {});
   }, []); // eslint-disable-line
   if (!p) return null;
@@ -144,11 +145,11 @@ function MiniProfile({ dojang, onSaved }: { dojang: string; onSaved: () => void 
   };
   return (
     <div className="mini-form">
-      <label className="field"><span>도장 이름</span><input type="text" value={p.name || dojang} onChange={(e) => set({ name: e.target.value })} /></label>
+      <label className="field"><span>{IND.place} 이름</span><input type="text" value={p.name || dojang} onChange={(e) => set({ name: e.target.value })} /></label>
       <label className="field"><span>동네</span><input type="text" placeholder="예: 서울 마포구 망원동" value={p.region} onChange={(e) => set({ region: e.target.value })} /></label>
-      <div className="field"><span>가르치는 나이</span><Chips multi options={AUDIENCES} value={p.audiences as any} onChange={(v) => set({ audiences: v })} /></div>
-      <label className="field"><span>교육 철학</span><input type="text" placeholder="예: 예절과 자신감" value={p.philosophy} onChange={(e) => set({ philosophy: e.target.value })} /></label>
-      <label className="field"><span>수업 시간</span><input type="text" placeholder="예: 평일 오후 1시~8시" value={p.hours ?? ''} onChange={(e) => set({ hours: e.target.value })} /></label>
+      <div className="field"><span>{isDaycare ? '돌보는 나이' : '가르치는 나이'}</span><Chips multi options={AUDIENCES} value={p.audiences as any} onChange={(v) => set({ audiences: v })} /></div>
+      <label className="field"><span>{IND.philLabel}</span><input type="text" placeholder={isDaycare ? '예: 놀이 속에서 스스로 자라는 아이' : '예: 예절과 자신감'} value={p.philosophy} onChange={(e) => set({ philosophy: e.target.value })} /></label>
+      <label className="field"><span>{isDaycare ? '운영 시간' : '수업 시간'}</span><input type="text" placeholder={isDaycare ? '예: 평일 7시 30분~19시 30분' : '예: 평일 오후 1시~8시'} value={p.hours ?? ''} onChange={(e) => set({ hours: e.target.value })} /></label>
       <div className="row"><button type="button" className="btn primary" onClick={save}>저장하고 다음</button></div>
       {err && <div className="note err">{err}</div>}
     </div>
@@ -200,7 +201,7 @@ export function KeyImport({ name = 'openai', test: testKind = 'openai', label = 
 
 // 첫 글: 메모 한 줄을 새 글 화면에 넣어 두고 이동 (만들기는 관장님이 직접 눌러 비용을 알고 시작)
 function FirstPost({ onGo }: { onGo: () => void }) {
-  const [memo, setMemo] = useState(local.get('quick-memo', '') || '유치부 친구들이 처음으로 줄넘기 열 개를 넘었어요');
+  const [memo, setMemo] = useState(local.get('quick-memo', '') || (isDaycare ? '햇님반 친구들이 처음으로 바깥놀이터에서 낙엽 밟기 놀이를 했어요' : '유치부 친구들이 처음으로 줄넘기 열 개를 넘었어요'));
   return (
     <div className="mini-form">
       <textarea rows={3} value={memo} onChange={(e) => setMemo(e.target.value)} />

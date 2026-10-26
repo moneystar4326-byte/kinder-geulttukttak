@@ -7,6 +7,7 @@ import { localFlags, missingInputs, regionWarning } from '../shared/validation';
 import { areaTags, dongOf, locationLine, mentionsNearby } from '../shared/areas';
 import { decorateHeadings } from '../shared/format';
 import type { CallOpts, TextAI } from './services/openai';
+import { isDaycare } from '../shared/industry';
 
 export const MAX_EXPAND = 2;
 
@@ -29,6 +30,21 @@ export function withDojoName(doc: ArticleDoc, profile: DojoProfile): ArticleDoc 
   const josa = last >= 0 && last < 11172 && last % 28 ? '은' : '는';
   const where = dongOf(profile.region) || profile.region.trim();
   const line = `${name}${josa} ${where ? `${where}에서 ` : ''}아이들과 함께하고 있어요.`;
+  const end = doc.sections[doc.sections.length - 1];
+  return { ...doc, sections: [...doc.sections.slice(0, -1), { ...end, paragraphs: [...end.paragraphs, line] }] };
+}
+
+// 어린이집: 글 끝 글쓴이 한 줄 (고른 경우만, 적어 준 이름 · 반 그대로 — 기획안 v0.2 4장)
+export function writerSignLine(input: ArticleInput, profile: DojoProfile) {
+  const w = input.writer;
+  if (!isDaycare || !w || !input.writerSign) return '';
+  const name = w.name.trim();
+  if (w.role === '원장') return `${profile.name.trim()} 원장${name ? ` ${name}` : ''} 드림`;
+  return `${w.className?.trim() ? `${w.className.trim()} ` : ''}담임${name ? ` ${name}` : ''} 선생님 드림`;
+}
+export function withWriterSign(doc: ArticleDoc, input: ArticleInput, profile: DojoProfile): ArticleDoc {
+  const line = writerSignLine(input, profile);
+  if (!line || !doc.sections.length || bodyText(doc).includes(line)) return doc;
   const end = doc.sections[doc.sections.length - 1];
   return { ...doc, sections: [...doc.sections.slice(0, -1), { ...end, paragraphs: [...end.paragraphs, line] }] };
 }
@@ -70,9 +86,9 @@ export async function generateArticle(deps: { db: Db; ai: TextAI; profile: DojoP
       return [{ code: 'review-failed', message: 'AI 사실 점검을 하지 못했어요. 직접 확인해 주세요.' }];
     });
     ctx.signal.throwIfAborted();
-    // 지역 태그는 코드가 붙임 (동네 · 가까운 초등학교 · 역 + 태권도)
+    // 지역 태그는 코드가 붙임 (동네 · 가까운 초등학교 · 역 + 태권도 / 어린이집판은 동네 · 아파트 + 어린이집)
     const tags = [...new Set([...areaTags(profile.region, profile.nearbyAreas ?? []), ...doc.tags])].slice(0, 15);
-    doc = decorateHeadings(withDojoName(withLocation({ ...doc, tags }, profile), profile)); // 소제목 이모지는 코드가 같은 모양으로
+    doc = decorateHeadings(withWriterSign(withDojoName(withLocation({ ...doc, tags }, profile), profile), input, profile)); // 소제목 이모지는 코드가 같은 모양으로
     doc = { ...doc, reviewFlags: mergeFlags(doc, profile, input, aiFlags) };
     const counts = countDoc(doc);
     const short = counts.withoutSpaces < min;
