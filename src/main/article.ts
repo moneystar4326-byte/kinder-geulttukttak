@@ -11,14 +11,19 @@ import { isDaycare } from '../shared/industry';
 
 export const MAX_EXPAND = 2;
 
+// 마지막 섹션 끝에 문단 한 줄 (위치 · 이름 · 글쓴이 줄이 같이 씀)
+const appendLine = (doc: ArticleDoc, line: string): ArticleDoc => {
+  const end = doc.sections[doc.sections.length - 1];
+  return { ...doc, sections: [...doc.sections.slice(0, -1), { ...end, paragraphs: [...end.paragraphs, line] }] };
+};
+
 // 본문에 주변 학교 · 역 이름이 없으면 마지막 섹션 끝에 위치 한 줄
 export function withLocation(doc: ArticleDoc, profile: DojoProfile): ArticleDoc {
   const areas = profile.nearbyAreas ?? [];
   if (!doc.sections.length || mentionsNearby(bodyText(doc), areas)) return doc;
   const line = locationLine(profile.name, profile.region, areas);
   if (!line) return doc;
-  const last = doc.sections[doc.sections.length - 1];
-  return { ...doc, sections: [...doc.sections.slice(0, -1), { ...last, paragraphs: [...last.paragraphs, line] }] };
+  return appendLine(doc, line);
 }
 
 // 본문에 도장 이름이 한 번도 없으면 마지막 섹션 끝에 한 줄 (2026-10-22 파일럿: 글에 상호명이 안 나옴)
@@ -29,9 +34,7 @@ export function withDojoName(doc: ArticleDoc, profile: DojoProfile): ArticleDoc 
   const last = name.charCodeAt(name.length - 1) - 0xac00;
   const josa = last >= 0 && last < 11172 && last % 28 ? '은' : '는';
   const where = dongOf(profile.region) || profile.region.trim();
-  const line = `${name}${josa} ${where ? `${where}에서 ` : ''}아이들과 함께하고 있어요.`;
-  const end = doc.sections[doc.sections.length - 1];
-  return { ...doc, sections: [...doc.sections.slice(0, -1), { ...end, paragraphs: [...end.paragraphs, line] }] };
+  return appendLine(doc, `${name}${josa} ${where ? `${where}에서 ` : ''}아이들과 함께하고 있어요.`);
 }
 
 // 어린이집: 글 끝 글쓴이 한 줄 (고른 경우만, 적어 준 이름 · 반 그대로 — 기획안 v0.2 4장)
@@ -45,8 +48,7 @@ export function writerSignLine(input: ArticleInput, profile: DojoProfile) {
 export function withWriterSign(doc: ArticleDoc, input: ArticleInput, profile: DojoProfile): ArticleDoc {
   const line = writerSignLine(input, profile);
   if (!line || !doc.sections.length || bodyText(doc).includes(line)) return doc;
-  const end = doc.sections[doc.sections.length - 1];
-  return { ...doc, sections: [...doc.sections.slice(0, -1), { ...end, paragraphs: [...end.paragraphs, line] }] };
+  return appendLine(doc, line);
 }
 
 export function titleWithPrefix(title: string, prefix?: string) {
@@ -155,6 +157,8 @@ export async function reviseArticle(deps: { db: Db; ai: TextAI; profile: DojoPro
     doc = { ...doc, titleCandidates: base.doc.titleCandidates };
     note = label;
   }
+  // AI가 글 전체를 다시 쓰면 고른 글쓴이 줄이 빠질 수 있어 다시 붙임 (어린이집 · 2026-10-27 버그 점검)
+  doc = withWriterSign(doc, art.input, profile);
   doc = { ...doc, reviewFlags: mergeFlags({ ...doc, reviewFlags: [] }, profile, art.input, doc.reviewFlags.filter((f) => f.code === 'demo')) };
   // 사용자가 그동안 고쳐 저장했다면 base 와 현재가 달라 → 새 버전은 남기되 현재 글을 덮어쓰지 않음
   ctx.signal.throwIfAborted();

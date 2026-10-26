@@ -44,20 +44,19 @@ export function createCardService(deps: CardDeps) {
     // AI 그림은 가로로 그려 카드 위쪽에 통째로 (글과 겹치지 않음)
     const prof = deps.profile();
     // 참고 그림 순서 = refLead 번호 순서: 아이 도복 → 사범님 → 로고(도복 로고를 켰을 때)
-    const logoRef = !!prof?.logoOnDobok && !!prof.logoPath && fs.existsSync(prof.logoPath);
+    const hasUniform = !!prof?.dobokRefPath && fs.existsSync(prof.dobokRefPath);
+    const hasCoach = !!prof?.coachRefPath && fs.existsSync(prof.coachRefPath);
+    // 어린이집은 원복 사진이 있을 때만 그림 속 로고 (원복이 없으면 로고 참고 그림도 보내지 않음)
+    const logoRef = !!prof?.logoOnDobok && !!prof.logoPath && fs.existsSync(prof.logoPath) && (!isDaycare || hasUniform);
     const refs = [prof?.dobokRefPath, prof?.coachRefPath, logoRef ? prof?.logoPath : undefined].filter((f): f is string => !!f && fs.existsSync(f));
     // 띠는 글 주제 · 제목으로 고름 (카드 3장 모두 같은 띠). 도복은 참고 사진 그대로
     const ver = db.getVersion(cs.articleVersionId);
     const input = ver ? db.getArticle(ver.articleId)?.input : undefined;
-    const hasUniform = !!prof?.dobokRefPath && fs.existsSync(prof.dobokRefPath);
-    const hasCoach = !!prof?.coachRefPath && fs.existsSync(prof.coachRefPath);
     let prompt: string;
     if (isDaycare) {
-      // 어린이집: 아이 나이는 글의 독자(영아 · 유아)와 주제로. 원복 로고는 원복 사진이 있을 때만
+      // 어린이집: 아이 나이는 글의 독자(영아 · 유아)와 주제로
       const age = ageFor([input?.audience, input?.topic, ver?.title].filter(Boolean).join(' '));
-      const logo = logoRef && hasUniform;
-      if (!logo && logoRef) refs.pop(); // 원복이 없으면 로고 참고 그림도 보내지 않음 (refs 의 마지막이 로고)
-      prompt = daycareRefLead(hasUniform, hasCoach, logo) + daycareBackgroundPrompt(card.copy.scene, cs.style.style, 'split', age, hasUniform, logo);
+      prompt = daycareRefLead(hasUniform, hasCoach, logoRef) + daycareBackgroundPrompt(card.copy.scene, cs.style.style, 'split', age, hasUniform, logoRef);
     } else {
       const belt = beltFor([input?.topic, ver?.title].filter(Boolean).join(' '));
       prompt = refLead(hasUniform, hasCoach, belt, logoRef) + backgroundPrompt(card.copy.scene, cs.style.style, 'split', undefined, belt, logoRef);

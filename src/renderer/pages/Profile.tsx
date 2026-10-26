@@ -39,6 +39,7 @@ export function ProfilePage() {
   const { info, reload } = useApp();
   const [p, setP] = useState<DojoProfile>(EMPTY);
   const [area, setArea] = useState('');
+  const [editAt, setEditAt] = useState<number | null>(null); // 어린이집: 주변 장소 이름 고쳐 쓰기 (종류 · 거리는 그대로)
   const msg = useMsg();
   useEffect(() => { call<DojoProfile | null>('profile:get').then((x) => x && setP({ ...EMPTY, ...x, ...(x.strengths ? {} : { strengths: [], otherFacts: x.otherFacts || x.classFeatures }) })); }, []);
   const set = (x: Partial<DojoProfile>) => setP({ ...p, ...x });
@@ -129,15 +130,20 @@ export function ProfilePage() {
           </div>
           <div className="row" style={{ marginBottom: 10 }}>
             <input className="grow" type="text" placeholder={TX.areaPh} value={area} onChange={(e) => setArea(e.target.value)} />
-            <button className="btn small" disabled={!area.trim()} onClick={() => { set({ nearbyAreas: [...areas, { name: area.trim(), kind: /초$/.test(area.trim()) ? '학교' : '직접 입력', source: 'manual' }] }); setArea(''); }}>추가</button>
+            {editAt != null
+              ? <>
+                  <button className="btn small primary" disabled={!area.trim()} onClick={() => { set({ nearbyAreas: areas.map((a, j) => (j === editAt ? { ...a, name: area.trim() } : a)) }); setArea(''); setEditAt(null); }}>고치기</button>
+                  <button className="btn small" onClick={() => { setArea(''); setEditAt(null); }}>그만두기</button>
+                </>
+              : <button className="btn small" disabled={!area.trim()} onClick={() => { set({ nearbyAreas: [...areas, { name: area.trim(), kind: /초$/.test(area.trim()) ? '학교' : '직접 입력', source: 'manual' }] }); setArea(''); }}>추가</button>}
           </div>
-          {isDaycare && <p className="hint">이름을 누르면 위 칸으로 옮겨져 고쳐 쓸 수 있어요 (예: "롯데낙천대" → "롯데낙천대아파트"). 고친 뒤 [추가]를 눌러 주세요.</p>}
+          {isDaycare && <p className="hint">이름을 누르면 위 칸에서 고쳐 쓸 수 있어요 (종류 · 거리는 그대로). 카카오 아파트 이름에는 제목 · 태그에서 "아파트"가 자동으로 붙어요 ("롯데낙천대" → [롯데낙천대아파트 어린이집]).</p>}
           <div className="chips">
             {areas.map((a, i) => (
               <span key={a.name + i} className="chip">{isDaycare
-                ? <button type="button" className="btn link" title="고쳐 쓰기" onClick={() => { setArea(a.name); set({ nearbyAreas: areas.filter((_, j) => j !== i) }); }}>{a.name}</button>
+                ? <button type="button" className="btn link" title="고쳐 쓰기" onClick={() => { setArea(a.name); setEditAt(i); }}>{a.name}</button>
                 : a.name} <span className="muted">{a.kind}{a.distance ? ` · ${a.distance}m` : ''}</span>
-                <button className="btn link" onClick={() => set({ nearbyAreas: areas.filter((_, j) => j !== i) })}>×</button></span>
+                <button className="btn link" onClick={() => { set({ nearbyAreas: areas.filter((_, j) => j !== i) }); if (editAt != null) { setEditAt(null); setArea(''); } }}>×</button></span>
             ))}
             {!areas.length && <span className="muted">아직 없어요</span>}
           </div>

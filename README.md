@@ -30,7 +30,7 @@ npm run dist      # Windows 설치파일 → release/글뚝딱-설치-0.1.0.exe
 - 개발 실행: `npm run dev:daycare` · 설치 파일: `npm run dist:daycare` → `release-daycare\어린이집글뚝딱-설치-1.0.0.exe` (설정 `electron-builder.daycare.cjs`)
 - 그냥 `npm run build` · `npm run dist` 는 지금처럼 태권 글뚝딱 (출력 같음 — 2.2.7 과 지시문 · 카드 · 머리말 결과를 글자 단위로 비교)
 - 자료 폴더 `%APPDATA%\어린이집 글뚝딱`, 위치 파일 `%APPDATA%\어린이집글뚝딱-자료위치.txt`, appId `kr.ddalkak.geulttukttak-daycare` → 한 PC에 두 앱을 깔아도 안 섞임
-- 시험: `tests/unit/daycare.test.ts` (이 파일만 어린이집 업종으로 불러옴). 다른 시험 파일을 `GTD_INDUSTRY=daycare` 로 돌리면 태권도 문구를 확인하는 시험은 실패하는 게 맞음
+- 시험: `tests/unit/daycare.test.ts` (이 파일만 어린이집 업종으로 불러옴). 다른 시험 파일을 `GTD_INDUSTRY=daycare` 로 돌리면 태권도 문구를 확인하는 시험은 실패하는 게 맞음. 빌드는 `--daycare` 로만 정함 (환경변수는 보지 않음)
 - 아직 남은 것: 이용권 업종 구분 · 새 버전 알림은 홈페이지 서버 작업 필요 (앱은 `product=daycare` 를 보내고, 이용권에 product 가 있으면 다른 업종은 잠금 · 없으면 통과), 안내 음성은 글자만 (녹음 전), 아이콘은 태권도판과 같음, 강점 목록 · 법 근거는 GPT 검토 중
 
 ## 구조

@@ -1,7 +1,7 @@
 // "주제 한 줄로 바로 쓰기"의 글 재료 만들기 — 컴퓨터판(NewArticle) · 휴대폰판(mobile/)이 같이 씀 (2026-10-26 휴대폰판 시작하며 뺌)
 import { ENDINGS, type ArticleInput, type DojoProfile } from './types';
 import { quickEnding, quickKind, quickWhen } from './quick';
-import { isDaycare, type Writer } from './industry';
+import { daycareAge, isDaycare, type Writer } from './industry';
 
 export const emptyInput = (p?: DojoProfile | null): ArticleInput => ({
   kind: '수업 후기', audience: p?.audiences[0] ?? (isDaycare ? '유아 (만 3~5세)' : '초등 저학년'), region: p?.region ?? '', topic: '',
@@ -14,11 +14,10 @@ export const emptyInput = (p?: DojoProfile | null): ArticleInput => ({
 // 중 · 고등을 먼저 ("중학교 1학년"이 초등으로 가지 않게), 숫자는 앞자리 숫자가 없을 때만 ("14살"이 유치부로 가지 않게)
 export const quickAudience = (t: string, profile?: DojoProfile | null) => {
   if (isDaycare) {
-    // 만 나이 · 반 이름 · 돌로 영아 / 유아 (둘 다 나오면 전체)
-    const infant = /영아|(?<!\d)만?\s*[0-2]\s*세|(?<!\d)[1-3]\s*살|돌\s*(쟁이|아기|지난)|아기/.test(t);
-    const child = /유아|누리\s*과정|(?<!\d)만?\s*[3-5]\s*세|(?<!\d)[4-7]\s*살/.test(t);
-    if (infant && !child) return '영아 (만 0~2세)';
-    if (child && !infant) return '유아 (만 3~5세)';
+    // 만 나이 · 돌로 영아 / 유아 (둘 다 나오거나 없으면 어린이집 대상 전체 — 카드 그림 나이와 같은 규칙)
+    const age = daycareAge(t);
+    if (age === 'infant') return '영아 (만 0~2세)';
+    if (age === 'preschool') return '유아 (만 3~5세)';
     return profile?.audiences.join(' · ') || '유아 (만 3~5세)';
   }
   if (/중학|중등|고등|청소년|중[1-3]|고[1-3]/.test(t)) return '중등 이상';

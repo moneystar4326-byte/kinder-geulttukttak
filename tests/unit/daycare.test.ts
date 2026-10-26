@@ -259,6 +259,39 @@ test('점검: 입소 약속 · 진단 · 발달 효과 · 사실에 없는 금�
   assert.deepEqual(V.unknownAmounts('월 15만 원, 30,000원', '30000원'), ['15만 원']); // 쉼표 · 띄어쓰기가 달라도 같은 금액
 });
 
+test('버그 점검 (2026-10-27): 아이 이름 오탐 · 놓침 · 조사', () => {
+  assert.deepEqual(V.childNames('낙엽이 바스락거렸어요, 기분이 좋아 보였어요. 간식이 맛있었어요. 급식이 따뜻했어요. 아이가 웃었어요. 다시 해 봤어요'), []);
+  assert.deepEqual(V.childNames('채원이가 블록을 쌓았어요. 지우가 웃었어요. 서아는 울었어요. 민준을 안아 줬어요').sort(), ['민준', '서아', '지우', '채원']);
+  assert.deepEqual(V.childNames('김민준이가 왔어요'), ['김민준']);
+  assert.equal(V.hideChildNames('민준을 안아 줬어요. 지우는 웃었고 채원이가 박수를 쳤어요. 민준이 웃었어요.', ['민준', '지우', '채원']),
+    '한 친구를 안아 줬어요. 한 친구는 웃었고 한 친구가 박수를 쳤어요. 한 친구가 웃었어요.');
+  assert.equal(V.hideChildNames('기분이 좋아지는 낙엽 놀이', V.childNames('낙엽이 바스락, 기분이 좋아요')), '기분이 좋아지는 낙엽 놀이'); // 카드가 망가지지 않음
+  // 어린이집 정보("자체 조리 급식이 …")는 이름을 찾는 곳이 아님
+  assert.ok(!V.localFlags(doc('급식이 맛있어요.'), prof({ otherFacts: '자체 조리 급식이 자랑이에요' }), input()).some((f) => f.code === 'child-name' && /급식/.test(f.message)));
+});
+
+test('버그 점검 (2026-10-27): 금액 · 키워드 띄어쓰기 · 중복 경고 · 재료 판단', () => {
+  assert.deepEqual(V.unknownAmounts('월 5천 원, 3만 원', '30,000원'), ['5천 원']); // 3만 원 = 30,000원, 천 원도 셈
+  assert.equal(V.spacedKeyword('물놀이'), '물놀이');
+  assert.equal(V.spacedKeyword('신대방동어린이집'), '신대방동 어린이집');
+  const adhd = V.localFlags(doc('ADHD 이야기와 면역력 이야기'), prof(), input()).filter((f) => f.code === 'banned');
+  assert.equal(adhd.length, 1); // 같은 섹션에 같은 말 경고 한 번 (BANNED 한 줄에 둘 다 걸림)
+  const recruit = input({ kind: '모집 안내', topic: '입소 안내', facts: { ...QI.emptyInput().facts, activities: '', recruit: { who: '2027년 3월 만 1세 · 만 2세', trial: '아이사랑 포털 대기 신청 후 원으로 상담 전화' } } });
+  assert.equal(V.thinFacts(recruit), false);
+});
+
+test('버그 점검 (2026-10-27): 나이 · 그림 장소 · 장면 영어', () => {
+  assert.equal(QI.quickAudience('아기상어 율동 놀이를 했어요', prof()), '영아 (만 0~2세) · 유아 (만 3~5세)');
+  assert.equal(IMG.ageFor('아기상어 율동'), 'mixed');
+  assert.equal(I.daycareAge('3살 친구들'), 'infant');
+  assert.equal(I.daycareAge('만 4세 숲 체험'), 'preschool');
+  assert.match(IMG.daycareSetting('a teacher walking around the classroom while toddlers paint'), /daycare classroom/);
+  assert.match(IMG.daycareSetting('a field trip to a museum'), /daycare classroom/);
+  assert.match(IMG.daycareSetting('children walking in a park'), /outdoor/);
+  assert.equal(IMG.daycareSafeScene('a unicorn puppet show'), 'a unicorn puppet show');
+  assert.equal(IMG.daycareSafeScene('a faceless child painting'), 'a child painting');
+});
+
 test('강점: 어린이집 목록 · 체크 안 한 서비스 경고', () => {
   assert.ok(S.STRENGTHS.some((s) => s.id === 'extended' && s.label === '연장보육'));
   assert.ok(!S.STRENGTHS.some((s) => /시범단|국기원|줄넘기/.test(s.label)));

@@ -129,6 +129,9 @@ export function createLicense(d: LicenseDeps) {
   function accept(token: string) {
     const v = verifyLicense(token, LICENSE_PUBLIC_KEY);
     if (!v.ok || v.claims.device !== d.device) throw new Error('받은 이용권이 맞지 않아요. 잠시 뒤 다시 해 주세요.');
+    // 다른 업종 이용권은 저장하지 않음: 연결은 실패로 알리고, 새로 받기면 쓰던 이용권을 그대로 둠 (2026-10-27 버그 점검)
+    const product = (v.claims as LicenseClaims & { product?: string }).product;
+    if (product && product !== INDUSTRY) throw new Error(WHY['other-product']);
     return v.claims;
   }
 

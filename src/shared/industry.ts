@@ -51,6 +51,15 @@ export const IND = isDaycare
 const DAYCARE_KIND: Record<string, string> = { '수업 후기': '놀이 · 활동 이야기', '모집 안내': '입소 안내', '교육 정보': '보육 정보' };
 export const kindLabel = (kind: string) => (isDaycare ? DAYCARE_KIND[kind] ?? kind : kind);
 
+// 어린이집 아이 나이: 영아(만 0~2세) · 유아(만 3~5세) · 둘 다 (글 독자 고르기와 카드 그림이 같이 씀)
+// "아기" 한 낱말은 보지 않음 ("아기상어 율동"이 영아가 되던 문제 · 2026-10-27 버그 점검). "N살"은 세는나이라 1~3살 = 영아
+export type AgeBand = 'infant' | 'preschool' | 'mixed';
+export function daycareAge(text: string): AgeBand {
+  const infant = /영아|(?<!\d)만?\s*[0-2]\s*세|(?<!\d)[1-3]\s*살|돌\s*(쟁이|아기|지난)|걸음마/.test(text);
+  const child = /유아|누리\s*과정|(?<!\d)만?\s*[3-5]\s*세|(?<!\d)[4-7]\s*살/.test(text);
+  return infant && !child ? 'infant' : child && !infant ? 'preschool' : 'mixed';
+}
+
 // 어린이집 글쓴이 (원장님 · 선생님이 같이 씀). 글마다 고른 사람을 글 재료에 그대로 담아 둠
 export type WriterRole = '원장' | '교사';
 export interface Writer { id: string; role: WriterRole; name: string; className?: string }

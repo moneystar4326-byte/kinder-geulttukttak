@@ -1,6 +1,7 @@
 // 카드 배경 그림 지시문 (기획서 7.2). 1버전(태권 글뚝딱)에서 손 · 띠 오류를 줄이려고 다듬은 도복 설명을 가져옴.
 // 그림에는 글자를 넣지 않음 — 한글 · 로고는 합성기가 얹음
 import type { CardStyle } from '../../../shared/types';
+import { daycareAge, type AgeBand } from '../../../shared/industry';
 
 const STYLE: Record<CardStyle, string> = {
   '교육 잡지형': 'Clean editorial magazine illustration, soft natural light, calm muted palette with generous empty space, refined and trustworthy mood.',
@@ -95,12 +96,8 @@ export function backgroundPrompt(scene: string, style: CardStyle, layout: Layout
 
 // ---------- 어린이집 (2026-10-27 기획안 v0.2 8장) ----------
 // 도복 · 띠 규칙 대신: 영유아 나이 · 원복(참고 사진이 있을 때) · 교실 · 안전. 얼굴은 태권도판처럼 그림체로 또렷하게
-export type AgeBand = 'infant' | 'preschool' | 'mixed';
-export function ageFor(text: string): AgeBand {
-  const infant = /영아|(?<!\d)만?\s*[0-2]\s*세|아기|돌\s*(쟁이|아기)/.test(text);
-  const child = /유아|(?<!\d)만?\s*[3-5]\s*세|누리\s*과정/.test(text);
-  return infant && !child ? 'infant' : child && !infant ? 'preschool' : 'mixed';
-}
+// 나이 판단은 글 독자 고르기와 같은 규칙 (shared/industry.ts)
+export const ageFor = daycareAge;
 const AGE: Record<AgeBand, string> = {
   infant: 'Children look about 1 to 2 years old: small toddlers with short limbs and round cheeks, sitting, crawling or walking with careful small steps.',
   preschool: 'Children look about 3 to 5 years old (preschoolers) with age-appropriate small bodies.',
@@ -118,12 +115,15 @@ export function daycareRefLead(hasUniform: boolean, hasRoom: boolean, hasLogo = 
   return parts.length ? `${parts.join(' ')} Use the reference images only for the uniforms and the room; draw a new scene as described below. ` : '';
 }
 
+// 얼굴 없이 그리라는 낱말만 뺌 (a → an 바꾸기는 하지 않음: "a unicorn"이 "an unicorn"이 되던 문제 · 2026-10-27 버그 점검)
 export const daycareSafeScene = (scene: string) =>
-  scene.replace(/\b(faceless|featureless|without faces?|no faces?)\b\s*/gi, '').replace(/\s{2,}/g, ' ').replace(/\b([Aa]) (?=[aeiou])/g, '$1n ').trim();
+  scene.replace(/\b(faceless|featureless)\b\s*/gi, '').replace(/\s{2,}/g, ' ').trim();
 
 // 장소는 장면을 따름 (2026-10-27 요요유치원 시험: 공원 소풍 카드에 교실 · 블록 그림이 나옴 — 교실을 기본으로 적어 둔 탓)
-const OUTDOOR = /\b(park|playground|forest|woods?|outdoors?|outside|garden|field|picnic|walk(ing)?|trail|yard|beach|farm|meadow|lawn|grass(y)?|street|zoo)\b/i;
-export const daycareSetting = (scene: string) => OUTDOOR.test(scene)
+// 실내 낱말이 있으면 실내 ("walking around the classroom", "field trip to a museum"이 바깥이 되던 문제)
+const INDOOR = /\b(classroom|indoors?|inside|room|hall|kitchen|museum|library|theater|theatre|gym|nap|lunch table)\b/i;
+const OUTDOOR = /\b(park|playground|forest|woods?|outdoors?|outside|garden|picnic|trail|yard|beach|farm|meadow|lawn|grass(y)?|street|zoo)\b/i;
+export const daycareSetting = (scene: string) => !INDOOR.test(scene) && OUTDOOR.test(scene)
   ? 'Setting: exactly the outdoor place described in the scene (for example a park, playground or forest path), safe and green, with teachers close to the children. Do not draw a classroom.'
   : 'Setting: a bright, tidy and safe Korean daycare classroom or play area with soft flooring, low wooden shelves and simple toys, matching the activity in the scene.';
 
