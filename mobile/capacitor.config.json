@@ -1,0 +1,6 @@
+{
+  "appId": "kr.ddalkak.geulttukttak.mobile",
+  "appName": "태권 글뚝딱",
+  "webDir": "dist",
+  "android": { "allowMixedContent": false }
+}

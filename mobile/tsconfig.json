@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler", "jsx": "react-jsx",
+    "strict": true, "skipLibCheck": true, "noEmit": true, "resolveJsonModule": true, "isolatedModules": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "paths": { "openai": ["./src/shims/openai.ts"], "node:fs": ["./src/shims/fs.ts"], "node:path": ["./src/shims/path.ts"] }
+  },
+  "include": ["src", "../src/shared", "../src/main/article.ts", "../src/main/services/openai", "../src/main/services/errors.ts"]
+}

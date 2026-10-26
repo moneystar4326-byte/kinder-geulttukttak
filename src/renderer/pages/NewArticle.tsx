@@ -8,19 +8,13 @@ import { ARTICLE_KINDS, AUDIENCES, CARD_STYLES, ENDINGS, TONES, type CardMode, t
 import { missingInputs } from '../../shared/validation';
 import { hintWords, pickKeywords } from '../../shared/keywords';
 import { autoPrefix, dongOf, prefixNames } from '../../shared/areas';
-import { quickEnding, quickKind, quickWhen } from '../../shared/quick';
+import { buildQuickInput, emptyInput } from '../../shared/quickInput';
 import { MicButton } from '../components/MicButton';
 
 // 말로 넣은 글은 적어 둔 메모 뒤에 이어 붙임
 const appendSpoken = (prev: string, text: string) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text);
 
 const KEY = 'new-article-form';
-const emptyInput = (p?: DojoProfile | null): ArticleInput => ({
-  kind: '수업 후기', audience: p?.audiences[0] ?? '초등 저학년', region: p?.region ?? '', topic: '',
-  facts: { activities: '', coachingPoints: '', scenes: '', values: '', extra: '', photoNotes: '', event: { when: '', where: '', who: '', bring: '', apply: '' }, recruit: { who: '', trial: '' }, growth: { before: '', now: '', process: '' } },
-  mainKeyword: '', subKeywords: [], tone: p?.tone ?? '따뜻한 설명형', ending: ENDINGS[0],
-  includeProfile: { philosophy: true, classFeatures: true, credentials: false, contact: false, address: false }, withCards: true, titlePrefix: '',
-});
 export interface CardPref { style: CardStyle; size: CardSize; mode: CardMode }
 
 function srcBadge(s: KeywordRow['source']) {
@@ -133,27 +127,13 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
   const setQuickPrefix = (v: boolean) => { setQuickPrefixState(v); local.set('quick-prefix', v); };
   const [detail, setDetail] = useState(false); // 항상 한 줄로 쓰기부터 (자세히 쓰기 입력은 그대로 보관)
   useEffect(() => { local.set('quick-memo', quick); }, [quick]);
-  // 메모에 나온 나이 · 학년으로 독자 정하기, 없으면 도장 교육 대상 전체
-  // 중 · 고등을 먼저 ("중학교 1학년"이 초등으로 가지 않게), 숫자는 앞자리 숫자가 없을 때만 ("14살"이 유치부로 가지 않게)
-  const quickAudience = (t: string) => {
-    if (/중학|중등|고등|청소년|중[1-3]|고[1-3]/.test(t)) return '중등 이상';
-    if (/유치|(?<!\d)[4-7]\s*살|어린이집/.test(t)) return '유치부';
-    if (/(?<!\d)[1-3]\s*학년|저학년/.test(t)) return '초등 저학년';
-    if (/(?<!\d)[4-6]\s*학년|고학년/.test(t)) return '초등 고학년';
-    if (/성인|어른/.test(t)) return '성인';
-    return profile?.audiences.join(' · ') || '초등 저학년';
-  };
   const quickStart = async (text?: string) => {
     const memo = (text ?? quick).trim();
     if (!memo) return;
     setBusy('quick'); msg.clear();
     try {
-      // 문장 끝(. ! ? 뒤 띄어쓰기 · 줄 끝)에서만 자름 — "10.18 승급심사", "3.1절"이 잘리지 않게. 비면 메모 앞부분
-      const first = memo.split(/[.!?](?=\s|$)|[\r\n]/).map((x) => x.trim()).find((x) => /[^.!?…\s]/.test(x)) ?? memo;
-      const topic = first.length > 40 ? `${first.slice(0, 40)}…` : first;
-      const base = emptyInput(profile);
-      // 네이버 검색광고 키가 있으면 실제 검색량으로 키워드 자동 고르기 (실패하면 주제를 키워드로)
-      let main = topic.replace(/…$/, ''), subs: string[] = [], chosen: KeywordRow[] = [];
+      // 네이버 검색광고 키가 있으면 실제 검색량으로 키워드 자동 고르기 (실패하면 주제를 키워드로 — buildQuickInput)
+      let main = '', subs: string[] = [], chosen: KeywordRow[] = [];
       if (naverReady) {
         setBusy('quick-kw');
         try {
@@ -163,16 +143,9 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
         } catch { /* 키워드 조회가 안 돼도 글은 만듦 */ }
         setBusy('quick');
       }
-      const kind = quickKind(memo);
-      const q: ArticleInput = {
-        ...base,
-        kind, topic, audience: quickAudience(memo), mainKeyword: main, subKeywords: subs, ending: quickEnding(kind),
-        facts: { ...base.facts, activities: memo, event: { ...base.facts.event!, when: kind === '행사 안내' ? quickWhen(memo) : '' } },
-        includeProfile: { philosophy: true, classFeatures: true, credentials: true, contact: false, address: false },
-        withCards: quickCards,
-        // 제목 앞 동네 이름: 글마다 돌아가며 ([신대방동 태권도] → [대길초 근처 태권도] → …)
-        titlePrefix: quickPrefix ? autoPrefix(profile?.region ?? '', profile?.nearbyAreas ?? [], (await call<unknown[]>('article:list').catch(() => [])).length) : '',
-      };
+      // 제목 앞 동네 이름: 글마다 돌아가며 ([신대방동 태권도] → [대길초 근처 태권도] → …)
+      const titlePrefix = quickPrefix ? autoPrefix(profile?.region ?? '', profile?.nearbyAreas ?? [], (await call<unknown[]>('article:list').catch(() => [])).length) : '';
+      const q = buildQuickInput({ memo, profile, main, subs, withCards: quickCards, titlePrefix });
       const art = await call<{ id: string }>('article:create', { input: q, keywords: chosen });
       local.set(`card-pref-${art.id}`, card);
       // 시작부터 실패하면(키 없음 · 잠김 등) 빈 글로 넘어가지 않고 이 화면에 이유를 보여 줌 (처음 사용자 시험 불편 12)

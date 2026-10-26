@@ -1,0 +1,23 @@
+{
+  "name": "geulttukttak-mobile",
+  "private": true,
+  "version": "0.1.0",
+  "description": "태권 글뚝딱 휴대폰(안드로이드)판 — 화면 · 글 만들기 코드는 ../src 를 같이 씀",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "sync": "vite build && cap sync android",
+    "apk": "vite build && cap sync android && cd android && gradlew.bat assembleDebug"
+  },
+  "dependencies": {
+    "@aparajita/capacitor-secure-storage": "8.0.1",
+    "@capacitor/android": "8.5.3",
+    "@capacitor/clipboard": "8.0.1",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/filesystem": "8.1.5",
+    "@capacitor/share": "8.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}
