@@ -52,7 +52,12 @@ export function normalizeDoc(raw: z.infer<typeof GeneratedArticleSchema>): Artic
   };
 }
 
-export function createOpenAI(opts: { apiKey: string; textModel: string; imageModel: string; timeoutMs?: number }): { text: TextAI; image: ImageAI; ping(): Promise<void> } {
+// 메모 말로 넣기 (2026-10-26): 받아쓰기 모델. 태권도 낱말을 힌트로 줘서 "품새 · 태극 · 미트"를 덜 틀리게
+export const LISTEN_MODEL = 'gpt-4o-mini-transcribe';
+const LISTEN_HINT = '태권도장 관장님의 수업 메모. 품새, 태극 1장, 승급심사, 승품단, 국기원, 유치부, 초등부, 미트, 겨루기, 앞차기, 돌려차기, 줄넘기, 사범님.';
+export type Listen = (audio: Uint8Array, mime: string, o?: CallOpts) => Promise<string>;
+
+export function createOpenAI(opts: { apiKey: string; textModel: string; imageModel: string; timeoutMs?: number }): { text: TextAI; image: ImageAI; listen: Listen; ping(): Promise<void> } {
   const client = new OpenAI({ apiKey: opts.apiKey, timeout: opts.timeoutMs ?? 180_000, maxRetries: 0 });
 
   async function json<T>(name: string, kind: string, instructions: string, input: string, schema: object, zod: z.ZodType<T>, o: CallOpts = {}): Promise<T> {
@@ -144,5 +149,15 @@ export function createOpenAI(opts: { apiKey: string; textModel: string; imageMod
     } catch (e) { const err = toApiError('OpenAI 이미지', e); if (err.code !== 'bad-request') throw err; throw new ApiError('permission', `이미지 모델 "${opts.imageModel}"을 이 키로 쓸 수 없어요. 글 만들기는 되고, 카드는 템플릿 모드로 만들 수 있어요.`, 'OpenAI 이미지'); }
   }
 
-  return { text, image, ping };
+  const listen: Listen = async (audio, mime, o = {}) => {
+    const ext = /mp4|m4a|aac/.test(mime) ? 'm4a' : /ogg/.test(mime) ? 'ogg' : 'webm';
+    let res: { text: string; usage?: unknown };
+    try {
+      res = (await client.audio.transcriptions.create({ file: await toFile(Buffer.from(audio), `memo.${ext}`, { type: mime }), model: LISTEN_MODEL, language: 'ko', prompt: LISTEN_HINT }, { signal: o.signal })) as { text: string; usage?: unknown };
+    } catch (e) { throw toApiError('OpenAI 받아쓰기', e); }
+    o.onUsage?.({ model: LISTEN_MODEL, kind: 'audio', reported: res.usage ?? null });
+    return res.text.trim();
+  };
+
+  return { text, image, listen, ping };
 }

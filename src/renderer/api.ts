@@ -2,7 +2,7 @@
 import type { Article, ArticleInput, ArticleSummary, ArticleVersion, Card, CardSet, DojoProfile, Job, KeywordRow } from '../shared/types';
 
 declare global {
-  interface Window { gtd: { call: (ch: string, arg?: unknown) => Promise<{ ok: boolean; data?: any; error?: string; code?: string }>; onJob: (fn: (j: Job) => void) => () => void } }
+  interface Window { gtd: { call: (ch: string, arg?: unknown) => Promise<{ ok: boolean; data?: any; error?: string; code?: string }>; onJob: (fn: (j: Job) => void) => () => void; onJarvis: (fn: () => void) => () => void } }
 }
 
 export class CallError extends Error { constructor(msg: string, public code?: string) { super(msg); } }
@@ -14,6 +14,7 @@ export async function call<T = any>(ch: string, arg?: unknown): Promise<T> {
 }
 
 export const onJob = (fn: (j: Job) => void) => window.gtd.onJob(fn);
+export const onJarvis = (fn: () => void) => window.gtd.onJarvis(fn);
 
 export interface AppInfo {
   version: string; dataDir: string; hasProfile: boolean; browser: string | null;

@@ -9,6 +9,10 @@ import { missingInputs } from '../../shared/validation';
 import { hintWords, pickKeywords } from '../../shared/keywords';
 import { autoPrefix, dongOf, prefixNames } from '../../shared/areas';
 import { quickEnding, quickKind, quickWhen } from '../../shared/quick';
+import { MicButton } from '../components/MicButton';
+
+// 말로 넣은 글은 적어 둔 메모 뒤에 이어 붙임
+const appendSpoken = (prev: string, text: string) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text);
 
 const KEY = 'new-article-form';
 const emptyInput = (p?: DojoProfile | null): ArticleInput => ({
@@ -24,7 +28,7 @@ function srcBadge(s: KeywordRow['source']) {
   return <span className={`badge ${s === 'naver' ? 'src-naver' : s === 'ai' ? 'src-ai' : s === 'demo' ? 'demo' : ''}`}>{label}</span>;
 }
 
-export function NewArticle() {
+export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; n: number } | null; onJarvisDone?: () => void } = {}) {
   const { info, go } = useApp();
   const [guideAt, setGuideAt] = useState<string | null>(null);
   const [profile, setProfile] = useState<DojoProfile | null>(null);
@@ -139,8 +143,8 @@ export function NewArticle() {
     if (/성인|어른/.test(t)) return '성인';
     return profile?.audiences.join(' · ') || '초등 저학년';
   };
-  const quickStart = async () => {
-    const memo = quick.trim();
+  const quickStart = async (text?: string) => {
+    const memo = (text ?? quick).trim();
     if (!memo) return;
     setBusy('quick'); msg.clear();
     try {
@@ -177,6 +181,13 @@ export function NewArticle() {
       go({ page: 'article', id: art.id });
     } catch (e) { msg.err(e); setBusy(''); }
   };
+  // 자비스가 넘긴 주제: 도장 정보를 불러온 뒤 한 번만 바로 시작
+  useEffect(() => {
+    if (!jarvis || !profile || busy) return;
+    onJarvisDone?.();
+    setDetail(false); setQuick(jarvis.text);
+    quickStart(jarvis.text);
+  }, [jarvis, profile, busy]); // eslint-disable-line
 
   const k = input.kind;
   if (!detail) return (
@@ -191,12 +202,13 @@ export function NewArticle() {
         <p className="hint">주제나 오늘 있었던 일을 한 줄 적으면, 도장 정보(지역 · 경력 · 수업 특징 · 교육 철학)와 함께 1,500자 이상 글을 만들어요 (행사 · 모집 안내는 1,000자 이상). 적지 않은 장면 · 대화 · 수상은 만들지 않으니, 실제 있었던 일을 적을수록 글이 풍성해져요.</p>
         <textarea rows={4} value={quick} onChange={(e) => setQuick(e.target.value)}
           placeholder={['예: 품새 대회 나가서 1학년 친구들이 단체 3등 했어요', '예: 유치부 태권도 몇 살부터 시작하면 좋을까요?', '예: 줄넘기 수행평가 준비'].join(String.fromCharCode(10))} />
+        <div className="row" style={{ marginTop: 8 }}><MicButton disabled={!info.secrets.openai || !!busy} onText={(t) => setQuick((q) => appendSpoken(q, t))} /></div>
         <div className="row" style={{ marginTop: 10 }}>
           <label className="row"><input type="checkbox" checked={quickPrefix} onChange={(e) => setQuickPrefix(e.target.checked)} /> 제목 앞에 동네 이름 붙이기 <span className="hint">({prefixNames(profile?.region ?? '', profile?.nearbyAreas ?? []).join(' · ') || '도장 정보에 지역 · 주변 장소가 없어요'} 중 돌아가며{dongOf(profile?.region ?? '') ? `, [${dongOf(profile?.region ?? '')} 태권도]는 세 편에 한 번` : ''})</span></label>
           <label className="row"><input type="checkbox" checked={quickCards} onChange={(e) => setQuickCards(e.target.checked)} /> 카드뉴스 3장도 만들기 {quickCards && card.mode === 'ai' && <span className="hint">(AI 그림 3장 비용 발생)</span>}</label>
         </div>
         <div className="row" style={{ marginTop: 10 }}>
-          <button className="btn primary" disabled={!quick.trim() || !!busy || !profile} onClick={quickStart}>{busy === 'quick-kw' ? '키워드 고르는 중…' : busy === 'quick' ? '시작하는 중…' : '바로 글 만들기'}</button>
+          <button className="btn primary" disabled={!quick.trim() || !!busy || !profile} onClick={() => quickStart()}>{busy === 'quick-kw' ? '키워드 고르는 중…' : busy === 'quick' ? '시작하는 중…' : '바로 글 만들기'}</button>
           <span className="hint">지역: {profile?.region ?? '-'} · 문체: {profile?.tone ?? '-'} · 키워드: {naverReady ? '네이버 검색량으로 자동 선택' : '주제 그대로 (설정에 검색광고 키가 없음)'}</span>
         </div>
         <Msg m={msg.m} />
@@ -282,6 +294,7 @@ export function NewArticle() {
             <textarea value={memo} onChange={(e) => setMemo(e.target.value)} rows={3}
               placeholder={k === '성장 이야기' ? '예: 6살 친구가 처음엔 엄마랑 안 떨어지려고 울었는데, 3주 동안 인사부터 같이 했더니 이제 혼자 들어와서 큰 소리로 인사해요. 자신감 전하고 싶어요' : '예: 오늘 유치부 앞차기 연습했어요. 무릎 먼저 올리라고 계속 말해줬고, 한 친구가 처음엔 못 하다가 끝에 제대로 찼어요. 도전 전하고 싶어요'} />
             <div className="row" style={{ marginTop: 8 }}>
+              <MicButton disabled={!info.secrets.openai || !!busy} onText={(t) => setMemo((m) => appendSpoken(m, t))} />
               <button className="btn primary small" disabled={!memo.trim() || !!busy} onClick={fromMemo}>{busy === 'memo' ? '나누는 중…' : '메모로 칸 채우기'}</button>
               <span className="hint">이미 적어 둔 칸은 그대로 둬요.</span>
             </div>

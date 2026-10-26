@@ -1,7 +1,7 @@
 {
   "name": "geulttukttak2",
   "productName": "태권 글뚝딱",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "private": true,
   "description": "태권 글뚝딱 버전 2 — 태권도 블로그 작가 (설치형)",
   "main": "out/main/index.js",
@@ -100,7 +100,10 @@
       "icon": "build/icon.png",
       "category": "public.app-category.productivity",
       "identity": null,
-      "artifactName": "태권글뚝딱-맥-${version}-${arch}.${ext}"
+      "artifactName": "태권글뚝딱-맥-${version}-${arch}.${ext}",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "수업 메모를 말로 넣을 때 마이크를 써요. 녹음은 글자로 바꾼 뒤 저장하지 않아요."
+      }
     }
   }
 }

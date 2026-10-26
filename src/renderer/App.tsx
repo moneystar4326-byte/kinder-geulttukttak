@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { call, type AppInfo } from './api';
+import { call, onJarvis, type AppInfo } from './api';
 import { Setup } from './pages/Setup';
 import { SettingsPage } from './pages/Settings';
 import { ProfilePage } from './pages/Profile';
@@ -31,6 +31,13 @@ export function App() {
     call<Latest>('app:latest').then(setLatest).catch(() => {});
     return () => { clearInterval(t); window.removeEventListener('focus', load); };
   }, []);
+  // 자비스가 넘긴 주제 (켤 때 · 이미 켜져 있을 때) → 새 글 작성 화면에서 바로 쓰기
+  const [jarvis, setJarvis] = useState<{ text: string; n: number } | null>(null);
+  useEffect(() => {
+    const take = () => call<string>('jarvis:take').then((t) => { if (t) { setJarvis({ text: t, n: Date.now() }); setRoute({ page: 'new' }); } }).catch(() => {});
+    take();
+    return onJarvis(take);
+  }, []);
   const value = { info: info!, reload, go: setRoute, license, setLicense };
 
   if (err) return <div className="main"><div className="note err">프로그램을 시작하지 못했어요: {err}</div></div>;
@@ -57,7 +64,7 @@ export function App() {
         <main className="main">
           <UpdateBar latest={latest} onClose={() => setLatest(null)} />
           <div className="page">
-            {route.page === 'new' && <NewArticle />}
+            {route.page === 'new' && <NewArticle jarvis={jarvis} onJarvisDone={() => setJarvis(null)} />}
             {route.page === 'history' && <History />}
             {route.page === 'profile' && <ProfilePage />}
             {route.page === 'settings' && <SettingsPage />}

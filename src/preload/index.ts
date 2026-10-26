@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 const CHANNELS = [
   'app:info', 'app:latest', 'license:status', 'license:connect', 'license:refresh', 'license:unlink', 'settings:save', 'settings:pickDir',
-  'secrets:set', 'secrets:remove', 'secrets:test', 'secrets:fromClipboard', 'guide:copy',
+  'secrets:set', 'secrets:remove', 'secrets:test', 'secrets:fromClipboard', 'guide:copy', 'voice:transcribe',
   'profile:get', 'profile:save', 'profile:pickLogo', 'profile:pickRef', 'profile:nearby', 'profile:prefixOptions',
   'keywords:naver', 'keywords:ai', 'facts:fromMemo',
   'article:list', 'article:create', 'article:updateInput', 'article:get', 'article:delete', 'article:generate', 'article:revise',
@@ -11,7 +11,7 @@ const CHANNELS = [
   'cards:plan', 'cards:renderFailed', 'cards:renderOne', 'cards:updateCopy', 'cards:suggestCopy', 'cards:restyle', 'cards:saveAs',
   'export:run', 'backup:create', 'backup:restore',
   'naver:status', 'naver:openLogin', 'naver:close', 'naver:clearSession', 'naver:fill',
-  'job:cancel', 'job:get', 'usage:summary', 'shell:open', 'shell:showFile',
+  'job:cancel', 'job:get', 'usage:summary', 'shell:open', 'shell:showFile', 'jarvis:take',
 ] as const;
 
 contextBridge.exposeInMainWorld('gtd', {
@@ -23,5 +23,10 @@ contextBridge.exposeInMainWorld('gtd', {
     const h = (_e: unknown, job: unknown) => fn(job);
     ipcRenderer.on('job:update', h);
     return () => ipcRenderer.removeListener('job:update', h);
+  },
+  onJarvis: (fn: () => void) => {
+    const h = () => fn();
+    ipcRenderer.on('jarvis:quick', h);
+    return () => ipcRenderer.removeListener('jarvis:quick', h);
   },
 });

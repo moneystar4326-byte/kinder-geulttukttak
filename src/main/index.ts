@@ -55,6 +55,13 @@ if (interrupted) log('jobs-interrupted', String(interrupted));
 
 let win: BrowserWindow | null = null;
 
+// 자비스 음성 비서: `--jarvis-quick=주제` 로 켜거나 다시 부르면 '주제 한 줄로 바로 쓰기'를 시작 (발행은 사람이 직접)
+const jarvisArg = (argv: string[]) => {
+  const a = argv.find((x) => x.startsWith('--jarvis-quick='));
+  return a ? a.slice('--jarvis-quick='.length).trim().slice(0, 300) : '';
+};
+let jarvisQuick = jarvisArg(process.argv);
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1360, height: 900, minWidth: 900, minHeight: 640, title: '태권 글뚝딱', backgroundColor: '#F7F7F5', show: false,
@@ -70,8 +77,12 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  // 원격 권한 요청(카메라 · 알림 등) 모두 거절
-  session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
+  // 권한 요청은 모두 거절. 예외 하나: 우리 앱 화면이 "메모 말로 넣기"에서 마이크(소리만)를 쓸 때 (2026-10-26)
+  session.defaultSession.setPermissionRequestHandler((wc, perm, cb, details) => {
+    const audioOnly = perm === 'media' && 'mediaTypes' in details && (details.mediaTypes ?? []).length > 0 && (details.mediaTypes ?? []).every((t) => t === 'audio');
+    cb(audioOnly && wc === win?.webContents && details.requestingUrl.startsWith('file:'));
+  });
+  session.defaultSession.setPermissionCheckHandler((wc, perm, origin) => perm === 'media' && wc === win?.webContents && origin.startsWith('file:'));
   // 카드 · 로고 미리보기: 데이터 폴더 assets 안의 파일만
   protocol.handle('gtd-asset', (req) => {
     const rel = decodeURIComponent(new URL(req.url).pathname).replace(/^\/+/, '');
@@ -113,6 +124,7 @@ app.whenReady().then(() => {
 
   registerIpc({
     db, vault, runner, browser, license, shooter: electronShooter(), dataDir, assetsDir, fontDir, win: () => win,
+    takeJarvisQuick: () => { const q = jarvisQuick; jarvisQuick = ''; return q; },
     requestRestore: (file) => {
       fs.writeFileSync(pendingRestore, file, 'utf-8');
       browser.close().finally(() => { db.close(); app.relaunch(); app.exit(0); });
@@ -121,7 +133,11 @@ app.whenReady().then(() => {
   createWindow();
 });
 
-app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+app.on('second-instance', (_e, argv) => {
+  const q = jarvisArg(argv);
+  if (q) { jarvisQuick = q; win?.webContents.send('jarvis:quick'); }
+  if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
+});
 app.on('window-all-closed', () => app.quit());
 app.on('web-contents-created', (_e, wc) => {
   wc.on('will-attach-webview', (e) => e.preventDefault());

@@ -15,7 +15,7 @@ import type { ArticleDoc, CardSet, KeywordRow } from '../../shared/types';
 import { CARD_STYLES } from '../../shared/types';
 import { loadSettings, saveSettings, type AppSettings } from '../settings';
 import { composeClassFeatures } from '../../shared/strengths';
-import { createOpenAI, type ImageAI, type TextAI } from '../services/openai';
+import { createOpenAI, type ImageAI, type Listen, type TextAI } from '../services/openai';
 import { hintOf, lookupKeywords } from '../services/naver-keywords';
 import { collectNearby, prefixOptions } from '../services/nearby';
 import { createCardService, type Shooter } from '../services/card-renderer';
@@ -38,6 +38,7 @@ export interface AppCtx {
   fontDir: string;
   win: () => BrowserWindow | null;
   requestRestore: (file: string) => void;
+  takeJarvisQuick: () => string;
 }
 
 const S = z.string().max(4000);
@@ -63,13 +64,13 @@ export function registerIpc(ctx: AppCtx) {
     db.addUsage({ jobId, provider: 'openai', model: u.model, kind: u.kind, reported: u.reported, estimate: { note: '실제 청구액 아님. 단가는 OpenAI 가격표 확인 필요', basis: null } });
 
   // AI로 새로 만드는 일은 모두 여기를 지남 → 이용권 확인 (AI를 안 쓰는 다시 맞춤은 gate: false)
-  function ai(opts: { gate?: boolean } = {}): { text: TextAI; image: ImageAI | null } {
+  function ai(opts: { gate?: boolean } = {}): { text: TextAI; image: ImageAI | null; listen: Listen } {
     const s = settings();
     if (opts.gate !== false && !(process.env.GTD_LICENSE_OFF === '1' && !app.isPackaged)) ctx.license.assertCanCreate();
     const key = vault.get('openai');
     if (!key) throw new ApiError('auth', '설정에서 OpenAI API 키를 먼저 등록해 주세요.', 'OpenAI');
     const o = createOpenAI({ apiKey: key, textModel: s.textModel, imageModel: s.imageModel });
-    return { text: o.text, image: o.image };
+    return { text: o.text, image: o.image, listen: o.listen };
   }
   const profileOrThrow = () => {
     const p = db.getProfile();
@@ -87,6 +88,7 @@ export function registerIpc(ctx: AppCtx) {
     secrets: vault.masked(), browser: findBrowser(settings().browserPath)?.name ?? null,
   }));
   // ---------- 계정 연결 · 이용권 · 새 버전 ----------
+  handle('jarvis:take', z.undefined(), () => ctx.takeJarvisQuick());
   handle('license:status', z.undefined(), () => ctx.license.status());
   handle('license:connect', z.undefined(), () => ctx.license.connect());
   handle('license:refresh', z.undefined(), () => ctx.license.refresh());
@@ -215,6 +217,12 @@ export function registerIpc(ctx: AppCtx) {
     return words.map((keyword): KeywordRow => ({ keyword, source: 'ai' }));
   });
 
+  // 메모 말로 넣기: 화면에서 녹음한 소리(최대 약 1분)를 글자로. 녹음 파일은 저장하지 않음
+  handle('voice:transcribe', z.object({ audio: z.instanceof(Uint8Array).refine((a) => a.byteLength > 1000, '녹음이 너무 짧아요. 버튼을 누르고 말씀해 주세요.').refine((a) => a.byteLength < 8_000_000, '녹음이 너무 길어요. 1분 안으로 나눠서 말씀해 주세요.'), mime: z.string().max(60) }), async ({ audio, mime }) => {
+    const text = await ai().listen(audio, mime, { onUsage: onUsage() });
+    if (!text) throw new Error('말소리를 알아듣지 못했어요. 마이크 가까이에서 다시 말씀해 주세요.');
+    return text;
+  });
   handle('facts:fromMemo', z.object({ memo: z.string().min(1, '메모를 적어 주세요').max(3000), kind: S, topic: S }), async ({ memo, kind, topic }) => {
     const a = ai();
     return a.text.splitMemo(memo, kind, topic, { onUsage: onUsage() });
