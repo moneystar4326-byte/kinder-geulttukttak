@@ -15,7 +15,7 @@ import type { ArticleDoc, CardSet, KeywordRow } from '../../shared/types';
 import { CARD_STYLES } from '../../shared/types';
 import { loadSettings, saveSettings, type AppSettings } from '../settings';
 import { composeClassFeatures } from '../../shared/strengths';
-import { createOpenAI, type ImageAI, type Listen, type TextAI } from '../services/openai';
+import { createOpenAI, listenHint, type ImageAI, type Listen, type TextAI } from '../services/openai';
 import { hintOf, lookupKeywords } from '../services/naver-keywords';
 import { collectNearby, prefixOptions } from '../services/nearby';
 import { createCardService, type Shooter } from '../services/card-renderer';
@@ -219,7 +219,9 @@ export function registerIpc(ctx: AppCtx) {
 
   // 메모 말로 넣기: 화면에서 녹음한 소리(최대 약 1분)를 글자로. 녹음 파일은 저장하지 않음
   handle('voice:transcribe', z.object({ audio: z.instanceof(Uint8Array).refine((a) => a.byteLength > 1000, '녹음이 너무 짧아요. 버튼을 누르고 말씀해 주세요.').refine((a) => a.byteLength < 8_000_000, '녹음이 너무 길어요. 1분 안으로 나눠서 말씀해 주세요.'), mime: z.string().max(60) }), async ({ audio, mime }) => {
-    const text = await ai().listen(audio, mime, { onUsage: onUsage() });
+    const p = db.getProfile();
+    const hint = listenHint(p ? [p.name, p.region, ...(p.nearbyAreas ?? []).map((a) => a.name)] : []);
+    const text = await ai().listen(audio, mime, { onUsage: onUsage(), hint });
     if (!text) throw new Error('말소리를 알아듣지 못했어요. 마이크 가까이에서 다시 말씀해 주세요.');
     return text;
   });

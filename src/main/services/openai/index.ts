@@ -52,10 +52,15 @@ export function normalizeDoc(raw: z.infer<typeof GeneratedArticleSchema>): Artic
   };
 }
 
-// 메모 말로 넣기 (2026-10-26): 받아쓰기 모델. 태권도 낱말을 힌트로 줘서 "품새 · 태극 · 미트"를 덜 틀리게
-export const LISTEN_MODEL = 'gpt-4o-mini-transcribe';
+// 메모 말로 넣기 (2026-10-26): 받아쓰기 모델 + 힌트(태권도 낱말 + 그 도장의 이름 · 동네 · 주변 학교)
+// mini 는 첫마디 · 고유명사를 자주 틀려서(잡음 섞은 시험 98% vs 100%) 큰 모델로. 1분에 약 8원
+export const LISTEN_MODEL = 'gpt-4o-transcribe';
 const LISTEN_HINT = '태권도장 관장님의 수업 메모. 품새, 태극 1장, 승급심사, 승품단, 국기원, 유치부, 초등부, 미트, 겨루기, 앞차기, 돌려차기, 줄넘기, 사범님.';
-export type Listen = (audio: Uint8Array, mime: string, o?: CallOpts) => Promise<string>;
+export const listenHint = (names: string[]) => {
+  const extra = [...new Set(names.map((n) => n.trim()).filter(Boolean))].slice(0, 20).join(', ');
+  return (extra ? `${LISTEN_HINT} 도장 · 동네 이름: ${extra}.` : LISTEN_HINT).slice(0, 600);
+};
+export type Listen = (audio: Uint8Array, mime: string, o?: CallOpts & { hint?: string }) => Promise<string>;
 
 export function createOpenAI(opts: { apiKey: string; textModel: string; imageModel: string; timeoutMs?: number }): { text: TextAI; image: ImageAI; listen: Listen; ping(): Promise<void> } {
   const client = new OpenAI({ apiKey: opts.apiKey, timeout: opts.timeoutMs ?? 180_000, maxRetries: 0 });
@@ -153,7 +158,7 @@ export function createOpenAI(opts: { apiKey: string; textModel: string; imageMod
     const ext = /mp4|m4a|aac/.test(mime) ? 'm4a' : /ogg/.test(mime) ? 'ogg' : 'webm';
     let res: { text: string; usage?: unknown };
     try {
-      res = (await client.audio.transcriptions.create({ file: await toFile(Buffer.from(audio), `memo.${ext}`, { type: mime }), model: LISTEN_MODEL, language: 'ko', prompt: LISTEN_HINT }, { signal: o.signal })) as { text: string; usage?: unknown };
+      res = (await client.audio.transcriptions.create({ file: await toFile(Buffer.from(audio), `memo.${ext}`, { type: mime }), model: LISTEN_MODEL, language: 'ko', prompt: o.hint ?? LISTEN_HINT }, { signal: o.signal })) as { text: string; usage?: unknown };
     } catch (e) { throw toApiError('OpenAI 받아쓰기', e); }
     o.onUsage?.({ model: LISTEN_MODEL, kind: 'audio', reported: res.usage ?? null });
     return res.text.trim();
