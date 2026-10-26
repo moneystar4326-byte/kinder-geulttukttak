@@ -24,8 +24,8 @@ export interface TextAI {
   revise(kind: Exclude<RevisionKind, 'titles' | 'paragraph'>, doc: ArticleDoc, o?: CallOpts, min?: number): Promise<ArticleDoc>;
   titles(doc: ArticleDoc, input: ArticleInput, o?: CallOpts): Promise<string[]>;
   paragraph(doc: ArticleDoc, sectionId: string, index: number, instruction: string, o?: CallOpts): Promise<string>;
-  cardOne(doc: ArticleDoc, title: string, index: number, current: { title: string; sub: string; scene: string }, others: string[], kind?: string, o?: CallOpts, writer?: Writer): Promise<{ title: string; sub: string }>;
-  cardCopies(doc: ArticleDoc, title: string, kind?: string, o?: CallOpts, writer?: Writer): Promise<{ title: string; sub: string; scene: string; afterSectionId: string }[]>;
+  cardOne(doc: ArticleDoc, title: string, index: number, current: { title: string; sub: string; scene: string }, others: string[], kind?: string, o?: CallOpts, writer?: Writer, noQuestion?: boolean): Promise<{ title: string; sub: string }>;
+  cardCopies(doc: ArticleDoc, title: string, kind?: string, o?: CallOpts, writer?: Writer, noQuestion?: boolean): Promise<{ title: string; sub: string; scene: string; afterSectionId: string }[]>;
   keywordIdeas(region: string, topic: string, kind: string, o?: CallOpts): Promise<string[]>;
   splitMemo(memo: string, kind: string, topic: string, o?: CallOpts): Promise<Record<string, string>>;
 }
@@ -86,6 +86,21 @@ export function createOpenAI(opts: { apiKey: string; textModel: string; imageMod
     throw lastErr instanceof ApiError ? lastErr : new ApiError('schema', 'AI 응답 형식이 맞지 않았어요. 다시 시도해 주세요.', 'OpenAI', true);
   }
 
+  // 어린이집 카드 점검 (2026-10-27 요요유치원 시험: 제목 "밖에서 무엇을 하나요?"에 "풍경을 만나요"로 답함 · 카드끼리 같은 말 · 공원 글에 교실 그림)
+  // 글처럼 만든 뒤 한 번 더 보고 고칠 곳만 고침. 실패하거나 모양이 다르면 처음 카드 그대로 (멈추기만 그대로 던짐)
+  type CardCopyRow = { title: string; sub: string; scene: string; afterSectionId: string };
+  async function checkCards(doc: ArticleDoc, title: string, cards: CardCopyRow[], kind?: string, o?: CallOpts, writer?: Writer, noQuestion = false): Promise<CardCopyRow[]> {
+    try {
+      const r = (await json('cards', 'text', P.SYSTEM_RULES, P.cardCheckPrompt(doc, title, cards, kind, writer, noQuestion), CARD_COPY_JSON, CardCopySchema, o)).cards;
+      if (r.length !== cards.length) return cards;
+      // 카드를 넣을 자리는 처음 것 그대로, 답 없이 끝나는 글이 새로 생기면 그 카드는 처음 것
+      return r.map((c, i) => (P.VAGUE_SUB.test(c.sub) && !P.VAGUE_SUB.test(cards[i].sub) ? cards[i] : { ...c, afterSectionId: cards[i].afterSectionId }));
+    } catch (e: any) {
+      if (o?.signal?.aborted || e?.name === 'AbortError' || e?.code === 'cancelled') throw e;
+      return cards;
+    }
+  }
+
   const text: TextAI = {
     async generate(p, input, regionNote, o) {
       return normalizeDoc(await json('article', 'text', P.SYSTEM_RULES, P.articlePrompt(p, input, regionNote), GENERATED_ARTICLE_JSON, GeneratedArticleSchema, o));
@@ -110,17 +125,22 @@ export function createOpenAI(opts: { apiKey: string; textModel: string; imageMod
       return (await json('paragraph', 'text', P.SYSTEM_RULES, P.paragraphPrompt(doc, sectionId, index, instruction), PARAGRAPH_JSON, ParagraphSchema, o)).paragraph.trim();
     },
     // 카드 글이 답 없이 끝나면(P.VAGUE_SUB) 한 번만 더 만들어 덜 막연한 쪽을 씀 (비용: 그때만 2번)
-    async cardOne(doc, title, index, current, others, kind, o, writer) {
-      const make = () => json('card_one', 'text', P.SYSTEM_RULES, P.cardOnePrompt(doc, title, index, current, others, kind, writer), CARD_ONE_JSON, CardOneSchema, o);
+    async cardOne(doc, title, index, current, others, kind, o, writer, noQuestion) {
+      const make = () => json('card_one', 'text', P.SYSTEM_RULES, P.cardOnePrompt(doc, title, index, current, others, kind, writer, noQuestion), CARD_ONE_JSON, CardOneSchema, o);
       let r = await make();
       if (P.VAGUE_SUB.test(r.sub)) { const again = await make(); if (!P.VAGUE_SUB.test(again.sub)) r = again; }
       return { title: r.title.trim(), sub: r.sub.trim() };
     },
-    async cardCopies(doc, title, kind, o, writer) {
-      const make = async () => (await json('cards', 'text', P.SYSTEM_RULES, P.cardCopyPrompt(doc, title, kind, writer), CARD_COPY_JSON, CardCopySchema, o)).cards;
+    async cardCopies(doc, title, kind, o, writer, noQuestion) {
+      const make = async () => (await json('cards', 'text', P.SYSTEM_RULES, P.cardCopyPrompt(doc, title, kind, writer, noQuestion), CARD_COPY_JSON, CardCopySchema, o)).cards;
       const vague = (cards: { sub: string }[]) => cards.filter((c) => P.VAGUE_SUB.test(c.sub)).length;
       let cards = await make();
       if (vague(cards)) { const again = await make(); if (vague(again) < vague(cards)) cards = again; }
+      if (isDaycare) {
+        cards = await checkCards(doc, title, cards, kind, o, writer, noQuestion);
+        // 재료가 적은 글인데 아직 질문 제목이 남았으면 한 번만 더 (글에 그 답이 없음)
+        if (noQuestion && cards.some((c) => /[?？]/.test(c.title))) cards = await checkCards(doc, title, cards, kind, o, writer, true);
+      }
       return cards;
     },
     async splitMemo(memo, kind, topic, o) {

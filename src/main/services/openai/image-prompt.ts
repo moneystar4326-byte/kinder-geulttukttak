@@ -121,10 +121,16 @@ export function daycareRefLead(hasUniform: boolean, hasRoom: boolean, hasLogo = 
 export const daycareSafeScene = (scene: string) =>
   scene.replace(/\b(faceless|featureless|without faces?|no faces?)\b\s*/gi, '').replace(/\s{2,}/g, ' ').replace(/\b([Aa]) (?=[aeiou])/g, '$1n ').trim();
 
+// 장소는 장면을 따름 (2026-10-27 요요유치원 시험: 공원 소풍 카드에 교실 · 블록 그림이 나옴 — 교실을 기본으로 적어 둔 탓)
+const OUTDOOR = /\b(park|playground|forest|woods?|outdoors?|outside|garden|field|picnic|walk(ing)?|trail|yard|beach|farm|meadow|lawn|grass(y)?|street|zoo)\b/i;
+export const daycareSetting = (scene: string) => OUTDOOR.test(scene)
+  ? 'Setting: exactly the outdoor place described in the scene (for example a park, playground or forest path), safe and green, with teachers close to the children. Do not draw a classroom.'
+  : 'Setting: a bright, tidy and safe Korean daycare classroom or play area with soft flooring, low wooden shelves and simple toys, matching the activity in the scene.';
+
 export function daycareBackgroundPrompt(scene: string, style: CardStyle, layout: Layout, age: AgeBand = 'mixed', uniformRef = false, logo = false) {
   return [
     `${layout === 'split' ? 'Landscape' : 'Vertical'} illustration for a Korean daycare center parent newsletter. Scene: ${daycareSafeScene(scene)}.`,
-    'Setting: a bright, tidy and safe Korean daycare classroom or play area with soft flooring, low wooden shelves and simple toys; if the scene is outdoors, a safe playground or forest path with a teacher nearby.',
+    daycareSetting(scene),
     STYLE[style],
     uniformRef
       ? `Children wear the daycare uniform from the reference image.${logo ? ' The only decoration is one small logo patch on the left chest.' : ''}`

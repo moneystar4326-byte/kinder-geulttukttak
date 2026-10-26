@@ -112,6 +112,15 @@ export function factsText(input: ArticleInput, profile: DojoProfile) {
     profile.otherFacts ?? '', profile.classFeatures, profile.hours ?? '', profile.classes ?? ''].join('\n');
 }
 
+// 재료가 주제 한 줄뿐인지 (주제를 뺀 활동 · 장면 · 도운 점 · 성장 · 행사 칸이 거의 비었음)
+// 이러면 글에 "무엇을 했는지" 같은 구체 답이 없어 카드 제목을 질문으로 쓰지 않음 (2026-10-27 요요유치원 시험)
+export function thinFacts(input: ArticleInput) {
+  const f = input.facts;
+  const own = [f.activities, f.coachingPoints, f.scenes, ...Object.values(f.growth ?? {}), ...Object.values(f.event ?? {})].join(' ');
+  const flat = (t: string) => t.replace(/[\s.,!?…]/g, '');
+  return flat(own.split(input.topic.replace(/…$/, '')).join('')).length < 25;
+}
+
 // 메모에 "민준이가 · 서연이는"처럼 이름 + 이 + 조사로 적힌 말 (받침 있는 이름 + "이"는 아이를 부르는 꼴)
 // 아이 · 놀이처럼 받침 없는 말은 걸리지 않고, 흔한 말은 따로 뺌
 const NOT_NAME = new Set(['어린', '물놀', '손놀', '몸놀', '소꿉놀', '모래놀', '선생님', '원장님', '친구들', '우리', '오늘', '처음', '마음', '사람', '하늘', '바깥놀']);

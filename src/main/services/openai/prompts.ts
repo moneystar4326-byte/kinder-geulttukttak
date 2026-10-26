@@ -248,17 +248,52 @@ scene 에서 위험해 보이는 장면(높은 곳에 올라가기, 작은 물�
   : `scene 은 배경 그림 장면을 영어로 한 문장 (예: "a child practicing a front stance in a bright dojang, instructor watching"). 글자 · 간판 · 숫자가 보이는 장면 금지. 실제 아이 사진이 아닌 일러스트 장면 (얼굴은 그림체로 또렷하게 — "faceless" 같은 말 쓰지 않기).
 scene 에서 띠 · 도복을 손에 들기 · 접기 · 건네기 · 준비하기 장면 금지 (띠는 늘 허리에 맨 하나). 띠 이야기 카드라도 인사 · 발차기 · 품새 · 줄넘기 · 앉아서 듣기 같은 동작 장면으로.`;
 
+// 어린이집: 제목 · 답 맞추기 (2026-10-27 요요유치원 시험 — "아이들은 밖에서 무엇을 하나요?"에 "바깥 풍경을 만나요"로 답하고,
+// 카드1 · 2가 같은 문장 "보라매공원으로 소풍을 다녀왔어요"를 되풀이, 카드2 title 이 글 제목 그대로, 공원 글에 교실 그림)
+const DAYCARE_MATCH_RULE = `제목과 답 맞추기 (꼭 지킬 것):
+- 질문 title 은 이 글에 적힌 내용으로 바로 답할 수 있는 구체적인 질문만 쓴다. 글에 그 답이 될 놀이 · 장면 · 방법이 없으면 질문 대신 문장 title 로 쓴다.
+- sub 첫 문장은 title 이 묻는 그것으로 답한다: "무엇을" → 한 일 · 놀이 이름, "어떻게" → 방법, "왜" → 이유, "언제 · 어디서" → 날짜 · 장소. "풍경을 만나요" · "경험을 해요" · "시간을 보내요"처럼 무엇인지 알 수 없는 답 금지.
+- 둘째 문장은 첫 문장과 다른 구체 내용이다. title 이나 첫 문장을 다른 말로 되풀이하지 않는다.
+- 세 장의 title · sub 에 같은 문장 · 같은 내용을 두 번 쓰지 않는다. title 을 글 제목 그대로 옮기지 않는다.
+- scene 은 그 카드 문구와 같은 장소 · 같은 활동이다 (문구가 공원 소풍이면 그림도 공원, 교실 놀이면 교실).`;
+
+// 어린이집 카드 점검 (글의 흐름 확인처럼 만든 뒤 한 번 더): 고칠 곳만 고치고 나머지는 글자 그대로
+// 재료가 주제 한 줄뿐이면 질문 제목 금지 (글에 답이 없음)
+const NO_QUESTION = '이 글은 재료가 적어 질문에 답할 구체 내용이 없다. 세 장 모두 title 을 물음표 없는 문장으로 쓴다 (카드1도).';
+
+export function cardCheckPrompt(doc: ArticleDoc, title: string, cards: { title: string; sub: string; scene: string; afterSectionId: string }[], kind?: string, writer?: Writer, noQuestion = false) {
+  const r = cardRoles(kind);
+  return `아래 [카드] 3장을 [글]과 비교해 점검하고, 틀린 곳만 고쳐 같은 JSON 형식으로 3장 모두 출력하라. 맞는 카드는 글자 그대로 둔다.
+카드 역할: 카드1 = ${r[0].guide}, 카드2 = ${r[1].guide}, 카드3 = ${r[2].guide}.${cardWriter(writer)}${noQuestion ? `\n${NO_QUESTION}` : ''}
+점검할 것:
+1. sub 첫 문장이 title 이 묻는 것(무엇을 · 어떻게 · 왜 · 언제 · 어디서)에 글에 적힌 구체 내용으로 답하는가. 아니면 첫 문장을 고치고, 글에 그 답이 없으면 title 을 답할 수 있는 질문이나 문장으로 바꾼다.
+2. 둘째 문장이 첫 문장 · title 을 되풀이하지 않고 글 속 다른 구체 내용인가.
+3. 세 장끼리 같은 문장 · 같은 내용이 되풀이되지 않는가. title 이 글 제목을 그대로 옮긴 말이 아닌가.
+4. scene 이 그 카드 문구와 같은 장소 · 같은 활동인가 (영어 한 문장, 글자 · 간판 · 숫자 없는 장면, 위험한 장면 금지).
+5. 글에 없는 사실 · 아이 이름 · 금액 · 입소 약속 · 진단하는 말이 없는가.
+${CARD_TITLE_RULE}
+${CARD_SUB_RULE}
+afterSectionId 는 바꾸지 않는다.
+
+[카드]
+${cards.map((c, i) => `카드${i + 1}: title="${c.title}" / sub="${c.sub}" / scene="${c.scene}" / afterSectionId="${c.afterSectionId}"`).join('\n')}
+
+[글 제목] ${title}
+[글]
+${sectionsFull(doc)}`;
+}
+
 // 선생님 글이면 카드도 반 시점으로 (원장님 글은 어린이집 시점)
 const cardWriter = (w?: Writer) =>
   isDaycare && w ? `\n카드 문구 시점: ${w.role === '교사' ? `"${w.className?.trim() || '우리 반'} 친구들"처럼 반 시점` : '어린이집 전체 시점'}.` : '';
 
-export function cardCopyPrompt(doc: ArticleDoc, title: string, kind?: string, writer?: Writer) {
+export function cardCopyPrompt(doc: ArticleDoc, title: string, kind?: string, writer?: Writer, noQuestion = false) {
   const r = cardRoles(kind);
   return `아래 블로그 글로 카드뉴스 3장 문구를 만들어라. 글에 있는 사실과 메시지만 쓴다.
 카드1 = ${r[0].guide}, 카드2 = ${r[1].guide}, 카드3 = ${r[2].guide}.
 세 장이 이 글 주제 하나로 이어지게 쓴다. 글 주제와 상관없는 ${isDaycare ? '어린이집 정보(다른 서비스 · 활동)' : '도장 정보(다른 수업 · 서비스)'}는 카드에 쓰지 않는다. 날짜 · 행사 이름은 글에 적힌 그대로.${cardWriter(writer)}
 ${CARD_TITLE_RULE}
-${CARD_SUB_RULE}
+${CARD_SUB_RULE}${isDaycare ? `\n${DAYCARE_MATCH_RULE}` : ''}${noQuestion ? `\n${NO_QUESTION}` : ''}
 ${SCENE_RULES}
 afterSectionId 는 그 카드를 넣기 좋은 섹션 id (카드1은 도입 뒤, 카드2 · 카드3은 내용이 가장 가까운 섹션 뒤).
 
@@ -268,11 +303,11 @@ ${sectionsFull(doc)}`;
 }
 
 // 카드 한 장 문구만 새로 (그림 · 장면은 그대로라 장면과 어울리게)
-export function cardOnePrompt(doc: ArticleDoc, title: string, index: number, current: { title: string; sub: string; scene: string }, others: string[], kind?: string, writer?: Writer) {
+export function cardOnePrompt(doc: ArticleDoc, title: string, index: number, current: { title: string; sub: string; scene: string }, others: string[], kind?: string, writer?: Writer, noQuestion = false) {
   return `아래 블로그 글로 카드뉴스 ${index + 1}번 카드(${cardRoles(kind)[index]?.guide ?? '이 글의 메시지'})의 문구를 새로 만들어라. 글에 있는 사실과 메시지만 쓴다. 글 주제와 상관없는 ${IND.place} 정보는 쓰지 않는다.${cardWriter(writer)}
 지금 문구와 다른 표현으로 쓰고, 다른 카드 제목과 겹치지 않게. 이 카드는 카드${index + 1}이다.${isDaycare ? ' 아이 이름 · 금액 · 입소 약속 · 진단하는 말 금지.' : ''}
 ${CARD_TITLE_RULE}
-${CARD_SUB_RULE}
+${CARD_SUB_RULE}${isDaycare ? `\n${DAYCARE_MATCH_RULE}` : ''}${noQuestion ? `\n${NO_QUESTION}` : ''}
 그림은 바꾸지 않으므로 그림 장면과 어긋나지 않게 쓴다. 그림 장면: ${current.scene}
 
 [지금 문구] ${current.title} / ${current.sub}

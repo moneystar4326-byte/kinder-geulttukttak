@@ -128,6 +128,47 @@ test('카드 문구: 장면은 안전 · 생활 장면, 선생님 글은 반 시
   assert.match(t, /블록은 쌓고 무너뜨리며 놀아요/);
 });
 
+test('카드 제목 · 답 맞추기 + 만든 뒤 한 번 더 점검 (요요유치원 시험에서 나온 카드)', () => {
+  // 실제로 나온 카드: 질문에 막연한 답 · 카드끼리 같은 문장 · 공원 글에 교실 그림
+  const bad = [
+    { title: '아이들은 밖에서 무엇을 하나요?', sub: '아이들은 소풍을 떠나 평소와 다른 바깥 풍경을 만나요. 장미반 아이들과 함께 보라매공원으로 소풍을 다녀왔어요.', scene: 'children and teachers together in a leafy park', afterSectionId: 's1' },
+    { title: '보라매공원으로 소풍을 다녀왔어요', sub: '보라매공원으로 소풍을 가 일상과 다른 바깥 풍경을 만났어요. 아이의 눈길이 어디에 머무는지에 마음을 둡니다.', scene: 'children looking around a green park', afterSectionId: 's2' },
+    { title: '자기 관심을 표현하며 함께 지내요', sub: '소풍은 자기 관심을 표현하는 경험이에요. 각자의 관심을 따라갈 수 있어요.', scene: 'children on a grassy park', afterSectionId: 's4' },
+  ];
+  const make = P.cardCopyPrompt(doc('공원에서 낙엽을 모았어요.'), '장미반 소풍', '수업 후기');
+  assert.match(make, /제목과 답 맞추기/);
+  assert.match(make, /"무엇을" → 한 일 · 놀이 이름/);
+  assert.match(make, /"풍경을 만나요" · "경험을 해요"/);
+  assert.match(make, /title 을 글 제목 그대로 옮기지 않는다/);
+  assert.match(P.cardOnePrompt(doc('x'), 't', 0, bad[0], [], '수업 후기'), /제목과 답 맞추기/);
+  const chk = P.cardCheckPrompt(doc('공원에서 낙엽을 모았어요.'), '장미반 소풍', bad, '수업 후기', TEACHER);
+  assert.match(chk, /틀린 곳만 고쳐 같은 JSON 형식으로 3장 모두/);
+  assert.match(chk, /카드1: title="아이들은 밖에서 무엇을 하나요\?"/);
+  assert.match(chk, /scene 이 그 카드 문구와 같은 장소/);
+  assert.match(chk, /afterSectionId 는 바꾸지 않는다/);
+  assert.match(chk, /\[글\]\n\(s1\)/);
+  assert.doesNotMatch(chk, TKD);
+});
+
+test('재료가 주제 한 줄뿐이면 카드 제목을 질문으로 쓰지 않음', () => {
+  const memo = '장미반 아이들과 함께 보라매공원으로 소풍갔어요';
+  const thin = input({ topic: memo, facts: { ...QI.emptyInput().facts, activities: memo } });
+  assert.equal(V.thinFacts(thin), true);
+  assert.equal(V.thinFacts(input({ topic: '소풍', facts: { ...QI.emptyInput().facts, activities: '보라매공원에서 낙엽을 모아 왕관을 만들고, 돗자리에 앉아 도시락을 먹었어요' } })), false);
+  assert.match(P.cardCopyPrompt(doc('x'), 't', '수업 후기', undefined, true), /세 장 모두 title 을 물음표 없는 문장으로/);
+  assert.doesNotMatch(P.cardCopyPrompt(doc('x'), 't', '수업 후기'), /물음표 없는 문장으로 쓴다 \(카드1도\)/);
+  assert.match(P.cardCheckPrompt(doc('x'), 't', [], '수업 후기', undefined, true), /카드1도/);
+  assert.match(P.cardOnePrompt(doc('x'), 't', 0, { title: 'a', sub: 'b', scene: 'c' }, [], '수업 후기', undefined, true), /카드1도/);
+});
+
+test('카드 그림 장소는 장면을 따름: 공원이면 공원, 아니면 교실', () => {
+  assert.match(IMG.daycareSetting('children and teachers together in a leafy park'), /outdoor place.*Do not draw a classroom/);
+  assert.match(IMG.daycareSetting('toddlers on a picnic mat under trees'), /outdoor/);
+  assert.match(IMG.daycareSetting('toddlers stacking soft blocks on a classroom rug'), /daycare classroom/);
+  const p = IMG.daycareBackgroundPrompt('children walking in a park', '따뜻한 일러스트', 'split');
+  assert.doesNotMatch(p, /low wooden shelves/);
+});
+
 test('카드 그림: 도복 · 띠 규칙 없이 영유아 · 교실 · 안전, 얼굴은 그림체로', () => {
   for (const age of ['infant', 'preschool', 'mixed'] as const) {
     const t = IMG.daycareBackgroundPrompt('toddlers playing with dough, faceless', '따뜻한 일러스트', 'split', age, false, false);

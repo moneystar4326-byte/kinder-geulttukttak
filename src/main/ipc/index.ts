@@ -10,7 +10,7 @@ import type { JobRunner } from '../jobs';
 import { generateArticle, reviseArticle, titleWithPrefix } from '../article';
 import { ArticleInputSchema, DocSchema, ProfileInput } from '../../shared/schemas';
 import { countDoc } from '../../shared/count';
-import { childNames, factsText, hideChildNames, plainBody, withKeywordFallback } from '../../shared/validation';
+import { childNames, factsText, hideChildNames, plainBody, thinFacts, withKeywordFallback } from '../../shared/validation';
 import type { ArticleDoc, ArticleInput, CardSet, KeywordRow } from '../../shared/types';
 import { IND, isDaycare } from '../../shared/industry';
 import { CARD_STYLES } from '../../shared/types';
@@ -299,7 +299,7 @@ export function registerIpc(ctx: AppCtx) {
     noCardJob(articleId);
     return runner.start('cards', articleId, '카드 문구 만드는 중', async ({ signal, step, jobId }) => {
       const v = db.getVersion(art.currentVersionId!)!;
-      const copies = (await a.text.cardCopies(v.doc, v.title, art.input.kind, { signal, onUsage: onUsage(jobId) }, art.input.writer)).map((c) => safeCopy(c, art.input));
+      const copies = (await a.text.cardCopies(v.doc, v.title, art.input.kind, { signal, onUsage: onUsage(jobId) }, art.input.writer, isDaycare && thinFacts(art.input))).map((c) => safeCopy(c, art.input));
       const cs = db.createCardSet(v.id, { ...style, mode }, copies);
       await cardService(a.image, jobId).renderSet(cs.id, { signal, onStep: step });
     }).job;
@@ -325,7 +325,7 @@ export function registerIpc(ctx: AppCtx) {
     const v = db.getVersion(cs.articleVersionId)!;
     const others = cs.cards.filter((x) => x.id !== cardId).map((x) => x.copy.title);
     const input = db.getArticle(articleId)?.input;
-    return safeCopy(await ai().text.cardOne(v.doc, v.title, c.index, c.copy, others, input?.kind, { onUsage: onUsage() }, input?.writer), input);
+    return safeCopy(await ai().text.cardOne(v.doc, v.title, c.index, c.copy, others, input?.kind, { onUsage: onUsage() }, input?.writer, isDaycare && !!input && thinFacts(input)), input);
   });
   handle('cards:updateCopy', z.object({ cardId: Id, copy: z.object({ title: z.string().max(80), sub: z.string().max(200), scene: z.string().max(500) }) }), ({ cardId, copy }) => { noCardJob(articleOfCard(cardId)); return cardService(null).updateCopy(cardId, copy); });
   // 스타일 · 크기만 바꿈 (템플릿 모드면 API 없이 다시 합성, AI 배경은 있던 그림을 새 비율로 다시 자름)
