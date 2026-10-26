@@ -23,6 +23,16 @@ npm run dist      # Windows 설치파일 → release/글뚝딱-설치-0.1.0.exe
 - **VS Code 안 터미널 주의**: VS Code 가 `ELECTRON_RUN_AS_NODE=1` 을 넣어 두어 `npm start` 가 "registerSchemesAsPrivileged" 오류로 멈춤. `env -u ELECTRON_RUN_AS_NODE npm start` (Git Bash) 또는 일반 터미널에서 실행. 설치본 사용자에게는 해당 없음.
 - 시험 때 데이터 폴더를 따로 쓰려면 `GTD_DATA_DIR=폴더`.
 
+## 어린이집 글뚝딱 (같은 코드, 설치 파일 따로 · 2026-10-27)
+
+기획안: `D:\어린이집글뚝딱` (v0.2). 업종 말 · 규칙은 `src/shared/industry.ts` 의 `isDaycare` 로 나뉨. 앱 안에 업종 고르기 메뉴는 없음.
+
+- 개발 실행: `npm run dev:daycare` · 설치 파일: `npm run dist:daycare` → `release-daycare\어린이집글뚝딱-설치-1.0.0.exe` (설정 `electron-builder.daycare.cjs`)
+- 그냥 `npm run build` · `npm run dist` 는 지금처럼 태권 글뚝딱 (출력 같음 — 2.2.7 과 지시문 · 카드 · 머리말 결과를 글자 단위로 비교)
+- 자료 폴더 `%APPDATA%\어린이집 글뚝딱`, 위치 파일 `%APPDATA%\어린이집글뚝딱-자료위치.txt`, appId `kr.ddalkak.geulttukttak-daycare` → 한 PC에 두 앱을 깔아도 안 섞임
+- 시험: `tests/unit/daycare.test.ts` (이 파일만 어린이집 업종으로 불러옴). 다른 시험 파일을 `GTD_INDUSTRY=daycare` 로 돌리면 태권도 문구를 확인하는 시험은 실패하는 게 맞음
+- 아직 남은 것: 이용권 업종 구분 · 새 버전 알림은 홈페이지 서버 작업 필요 (앱은 `product=daycare` 를 보내고, 이용권에 product 가 있으면 다른 업종은 잠금 · 없으면 통과), 안내 음성은 글자만 (녹음 전), 아이콘은 태권도판과 같음, 강점 목록 · 법 근거는 GPT 검토 중
+
 ## 구조
 
 Electron 44.9 (Chromium · Node 24.22) + React 19 + TypeScript + SQLite(`node:sqlite`, Electron 내장 — 따로 빌드할 모듈 없음) + playwright-core 1.64.
