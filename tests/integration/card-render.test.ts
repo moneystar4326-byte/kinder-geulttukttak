@@ -44,6 +44,15 @@ test('세 가지 스타일 · 두 크기에서 권장 길이 문구는 넘치지
   }
 });
 
+// 2026-10-27 카드 글 2문장 60~110자 (답 + 글 속 구체 내용). 80자가 넘으면 기본 틀은 한 단계 작은 글자
+const LONG2: CardCopy = { title: '친구들 앞에서 망설이는 우리 아이도 괜찮을까요', sub: '네, 처음엔 머뭇거리는 게 자연스러워요. 오늘은 태극 1장을 세 부분으로 나눠 한 부분씩 따라 하고, 해낼 때마다 바로 칭찬해 주었어요. 다음 시간에는 두 부분씩 이어 봐요.', scene: '' };
+test('새 카드 글 최대 길이(약 100자)도 세 가지 스타일 · 두 크기에서 넘치지 않음', { skip: !exe && '크롬 · 엣지 없음' }, async () => {
+  for (const style of CARD_STYLES) for (const size of ['1080x1350', '1080x1080'] as CardSize[]) {
+    const m = await render(LONG2, style, size, `long2_${style}_${size}`);
+    assert.equal(m.overflow, false, `${style} ${size} 넘침 (제목 ${m.titleLines}줄, 보조 ${m.subLines}줄)`);
+  }
+});
+
 test('너무 긴 문구는 넘침으로 판정 (자동 축소하지 않음)', { skip: !exe && '크롬 · 엣지 없음' }, async () => {
   const long = { title: '친구들 앞에서 망설이는 우리 아이를 위한 아주 긴 제목이 여기 계속 이어지고 또 이어집니다', sub: '보조 문구가 아주 길어지면 '.repeat(14), scene: '' };
   const m = await render(long, '따뜻한 일러스트', '1080x1080', 'overflow_check');

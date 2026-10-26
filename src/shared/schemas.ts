@@ -62,7 +62,7 @@ export const CARD_COPY_JSON = {
         type: 'object', additionalProperties: false, required: ['title', 'sub', 'scene', 'afterSectionId'],
         properties: {
           title: { type: 'string', description: '카드 제목 10~28자' },
-          sub: { type: 'string', description: '보조 문구 30~80자' },
+          sub: { type: 'string', description: '2문장 60~110자: 제목에 대한 답 + 글 속 구체 내용' },
           scene: { type: 'string', description: '배경 그림 장면 설명 (영어, 글자 없는 장면)' },
           afterSectionId: str,
         },
@@ -94,7 +94,7 @@ export const PARAGRAPH_JSON = {
 export const CardOneSchema = z.object({ title: z.string().min(1), sub: z.string().min(1) });
 export const CARD_ONE_JSON = {
   type: 'object', additionalProperties: false, required: ['title', 'sub'],
-  properties: { title: { type: 'string', description: '카드 제목 10~28자' }, sub: { type: 'string', description: '보조 문구 30~80자' } },
+  properties: { title: { type: 'string', description: '카드 제목 10~28자' }, sub: { type: 'string', description: '2문장 60~110자: 제목에 대한 답 + 글 속 구체 내용' } },
 } as const;
 
 export const TitlesSchema = z.object({ titleCandidates: z.array(z.string().min(1)).length(3) });

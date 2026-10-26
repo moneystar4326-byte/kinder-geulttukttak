@@ -45,7 +45,7 @@ function CardBox({ card, cs, articleId, busy, onChanged, kind }: { card: Card; c
         <small className={t > 28 || t < 10 ? 'badge warn' : 'hint'}>{t}자 · 10~28자가 보기 좋아요</small>
         <div className="hint" style={{ fontWeight: 600, marginTop: 6 }}>작은 글씨 (제목 아래 설명)</div>
         <textarea value={sub} onChange={(e) => setSub(e.target.value)} />
-        <small className={s > 80 || s < 30 ? 'badge warn' : 'hint'}>{s}자 · 30~80자가 보기 좋아요</small>
+        <small className={s > 110 || s < 40 ? 'badge warn' : 'hint'}>{s}자 · 60~110자가 보기 좋아요</small>
         <div className="row" style={{ marginTop: 6 }}>
           <button className="btn small primary" disabled={!changed || busy} onClick={apply} title="고친 글을 카드에 다시 얹어요. 그림은 그대로라 비용이 없어요.">문구 적용</button>
           <button className="btn small" disabled={busy || suggesting} onClick={suggest} title="AI가 이 카드의 큰 글씨 · 작은 글씨를 새로 써서 칸에 넣어요. 그림은 그대로예요.">{suggesting ? '쓰는 중…' : '문구만 다시'}</button>
