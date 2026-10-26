@@ -1,17 +1,15 @@
 // 앱 전체가 같이 쓰는 데이터 모양
-import { isDaycare, type Writer } from './industry';
+import type { Writer } from './daycare';
 
 export const ARTICLE_KINDS = ['수업 후기', '성장 이야기', '행사 안내', '모집 안내', '교육 정보'] as const;
 export type ArticleKind = (typeof ARTICLE_KINDS)[number];
 
 // 어린이집판은 영아 · 유아 (2026-10-27 기획안 v0.2)
-export const AUDIENCES: readonly string[] = isDaycare ? ['영아 (만 0~2세)', '유아 (만 3~5세)'] : ['유치부', '초등 저학년', '초등 고학년', '중등 이상', '성인'];
+export const AUDIENCES: readonly string[] = ['영아 (만 0~2세)', '유아 (만 3~5세)'];
 export const TONES = ['따뜻한 설명형', '전문적인 교육형'] as const;
 export type Tone = (typeof TONES)[number];
 // 순서가 뜻: 0 소개 · 1 상담 · 2 가정 · 3 인사 (quick.ts 가 번호로 고름)
-export const ENDINGS: readonly string[] = isDaycare
-  ? ['어린이집 소개로 마무리', '입소 상담 안내로 마무리', '가정에서 해 볼 것으로 마무리', '마무리 인사만']
-  : ['도장 소개로 마무리', '상담 안내로 마무리', '가정에서 해 볼 것으로 마무리', '마무리 인사만'];
+export const ENDINGS: readonly string[] = ['어린이집 소개로 마무리', '입소 상담 안내로 마무리', '가정에서 해 볼 것으로 마무리', '마무리 인사만'];
 
 export interface DojoProfile {
   id: string;
@@ -23,20 +21,20 @@ export interface DojoProfile {
   classFeatures: string; // 아래 칸들을 모은 것 (글을 쓸 때 AI에 전달)
   hours?: string; // 수업 시간
   classes?: string; // 반 구성
-  promoDay?: string; // 승급심사
-  strengths?: string[]; // 우리 도장 강점 (체크한 것만 글에 씀)
+  promoDay?: string; // 정기 행사 (생일잔치 등)
+  strengths?: string[]; // 우리 어린이집 강점 (체크한 것만 글에 씀)
   strengthsEtc?: string; // 그 밖의 강점 (쉼표)
   otherFacts?: string; // 그 밖의 운영 사실
   credentials?: string; // 확인 가능한 내용만
   contact?: string;
   consultLink?: string;
   blogUrl?: string;
-  mapName?: string; // 네이버 지도에서 검색할 도장 이름 (비우면 도장명) // https://blog.naver.com/아이디 (네이버 초안 입력에 필요)
+  mapName?: string; // 네이버 지도에서 검색할 어린이집 이름 (비우면 어린이집 이름) // https://blog.naver.com/아이디 (네이버 초안 입력에 필요)
   logoPath?: string; // 앱 폴더 assets 안으로 복사한 경로
   logoScale?: number; // 카드 로고 크기 % (60~200, 기본 120) · 2026-10-22 파일럿
-  logoOnDobok?: boolean; // 카드 그림 속 아이 도복 왼쪽 가슴에 로고 (AI가 그려서 모양이 조금 다를 수 있음)
-  dobokRefPath?: string; // 아이 도복 · 품띠 참고 사진 (그림에 그대로 따라 그리게)
-  coachRefPath?: string; // 사범님 도복 참고 사진
+  logoOnDobok?: boolean; // 카드 그림 속 아이 원복 왼쪽 가슴에 로고 (원복 사진이 있을 때만) (AI가 그려서 모양이 조금 다를 수 있음)
+  dobokRefPath?: string; // 원복 참고 사진 (그림에 그대로 따라 그리게) — 칸 이름은 태권 글뚝딱 때 그대로
+  coachRefPath?: string; // 교실 참고 사진 — 칸 이름은 태권 글뚝딱 때 그대로
   brand: { main: string; accent: string };
   tone: Tone;
   avoidWords: string; // 쉼표 구분
@@ -84,7 +82,7 @@ export interface ArticleInput {
   ending: string;
   includeProfile: { philosophy: boolean; classFeatures: boolean; credentials: boolean; contact: boolean; address: boolean };
   withCards: boolean;
-  titlePrefix?: string; // 예: [보라매초 근처 태권도] — 코드가 제목 앞에 붙임 (AI에 동네 이름을 맡기지 않음)
+  titlePrefix?: string; // 예: [롯데낙천대아파트 어린이집] — 코드가 제목 앞에 붙임 (AI에 동네 이름을 맡기지 않음)
   writer?: Writer; // 이 글을 쓰는 사람 (어린이집판). 고른 때의 이름 · 반을 그대로 담음
   writerSign?: boolean; // 글 끝에 글쓴이 한 줄 (코드가 붙임)
 }

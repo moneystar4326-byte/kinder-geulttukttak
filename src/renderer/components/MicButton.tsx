@@ -1,8 +1,8 @@
-// 메모 말로 넣기: 누르면 녹음 → 한 번 더 누르면(또는 1분이 되면) 멈추고 관장님 OpenAI 키로 받아쓰기 → onText
+// 메모 말로 넣기: 누르면 녹음 → 한 번 더 누르면(또는 1분이 되면) 멈추고 원장님 · 선생님 OpenAI 키로 받아쓰기 → onText
 // 녹음은 메모리에만 있고 저장하지 않음. 마이크 권한은 main(index.ts)이 우리 화면의 소리만 허용
 import { useEffect, useRef, useState } from 'react';
 import { call } from '../api';
-import { IND } from '../../shared/industry';
+import { APP } from '../../shared/daycare';
 
 const MAX_SEC = 60;
 const pickMime = () => ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((m) => MediaRecorder.isTypeSupported(m)) ?? '';
@@ -55,7 +55,7 @@ export function MicButton({ onText, disabled }: { onText: (text: string) => void
         {state === 'rec' ? `■ 다 말했어요 (${sec}초)` : state === 'busy' ? '글자로 바꾸는 중…' : '🎤 말로 넣기'}
       </button>
       {state === 'rec' && <span className="hint">듣고 있어요. 다 말씀하시면 다시 누르세요 (최대 {MAX_SEC}초)</span>}
-      {state === 'idle' && !err && <span className="hint">{IND.owner} OpenAI 키로 받아써요 (1분에 약 8원) · {IND.place} 이름 · 동네 이름을 알아듣게 힌트를 줘요</span>}
+      {state === 'idle' && !err && <span className="hint">{APP.owner} OpenAI 키로 받아써요 (1분에 약 8원) · {APP.place} 이름 · 동네 이름을 알아듣게 힌트를 줘요</span>}
       {err && <span className="note err" role="alert">{err}</span>}
     </span>
   );

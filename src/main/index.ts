@@ -14,23 +14,23 @@ import { loadSettings } from './settings';
 import { restoreBackup } from './backup';
 import { initLog, log } from './log';
 import { createLicense, readDeviceHash } from './license';
-import { IND, isDaycare } from '../shared/industry';
+import { APP } from '../shared/daycare';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'gtd-asset', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
 // 시험용: 데이터 폴더를 따로 (실사용 자료와 섞이지 않게)
 if (process.env.GTD_DATA_DIR) app.setPath('userData', process.env.GTD_DATA_DIR);
 // 자료 폴더 옮기기: %APPDATA%\글뚝딱-자료위치.txt 에 적힌 폴더를 씀 (2026-10-18 사용자: D 드라이브에 두고 싶음)
-// 어린이집판은 위치 파일 · 기본 자료 폴더가 따로 (%APPDATA%\어린이집글뚝딱-자료위치.txt · %APPDATA%\어린이집 글뚝딱) — 한 PC에 두 앱을 깔아도 섞이지 않게
+// 위치 파일 · 기본 자료 폴더가 태권 글뚝딱과 따로 (%APPDATA%\어린이집글뚝딱-자료위치.txt · %APPDATA%\어린이집 글뚝딱) — 한 PC에 두 앱을 깔아도 섞이지 않게
 else {
-  if (isDaycare) app.setPath('userData', path.join(app.getPath('appData'), IND.appName));
+  app.setPath('userData', path.join(app.getPath('appData'), APP.appName));
   let where = '';
-  try { where = fs.readFileSync(path.join(app.getPath('appData'), IND.dataLocFile), 'utf-8').trim(); } catch { /* 없으면 기본 위치 */ }
+  try { where = fs.readFileSync(path.join(app.getPath('appData'), APP.dataLocFile), 'utf-8').trim(); } catch { /* 없으면 기본 위치 */ }
   if (where && fs.existsSync(where)) app.setPath('userData', where);
   else if (where) {
     // 적어 둔 자료 폴더가 없으면 (드라이브가 안 붙음 등) 빈 자료로 켜지 않고 알림 후 종료 — 2026-10-18 버그 점검
     // showErrorBox 는 ready 전에도 쓸 수 있음 → 아래에서 DB 를 만들기 전에 멈춤
-    dialog.showErrorBox('글뚝딱 자료 폴더를 찾지 못했어요', [`자료 폴더가 없어요: ${where}`, '', '드라이브가 연결되어 있는지 확인한 뒤 다시 켜 주세요.', `자료 위치를 바꾸려면 ${path.join(app.getPath('appData'), IND.dataLocFile)} 파일을 고치거나 지우면 돼요.`].join(String.fromCharCode(10)));
+    dialog.showErrorBox('글뚝딱 자료 폴더를 찾지 못했어요', [`자료 폴더가 없어요: ${where}`, '', '드라이브가 연결되어 있는지 확인한 뒤 다시 켜 주세요.', `자료 위치를 바꾸려면 ${path.join(app.getPath('appData'), APP.dataLocFile)} 파일을 고치거나 지우면 돼요.`].join(String.fromCharCode(10)));
     process.exit(1);
   }
 }
@@ -67,7 +67,7 @@ let jarvisQuick = jarvisArg(process.argv);
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1360, height: 900, minWidth: 900, minHeight: 640, title: IND.appName, backgroundColor: '#F7F7F5', show: false,
+    width: 1360, height: 900, minWidth: 900, minHeight: 640, title: APP.appName, backgroundColor: '#F7F7F5', show: false,
     webPreferences: { preload: path.join(__dirname, '../preload/index.js'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, spellcheck: false },
   });
   win.setMenuBarVisibility(false);

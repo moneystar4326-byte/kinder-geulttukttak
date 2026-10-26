@@ -1,9 +1,8 @@
 // 블로그 글 모양 (2026-10-18 사용자: 1버전처럼 이모지 · 큰 소제목 · 생동감 · 태그)
 // 1버전(태권 글뚝딱 shared/layout.ts · lines.ts)의 규칙을 옮김
 import type { ArticleDoc } from './types';
-import { isDaycare } from './industry';
 
-export const HEADING_EMOJI = isDaycare ? ['🌱', '💡', '📌', '🙌', '✨', '🧸', '🗓️'] : ['🥋', '💡', '📌', '🙌', '✨', '💪', '🗓️'];
+export const HEADING_EMOJI = ['🌱', '💡', '📌', '🙌', '✨', '🧸', '🗓️'];
 
 // 앞에 붙은 이모지 · 기호 떼기 (AI가 붙인 것을 지우고 코드가 같은 모양으로 다시 붙임)
 export const stripLeadEmoji = (s: string) => s.replace(/^[\p{Extended_Pictographic}\u{FE0F}\u{200D}\s■□●○▶︎▷-]+/u, '').trim();

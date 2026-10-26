@@ -7,7 +7,7 @@ import { NewArticle } from './pages/NewArticle';
 import { History } from './pages/History';
 import { ArticlePage } from './pages/ArticlePage';
 import { AccountChip, UpdateBar, type Latest, type LicenseStatus } from './components/Account';
-import { IND } from '../shared/industry';
+import { APP } from '../shared/daycare';
 
 export type Route = { page: 'new' } | { page: 'history' } | { page: 'profile' } | { page: 'settings' } | { page: 'article'; id: string };
 
@@ -52,10 +52,10 @@ export function App() {
     <Ctx.Provider value={value}>
       <div className="app">
         <aside className="side">
-          <div className="brand">{IND.appName}<small>{IND.appSub}</small></div>
+          <div className="brand">{APP.appName}<small>{APP.appSub}</small></div>
           {nav('new', '새 글 작성')}
           {nav('history', '작성 이력')}
-          {nav('profile', `${IND.place} 정보`)}
+          {nav('profile', `${APP.place} 정보`)}
           {nav('settings', '설정')}
           <AccountChip />
           <div className="foot">

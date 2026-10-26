@@ -2,7 +2,7 @@
 import type { ArticleDoc, ArticleInput, DojoProfile, ReviewFlag } from './types';
 import { bodyText, countDoc, minCharsFor } from './count';
 import { uncheckedMentions } from './strengths';
-import { IND, isDaycare } from './industry';
+import { APP } from './daycare';
 
 // 생성 전에 빠진 재료 (빠지면 먼저 보완 요청)
 export function missingInputs(input: ArticleInput): string[] {
@@ -11,8 +11,8 @@ export function missingInputs(input: ArticleInput): string[] {
   if (!input.topic.trim()) miss.push('주제');
   // 주요 키워드는 비워도 됨 (주제를 씀 — withKeywordFallback)
   if (input.subKeywords.length > 2) miss.push('보조 키워드는 2개까지');
-  if (input.kind === '수업 후기' && !f.activities.trim()) miss.push(isDaycare ? '한 놀이 · 활동' : '진행 활동');
-  // 한 줄 메모(진행 활동)가 있으면 행사 · 모집 칸은 비어도 됨 — 메모에 있는 것만 쓰고 없는 건 "도장으로 문의" (2026-10-18)
+  if (input.kind === '수업 후기' && !f.activities.trim()) miss.push('한 놀이 · 활동');
+  // 한 줄 메모(진행 활동)가 있으면 행사 · 모집 칸은 비어도 됨 — 메모에 있는 것만 쓰고 없는 건 "어린이집으로 문의" (2026-10-18)
   if (input.kind === '행사 안내' && !f.activities.trim()) {
     const e = f.event;
     if (!e?.when.trim()) miss.push('행사 일시');
@@ -20,7 +20,7 @@ export function missingInputs(input: ArticleInput): string[] {
     if (!e?.who.trim()) miss.push('행사 대상');
     if (!e?.apply.trim()) miss.push('신청 방법');
   }
-  if (input.kind === '모집 안내' && !f.activities.trim() && !f.recruit?.who.trim()) miss.push(isDaycare ? '입소 대상' : '모집 대상');
+  if (input.kind === '모집 안내' && !f.activities.trim() && !f.recruit?.who.trim()) miss.push('입소 대상');
   if (input.kind === '성장 이야기') {
     if (!f.growth?.before.trim()) miss.push('이전 모습');
     if (!f.growth?.now.trim()) miss.push('현재 관찰');
@@ -33,12 +33,12 @@ export function withKeywordFallback(input: ArticleInput): ArticleInput {
   return input.mainKeyword.trim() ? input : { ...input, mainKeyword: input.topic.trim() };
 }
 
-// 목표 지역이 도장 소재지와 다르면 확인 안내 (그 지역에 있다고 쓰지 않게)
+// 목표 지역이 어린이집 소재지와 다르면 확인 안내 (그 지역에 있다고 쓰지 않게)
 export function regionWarning(input: ArticleInput, profile: DojoProfile): string | null {
   const a = input.region.replace(/\s/g, ''), b = profile.region.replace(/\s/g, '');
   if (!a || !b) return null;
   if (a.includes(b) || b.includes(a)) return null;
-  return `목표 지역(${input.region})이 ${IND.place} 소재지(${profile.region})와 달라요. 글에는 "${input.region}에 있다"고 쓰지 않고, 가까운 곳이라는 사실만 써요.`;
+  return `목표 지역(${input.region})이 ${APP.place} 소재지(${profile.region})와 달라요. 글에는 "${input.region}에 있다"고 쓰지 않고, 가까운 곳이라는 사실만 써요.`;
 }
 
 // 보장 · 과장 표현 (기획서 6.1)
@@ -65,11 +65,11 @@ export function localFlags(doc: ArticleDoc, profile: DojoProfile, input?: Articl
   const avoid = profile.avoidWords.split(',').map((s) => s.trim()).filter(Boolean);
   for (const s of doc.sections) {
     const text = [s.heading ?? '', ...s.paragraphs].join('\n');
-    for (const [re, label] of isDaycare ? [...BANNED, ...DAYCARE_BANNED] : BANNED) if (re.test(text)) flags.push({ code: 'banned', message: `${label}: "${text.match(re)![0]}"`, sectionId: s.id });
+    for (const [re, label] of [...BANNED, ...DAYCARE_BANNED]) if (re.test(text)) flags.push({ code: 'banned', message: `${label}: "${text.match(re)![0]}"`, sectionId: s.id });
     for (const w of avoid) if (text.includes(w)) flags.push({ code: 'avoid-word', message: `피할 표현 "${w}"이 있어요`, sectionId: s.id });
   }
   for (const m of uncheckedMentions(bodyText(doc), profile)) flags.push({ code: 'unchecked-service', message: m });
-  if (isDaycare && input) {
+  if (input) {
     const body = bodyText(doc);
     for (const a of unknownAmounts(body, factsText(input, profile))) flags.push({ code: 'fee', message: `사실 칸에 없는 금액 "${a}"이 글에 있어요. 보육료 · 필요경비는 적어 준 그대로만 써요.` });
     for (const n of childNames(memoText(input))) if (body.includes(n)) flags.push({ code: 'child-name', message: `메모에 있던 이름 "${n}"이 글에 있어요. 아이 이름이면 "한 친구"로 바꿔 주세요.` });
@@ -90,11 +90,9 @@ export function localFlags(doc: ArticleDoc, profile: DojoProfile, input?: Articl
 }
 
 export const KEYWORD_MAX = 6;
-const KEYWORD_TAILS = isDaycare
-  ? ['국공립어린이집', '가정어린이집', '민간어린이집', '직장어린이집', '어린이집', '유치원'] // "놀이"는 넣지 않음 (물놀이 → 물 놀이)
-  : ['태권도장', '태권도', '체육관', '줄넘기', '품새', '학원', '운동'];
+const KEYWORD_TAILS = ['국공립어린이집', '가정어린이집', '민간어린이집', '직장어린이집', '어린이집', '유치원']; // "놀이"는 넣지 않음 (물놀이 → 물 놀이)
 
-// 검색어 → 본문에 쓸 띄어 쓴 꼴 ("신대방동태권도" → "신대방동 태권도", 이미 띄어 썼으면 그대로)
+// 검색어 → 본문에 쓸 띄어 쓴 꼴 ("신대방동어린이집" → "신대방동 어린이집", 이미 띄어 썼으면 그대로)
 export function spacedKeyword(kw: string) {
   const k = kw.trim();
   if (/\s/.test(k)) return k;

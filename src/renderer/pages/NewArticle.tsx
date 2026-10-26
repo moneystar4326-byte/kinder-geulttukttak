@@ -10,35 +10,23 @@ import { hintWords, pickKeywords } from '../../shared/keywords';
 import { autoPrefix, dongOf, prefixNames } from '../../shared/areas';
 import { buildQuickInput, emptyInput } from '../../shared/quickInput';
 import { MicButton } from '../components/MicButton';
-import { IND, isDaycare, kindLabel, writerLabel, type Writer } from '../../shared/industry';
+import { APP, kindLabel, writerLabel, type Writer } from '../../shared/daycare';
 
 // 말로 넣은 글은 적어 둔 메모 뒤에 이어 붙임
 const appendSpoken = (prev: string, text: string) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text);
 
-// 화면 문구 (태권도판은 2.2.6 그대로)
-const TX = isDaycare
-  ? {
-      quickPh: ['예: 햇님반 친구들이랑 가을 낙엽 밟기 놀이를 했어요', '예: 만 1세 아기 어린이집 적응 기간은 얼마나 걸릴까요?', '예: 10월 30일 할로윈 파티 안내'],
-      quickHint: '주제나 오늘 있었던 일을 한 줄 적으면, 어린이집 정보(지역 · 보육 특징 · 보육 철학)와 함께 1,500자 이상 글을 만들어요 (행사 · 입소 안내는 1,000자 이상). 적지 않은 장면 · 대화 · 아이 이름 · 금액은 만들지 않으니, 실제 있었던 일을 적을수록 글이 풍성해져요.',
-      topicHint: '예: 낙엽 밟기 바깥놀이', memoHint: '오늘 있었던 놀이 · 생활을 말하듯 적고 버튼을 누르면 아래 칸에 나눠 넣어요. 메모에 없는 내용은 만들지 않아요.',
-      memoGrowth: '예: 만 2세 친구가 처음엔 엄마랑 안 떨어지려고 울었는데, 2주 동안 좋아하는 블록 놀이로 아침을 시작했더니 이제 웃으며 들어와요. 자신감 전하고 싶어요',
-      memoPh: '예: 오늘 햇님반은 밀가루 반죽 촉감놀이를 했어요. 손으로 조물조물 만져 보게 했고, 한 친구가 처음엔 망설이다가 끝에는 동그랗게 빚었어요. 호기심 전하고 싶어요',
-      act: '한 놀이 · 활동', actHint: '예: 밀가루 반죽 촉감놀이, 바깥 산책', coach: '선생님이 도운 점', coachHint: '구체적으로 (예: 먼저 손끝으로 만져 보게 하기)',
-      recruitWho: '입소 대상', recruitTrial: '상담 · 대기 신청 방법',
-      values: ['호기심', '배려', '나눔', '자신감', '도전', '협동', '즐거움', '자립', '감사'],
-      facts: '여기 적은 사실로만 글을 써요. 적지 않은 장면 · 대화 · 수상 · 경력 · 금액 · 일정은 만들지 않아요. 아이 이름은 적지 않아도 되고, 적어도 글에는 "한 친구"처럼 익명으로 써요.',
-    }
-  : {
-      quickPh: ['예: 품새 대회 나가서 1학년 친구들이 단체 3등 했어요', '예: 유치부 태권도 몇 살부터 시작하면 좋을까요?', '예: 줄넘기 수행평가 준비'],
-      quickHint: '주제나 오늘 있었던 일을 한 줄 적으면, 도장 정보(지역 · 경력 · 수업 특징 · 교육 철학)와 함께 1,500자 이상 글을 만들어요 (행사 · 모집 안내는 1,000자 이상). 적지 않은 장면 · 대화 · 수상은 만들지 않으니, 실제 있었던 일을 적을수록 글이 풍성해져요.',
-      topicHint: '예: 태극 1·2장 품새 발표 수업', memoHint: '오늘 수업에서 있었던 일을 말하듯 적고 버튼을 누르면 아래 칸에 나눠 넣어요. 메모에 없는 내용은 만들지 않아요.',
-      memoGrowth: '예: 6살 친구가 처음엔 엄마랑 안 떨어지려고 울었는데, 3주 동안 인사부터 같이 했더니 이제 혼자 들어와서 큰 소리로 인사해요. 자신감 전하고 싶어요',
-      memoPh: '예: 오늘 유치부 앞차기 연습했어요. 무릎 먼저 올리라고 계속 말해줬고, 한 친구가 처음엔 못 하다가 끝에 제대로 찼어요. 도전 전하고 싶어요',
-      act: '진행 활동', actHint: '예: 태극 1·2장, 발표 연습', coach: '지도 포인트', coachHint: '구체적으로 (예: 방향을 보고 움직이기)',
-      recruitWho: '모집 대상', recruitTrial: '체험 방법',
-      values: ['도전', '끈기', '자신감', '예절', '배려', '집중', '용기', '협동', '책임감'],
-      facts: '여기 적은 사실로만 글을 써요. 적지 않은 장면 · 대화 · 수상 · 경력 · 가격 · 일정은 만들지 않아요. 아이 이름은 적지 않아도 되고, 적어도 글에는 익명으로 써요.',
-    };
+// 화면 문구
+const TX = {
+  quickPh: ['예: 햇님반 친구들이랑 가을 낙엽 밟기 놀이를 했어요', '예: 만 1세 아기 어린이집 적응 기간은 얼마나 걸릴까요?', '예: 10월 30일 할로윈 파티 안내'],
+  quickHint: '주제나 오늘 있었던 일을 한 줄 적으면, 어린이집 정보(지역 · 보육 특징 · 보육 철학)와 함께 1,500자 이상 글을 만들어요 (행사 · 입소 안내는 1,000자 이상). 적지 않은 장면 · 대화 · 아이 이름 · 금액은 만들지 않으니, 실제 있었던 일을 적을수록 글이 풍성해져요.',
+  topicHint: '예: 낙엽 밟기 바깥놀이', memoHint: '오늘 있었던 놀이 · 생활을 말하듯 적고 버튼을 누르면 아래 칸에 나눠 넣어요. 메모에 없는 내용은 만들지 않아요.',
+  memoGrowth: '예: 만 2세 친구가 처음엔 엄마랑 안 떨어지려고 울었는데, 2주 동안 좋아하는 블록 놀이로 아침을 시작했더니 이제 웃으며 들어와요. 자신감 전하고 싶어요',
+  memoPh: '예: 오늘 햇님반은 밀가루 반죽 촉감놀이를 했어요. 손으로 조물조물 만져 보게 했고, 한 친구가 처음엔 망설이다가 끝에는 동그랗게 빚었어요. 호기심 전하고 싶어요',
+  act: '한 놀이 · 활동', actHint: '예: 밀가루 반죽 촉감놀이, 바깥 산책', coach: '선생님이 도운 점', coachHint: '구체적으로 (예: 먼저 손끝으로 만져 보게 하기)',
+  recruitWho: '입소 대상', recruitTrial: '상담 · 대기 신청 방법',
+  values: ['호기심', '배려', '나눔', '자신감', '도전', '협동', '즐거움', '자립', '감사'],
+  facts: '여기 적은 사실로만 글을 써요. 적지 않은 장면 · 대화 · 수상 · 경력 · 금액 · 일정은 만들지 않아요. 아이 이름은 적지 않아도 되고, 적어도 글에는 "한 친구"처럼 익명으로 써요.',
+};
 
 // 어린이집: 누가 쓰는 글인가요? (어린이집 정보의 글쓴이 목록, 없으면 원장님)
 const DIRECTOR: Writer = { id: 'director', role: '원장', name: '' };
@@ -84,7 +72,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
     call<DojoProfile | null>('profile:get').then((p) => {
       setProfile(p);
       if (!saved) setInput(emptyInput(p));
-      // 도장 정보에 있는 것은 다시 묻지 않음: 비어 있으면 채움
+      // 어린이집 정보에 있는 것은 다시 묻지 않음: 비어 있으면 채움
       else if (p) setInput((cur) => ({ ...cur, region: cur.region || p.region, audience: cur.audience || p.audiences[0] || cur.audience }));
     });
   }, []); // eslint-disable-line
@@ -153,7 +141,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
   const [writerSign, setWriterSignState] = useState(local.get('writer-sign', false));
   const setWriterId = (id: string) => { setWriterIdState(id); local.set('writer-id', id); };
   const setWriterSign = (v: boolean) => { setWriterSignState(v); local.set('writer-sign', v); };
-  const writer = isDaycare ? writers.find((w) => w.id === writerId) ?? writers.find((w) => w.role === '원장') ?? DIRECTOR : undefined;
+  const writer = writers.find((w) => w.id === writerId) ?? writers.find((w) => w.role === '원장') ?? DIRECTOR;
 
   const start = async () => {
     if (miss.length) { msg.err(new Error(`먼저 채워 주세요: ${miss.join(', ')}`)); return; }
@@ -169,7 +157,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
     } catch (e) { msg.err(e); setBusy(''); }
   };
 
-  // 빠른 작성: 주제(또는 메모) 한 줄 → 도장 정보 + 일반 교육 설명으로 바로 글 + 카드
+  // 빠른 작성: 주제(또는 메모) 한 줄 → 어린이집 정보 + 일반 교육 설명으로 바로 글 + 카드
   const [quick, setQuick] = useState(local.get('quick-memo', ''));
   const [quickCards, setQuickCards] = useState(true);
   const [quickPrefix, setQuickPrefixState] = useState(local.get('quick-prefix', true));
@@ -192,7 +180,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
         } catch { /* 키워드 조회가 안 돼도 글은 만듦 */ }
         setBusy('quick');
       }
-      // 제목 앞 동네 이름: 글마다 돌아가며 ([신대방동 태권도] → [대길초 근처 태권도] → …)
+      // 제목 앞 동네 이름: 글마다 돌아가며 ([신대방동 어린이집] → [롯데낙천대아파트 어린이집] → …)
       const titlePrefix = quickPrefix ? autoPrefix(profile?.region ?? '', profile?.nearbyAreas ?? [], (await call<unknown[]>('article:list').catch(() => [])).length) : '';
       const q = buildQuickInput({ memo, profile, main, subs, withCards: quickCards, titlePrefix, writer, writerSign });
       const art = await call<{ id: string }>('article:create', { input: q, keywords: chosen });
@@ -203,7 +191,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
       go({ page: 'article', id: art.id });
     } catch (e) { msg.err(e); setBusy(''); }
   };
-  // 자비스가 넘긴 주제: 도장 정보를 불러온 뒤 한 번만 바로 시작
+  // 자비스가 넘긴 주제: 어린이집 정보를 불러온 뒤 한 번만 바로 시작
   useEffect(() => {
     if (!jarvis || !profile || busy) return;
     onJarvisDone?.();
@@ -218,16 +206,16 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
       <LockBanner />
       {guideAt && <SetupGuide start={guideAt} onClose={() => setGuideAt(null)} />}
       {!info.secrets.openai && <div className="note warn">AI 연결(OpenAI 키)이 아직 안 됐어요. 연결해야 글을 만들 수 있어요. <button className="btn link" onClick={() => setGuideAt('A03')}>🔊 비서와 같이 연결하기</button></div>}
-      {!profile && <div className="note warn">{IND.place} 정보를 먼저 저장해 주세요. <button className="btn link" onClick={() => go({ page: 'profile' })}>{IND.place} 정보로 가기</button></div>}
+      {!profile && <div className="note warn">{APP.place} 정보를 먼저 저장해 주세요. <button className="btn link" onClick={() => go({ page: 'profile' })}>{APP.place} 정보로 가기</button></div>}
       <div className="panel">
         <h2>주제 한 줄로 바로 쓰기</h2>
         <p className="hint">{TX.quickHint}</p>
-        {isDaycare && <WriterPick writers={writers} value={writer} onChange={(w) => setWriterId(w.id)} sign={writerSign} onSign={setWriterSign} />}
+        {<WriterPick writers={writers} value={writer} onChange={(w) => setWriterId(w.id)} sign={writerSign} onSign={setWriterSign} />}
         <textarea rows={4} value={quick} onChange={(e) => setQuick(e.target.value)}
           placeholder={TX.quickPh.join(String.fromCharCode(10))} />
         <div className="row" style={{ marginTop: 8 }}><MicButton disabled={!info.secrets.openai || !!busy} onText={(t) => setQuick((q) => appendSpoken(q, t))} /></div>
         <div className="row" style={{ marginTop: 10 }}>
-          <label className="row"><input type="checkbox" checked={quickPrefix} onChange={(e) => setQuickPrefix(e.target.checked)} /> 제목 앞에 동네 이름 붙이기 <span className="hint">({prefixNames(profile?.region ?? '', profile?.nearbyAreas ?? []).join(' · ') || `${IND.place} 정보에 지역 · 주변 장소가 없어요`} 중 돌아가며{dongOf(profile?.region ?? '') ? `, [${dongOf(profile?.region ?? '')} ${IND.term}]는 세 편에 한 번` : ''})</span></label>
+          <label className="row"><input type="checkbox" checked={quickPrefix} onChange={(e) => setQuickPrefix(e.target.checked)} /> 제목 앞에 동네 이름 붙이기 <span className="hint">({prefixNames(profile?.region ?? '', profile?.nearbyAreas ?? []).join(' · ') || `${APP.place} 정보에 지역 · 주변 장소가 없어요`} 중 돌아가며{dongOf(profile?.region ?? '') ? `, [${dongOf(profile?.region ?? '')} ${APP.term}]는 세 편에 한 번` : ''})</span></label>
           <label className="row"><input type="checkbox" checked={quickCards} onChange={(e) => setQuickCards(e.target.checked)} /> 카드뉴스 3장도 만들기 {quickCards && card.mode === 'ai' && <span className="hint">(AI 그림 3장 비용 발생)</span>}</label>
         </div>
         <div className="row" style={{ marginTop: 10 }}>
@@ -248,7 +236,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
         <button className="btn small" onClick={() => { if (confirm('입력한 내용을 비울까요?')) { local.del(KEY); setInput(emptyInput(profile)); setKeywords([]); setStep(1); } }}>새로 쓰기</button>
       </div>
       <LockBanner />
-      {!profile && <div className="note warn">{IND.place} 정보를 먼저 저장해 주세요. <button className="btn link" onClick={() => go({ page: 'profile' })}>{IND.place} 정보로 가기</button></div>}
+      {!profile && <div className="note warn">{APP.place} 정보를 먼저 저장해 주세요. <button className="btn link" onClick={() => go({ page: 'profile' })}>{APP.place} 정보로 가기</button></div>}
 
       <div className="steps">
         {['1 주제 · 키워드', '2 실제 재료', '3 생성 설정'].map((t, i) => <button key={t} className={`step ${step === i + 1 ? 'on' : ''}`} onClick={() => setStep(i + 1)}>{t}</button>)}
@@ -257,14 +245,14 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
       {step === 1 && (
         <div className="split">
           <div className="panel">
-            {isDaycare && <WriterPick writers={writers} value={writer} onChange={(w) => setWriterId(w.id)} sign={writerSign} onSign={setWriterSign} />}
+            {<WriterPick writers={writers} value={writer} onChange={(w) => setWriterId(w.id)} sign={writerSign} onSign={setWriterSign} />}
             <Field label="글 종류" req><Chips options={ARTICLE_KINDS} value={input.kind} label={kindLabel} onChange={(v) => set({ kind: v })} /></Field>
             <Field label="주요 독자" req><Chips options={AUDIENCES} value={input.audience as any} onChange={(v) => set({ audience: v })} /></Field>
-            <Field label="목표 지역" req hint={regionDiff ? `${IND.place} 소재지(${profile!.region})와 달라요. 글에는 그 지역에 있다고 쓰지 않아요.` : `${IND.place} 소재지가 기본값이에요`}>
+            <Field label="목표 지역" req hint={regionDiff ? `${APP.place} 소재지(${profile!.region})와 달라요. 글에는 그 지역에 있다고 쓰지 않아요.` : `${APP.place} 소재지가 기본값이에요`}>
               <input type="text" value={input.region} onChange={(e) => set({ region: e.target.value })} />
             </Field>
             <Field label="주제" req hint={TX.topicHint}><input type="text" value={input.topic} onChange={(e) => { set({ topic: e.target.value }); if (!hint || hint === input.topic) setHint(e.target.value); }} /></Field>
-            <Field label="제목 앞 동네 이름 (선택)" hint={`고른 그대로 제목 앞에 붙여요 (AI가 만들지 않음). 후보는 ${IND.place} 정보의 주변 장소에서 와요`}>
+            <Field label="제목 앞 동네 이름 (선택)" hint={`고른 그대로 제목 앞에 붙여요 (AI가 만들지 않음). 후보는 ${APP.place} 정보의 주변 장소에서 와요`}>
               <select value={input.titlePrefix ?? ''} onChange={(e) => set({ titlePrefix: e.target.value })}>
                 <option value="">붙이지 않음</option>
                 {prefixes.map((p) => <option key={p} value={p}>{p}</option>)}
@@ -367,9 +355,9 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
           <div className="panel">
             <Field label="문체"><Chips options={TONES} value={input.tone} onChange={(v) => set({ tone: v })} /></Field>
             <Field label="마무리"><Chips options={ENDINGS} value={input.ending as any} onChange={(v) => set({ ending: v })} /></Field>
-            <Field label={`이번 글에 넣을 ${IND.place} 정보`} hint={`${IND.place} 정보는 매 글에 무조건 넣지 않아요`}>
+            <Field label={`이번 글에 넣을 ${APP.place} 정보`} hint={`${APP.place} 정보는 매 글에 무조건 넣지 않아요`}>
               <div className="chips">
-                {([['philosophy', IND.philLabel], ['classFeatures', IND.featLabel], ['credentials', '경력 · 자격'], ['contact', '연락처 · 상담 링크'], ['address', '상세 주소']] as const).map(([key, label]) => (
+                {([['philosophy', APP.philLabel], ['classFeatures', APP.featLabel], ['credentials', '경력 · 자격'], ['contact', '연락처 · 상담 링크'], ['address', '상세 주소']] as const).map(([key, label]) => (
                   <button key={key} type="button" className={`chip ${input.includeProfile[key] ? 'on' : ''}`} onClick={() => set({ includeProfile: { ...input.includeProfile, [key]: !input.includeProfile[key] } })}>{label}</button>
                 ))}
               </div>

@@ -12,7 +12,7 @@ import { ArticleInputSchema, DocSchema, ProfileInput } from '../../shared/schema
 import { countDoc } from '../../shared/count';
 import { childNames, hideChildNames, memoText, plainBody, thinFacts, withKeywordFallback } from '../../shared/validation';
 import type { ArticleDoc, ArticleInput, CardSet, KeywordRow } from '../../shared/types';
-import { IND, isDaycare } from '../../shared/industry';
+import { APP } from '../../shared/daycare';
 import { CARD_STYLES } from '../../shared/types';
 import { loadSettings, saveSettings, type AppSettings } from '../settings';
 import { composeClassFeatures } from '../../shared/strengths';
@@ -26,6 +26,9 @@ import { exportFiles, makeBackup, readBackupManifest } from '../backup';
 import { ApiError, toApiError } from '../services/errors';
 import { log } from '../log';
 import { SERVER, type License } from '../license';
+
+// 홈페이지가 어린이집 글뚝딱 최신 버전을 따로 알려 주게 되면 true (지금은 태권 글뚝딱 버전만 알려 줌)
+const LATEST_FOR_DAYCARE = false;
 
 export interface AppCtx {
   db: Db;
@@ -76,11 +79,11 @@ export function registerIpc(ctx: AppCtx) {
   const profileOrThrow = () => {
     const p = db.getProfile();
     if (p) return p;
-    throw new Error(`${IND.place} 정보를 먼저 저장해 주세요`);
+    throw new Error(`${APP.place} 정보를 먼저 저장해 주세요`);
   };
-  // 어린이집: 카드 문구에서 메모 속 아이 이름을 "한 친구"로 (본문은 점검 결과로 알림 — validation.ts)
+  // 카드 문구에서 메모 속 아이 이름을 "한 친구"로 (본문은 점검 결과로 알림 — validation.ts)
   const safeCopies = <T extends { title: string; sub: string }>(cards: T[], input?: ArticleInput): T[] => {
-    if (!isDaycare || !input) return cards;
+    if (!input) return cards;
     const names = childNames(memoText(input)); // 이름은 한 번만 찾음
     return names.length ? cards.map((c) => ({ ...c, title: hideChildNames(c.title, names), sub: hideChildNames(c.sub, names) })) : cards;
   };
@@ -101,8 +104,8 @@ export function registerIpc(ctx: AppCtx) {
   handle('license:refresh', z.undefined(), () => ctx.license.refresh());
   handle('license:unlink', z.undefined(), () => ctx.license.unlink());
   handle('app:latest', z.undefined(), async () => {
-    // 어린이집판: 홈페이지가 아직 업종별 최신 버전을 따로 알려 주지 않아 (태권도판 2.x 를 새 버전으로 안내하게 됨) 묻지 않음 — 서버에 product 구분이 생기면 켬
-    if (isDaycare) return null;
+    // 홈페이지가 아직 어린이집 글뚝딱 최신 버전을 따로 알려 주지 않아 (태권 글뚝딱 2.x 를 새 버전으로 안내하게 됨) 묻지 않음 — 서버에 product 구분이 생기면 켬
+    if (!LATEST_FOR_DAYCARE) return null;
     const r = await fetch(`${SERVER}/api/app/version`, { signal: AbortSignal.timeout(10_000) });
     if (!r.ok) return null;
     const j = (await r.json()) as { latest?: string; minimum?: string; notes?: string[]; download?: string };
@@ -130,7 +133,7 @@ export function registerIpc(ctx: AppCtx) {
   handle('secrets:remove', SecretSchema, (name) => { vault.remove(name); return vault.masked(); });
   // 전담 비서 [담당자 부르기]: 막힌 단계 문구를 카톡에 붙여 넣게 복사 (화면 쪽 클립보드 권한은 막아 둠)
   handle('guide:copy', z.string().min(1).max(300), async (text) => { await clipboard.writeText(text); return true; });
-  // 설치 도우미 [복사한 키 가져오기]: 관장님이 버튼을 누를 때만 클립보드를 한 번 읽음 (몰래 지켜보지 않음)
+  // 설치 도우미 [복사한 키 가져오기]: 원장님 · 선생님이 버튼을 누를 때만 클립보드를 한 번 읽음 (몰래 지켜보지 않음)
   // 키 모양이 맞으면 암호화 저장 후 클립보드를 비움 · 키 원문은 화면으로 돌려주지 않음
   handle('secrets:fromClipboard', z.enum(['openai', 'naverApiKey', 'naverSecret', 'kakao']), async (name) => {
     const v = (await clipboard.readText()).trim();
@@ -150,8 +153,8 @@ export function registerIpc(ctx: AppCtx) {
       return `연결됨: 글 모델 ${s.textModel} · 이미지 모델 ${s.imageModel} 확인 (모델 정보 조회만, 생성 비용 없음)`;
     }
     if (kind === 'naver') {
-      const r = await lookupKeywords(naverCreds(), [IND.term]);
-      return `연결됨: "${IND.term}" 관련 ${r.rows.length}개 받음`;
+      const r = await lookupKeywords(naverCreds(), [APP.term]);
+      return `연결됨: "${APP.term}" 관련 ${r.rows.length}개 받음`;
     }
     const key = vault.get('kakao');
     if (!key) throw new Error('카카오 키가 없어요');
@@ -168,11 +171,11 @@ export function registerIpc(ctx: AppCtx) {
     return { apiKey, secret, customerId };
   }
 
-  // ---------- 도장 프로필 ----------
+  // ---------- 어린이집 프로필 ----------
   handle('profile:get', z.undefined(), () => db.getProfile());
   handle('profile:save', ProfileInput, (p) => {
     const classFeatures = p.strengths ? composeClassFeatures(p) : p.classFeatures; // 칸으로 나눈 자료면 칸을 모아서
-    if (!classFeatures.trim()) throw new Error(isDaycare ? '운영 시간 · 반 구성 · 강점 중 하나 이상 적어 주세요' : '수업 시간 · 반 구성 · 강점 중 하나 이상 적어 주세요');
+    if (!classFeatures.trim()) throw new Error('운영 시간 · 반 구성 · 강점 중 하나 이상 적어 주세요');
     return db.saveProfile({ ...p, classFeatures, id: p.id || 'default' } as any);
   });
   handle('profile:pickLogo', z.undefined(), async () => {
@@ -189,7 +192,7 @@ export function registerIpc(ctx: AppCtx) {
     return dest;
   });
   handle('profile:pickRef', z.enum(['dobok', 'coach']), async (kind) => {
-    const r = await dialog.showOpenDialog(ctx.win()!, { title: isDaycare ? (kind === 'dobok' ? '원복 사진' : '교실 사진') : kind === 'dobok' ? '아이 도복 · 품띠 사진' : '사범님 도복 사진', filters: [{ name: '사진 (PNG · JPG)', extensions: ['png', 'jpg', 'jpeg'] }], properties: ['openFile'] });
+    const r = await dialog.showOpenDialog(ctx.win()!, { title: kind === 'dobok' ? '원복 사진' : '교실 사진', filters: [{ name: '사진 (PNG · JPG)', extensions: ['png', 'jpg', 'jpeg'] }], properties: ['openFile'] });
     if (r.canceled) return null;
     const src = r.filePaths[0];
     if (fs.statSync(src).size > 20 * 1024 * 1024) throw new Error('사진이 너무 커요 (20MB 이하)');
@@ -203,7 +206,7 @@ export function registerIpc(ctx: AppCtx) {
     const key = vault.get('kakao');
     if (!key) throw new Error('설정에서 카카오 REST API 키를 먼저 등록해 주세요. 키 없이 동네 이름을 직접 적어도 돼요.');
     const p = db.getProfile();
-    if (!p) throw new Error(`${IND.place} 정보를 먼저 저장해 주세요`);
+    if (!p) throw new Error(`${APP.place} 정보를 먼저 저장해 주세요`);
     const dong = p.region.trim().split(/\s+/).pop() ?? '';
     const areas = await collectNearby(key, p.address ?? '', [dong, dong.replace(/동$/, '')].filter(Boolean));
     const manual = (p.nearbyAreas ?? []).filter((a) => a.source === 'manual');
@@ -298,7 +301,7 @@ export function registerIpc(ctx: AppCtx) {
     noCardJob(articleId);
     return runner.start('cards', articleId, '카드 문구 만드는 중', async ({ signal, step, jobId }) => {
       const v = db.getVersion(art.currentVersionId!)!;
-      const copies = safeCopies(await a.text.cardCopies(v.doc, v.title, art.input.kind, { signal, onUsage: onUsage(jobId) }, art.input.writer, isDaycare && thinFacts(art.input)), art.input);
+      const copies = safeCopies(await a.text.cardCopies(v.doc, v.title, art.input.kind, { signal, onUsage: onUsage(jobId) }, art.input.writer, thinFacts(art.input)), art.input);
       const cs = db.createCardSet(v.id, { ...style, mode }, copies);
       await cardService(a.image, jobId).renderSet(cs.id, { signal, onStep: step });
     }).job;
@@ -324,7 +327,7 @@ export function registerIpc(ctx: AppCtx) {
     const v = db.getVersion(cs.articleVersionId)!;
     const others = cs.cards.filter((x) => x.id !== cardId).map((x) => x.copy.title);
     const input = db.getArticle(articleId)?.input;
-    return safeCopies([await ai().text.cardOne(v.doc, v.title, c.index, c.copy, others, input?.kind, { onUsage: onUsage() }, input?.writer, isDaycare && !!input && thinFacts(input))], input)[0];
+    return safeCopies([await ai().text.cardOne(v.doc, v.title, c.index, c.copy, others, input?.kind, { onUsage: onUsage() }, input?.writer, !!input && thinFacts(input))], input)[0];
   });
   handle('cards:updateCopy', z.object({ cardId: Id, copy: z.object({ title: z.string().max(80), sub: z.string().max(200), scene: z.string().max(500) }) }), ({ cardId, copy }) => { noCardJob(articleOfCard(cardId)); return cardService(null).updateCopy(cardId, copy); });
   // 스타일 · 크기만 바꿈 (템플릿 모드면 API 없이 다시 합성, AI 배경은 있던 그림을 새 비율로 다시 자름)
@@ -354,7 +357,7 @@ export function registerIpc(ctx: AppCtx) {
     return files;
   });
   handle('backup:create', z.undefined(), async () => {
-    const r = await dialog.showSaveDialog(ctx.win()!, { defaultPath: path.join(settings().saveDir, `${IND.backupName}_${new Date().toISOString().slice(0, 10)}.zip`), filters: [{ name: '백업 (zip)', extensions: ['zip'] }] });
+    const r = await dialog.showSaveDialog(ctx.win()!, { defaultPath: path.join(settings().saveDir, `${APP.backupName}_${new Date().toISOString().slice(0, 10)}.zip`), filters: [{ name: '백업 (zip)', extensions: ['zip'] }] });
     if (r.canceled || !r.filePath) return null;
     return makeBackup(db, ctx.dataDir, r.filePath, app.getVersion());
   });
@@ -381,7 +384,7 @@ export function registerIpc(ctx: AppCtx) {
     const v = art.currentVersionId ? db.getVersion(art.currentVersionId) : null;
     if (!v) throw new Error('글을 먼저 만들어 주세요');
     const p = db.getProfile();
-    if (!p?.blogUrl) throw new Error(`${IND.place} 정보에 네이버 블로그 주소를 적어 주세요 (예: https://blog.naver.com/아이디)`);
+    if (!p?.blogUrl) throw new Error(`${APP.place} 정보에 네이버 블로그 주소를 적어 주세요 (예: https://blog.naver.com/아이디)`);
     const cs = db.latestCardSet(articleId);
     const cards = (cs?.cards ?? []).filter((c) => c.status === 'done' && c.outputPath);
     if (cs && cards.some((c) => c.overflow)) throw new Error('글자가 넘친 카드가 있어요. 카드 문구를 줄인 뒤 넣어 주세요.');
@@ -395,7 +398,7 @@ export function registerIpc(ctx: AppCtx) {
       if (r.state === 'existing-draft') throw Object.assign(new Error('네이버 편집기에 작성 중인 글이 있어 덮어쓰지 않았어요. 새 글로 시작할지 골라 주세요.'), { code: 'existing-draft' });
       if (r.state === 'not-owner') throw new Error(`글쓰기 화면을 열지 못했어요. 로그인한 네이버 아이디가 blog.naver.com/${r.blogId} 의 주인인지 확인해 주세요.`);
       const c = r.check;
-      const msg = [`제목 ${c.titleOk ? '확인' : '다름 — 직접 확인 필요'}`, `이미지 ${c.images}장`, cardNote, r.map === true ? `${IND.place} 지도 넣음` : r.map === false ? `${IND.place} 지도는 못 찾아서 빠짐 (${IND.place} 정보의 지도 검색 이름 확인)` : '', c.leftMarks.length ? `카드 ${c.leftMarks.join(', ')}번은 올리지 못해 자리 글자가 남아 있어요 (네이버 창에서 그 자리에 직접 올려 주세요 · 저장 폴더에 카드 파일이 있어요)` : '', '발행 · 저장은 직접 눌러 주세요'].filter(Boolean).join(' · ');
+      const msg = [`제목 ${c.titleOk ? '확인' : '다름 — 직접 확인 필요'}`, `이미지 ${c.images}장`, cardNote, r.map === true ? `${APP.place} 지도 넣음` : r.map === false ? `${APP.place} 지도는 못 찾아서 빠짐 (${APP.place} 정보의 지도 검색 이름 확인)` : '', c.leftMarks.length ? `카드 ${c.leftMarks.join(', ')}번은 올리지 못해 자리 글자가 남아 있어요 (네이버 창에서 그 자리에 직접 올려 주세요 · 저장 폴더에 카드 파일이 있어요)` : '', '발행 · 저장은 직접 눌러 주세요'].filter(Boolean).join(' · ');
       return `입력 끝: ${msg}`;
     }).job;
   });

@@ -2,7 +2,7 @@
 // 글자가 넘치면 자동으로 줄이지 않고 overflow 로 알려 문구를 줄이게 함 (measure 스크립트)
 import { pathToFileURL } from 'node:url';
 import type { CardCopy, CardSize, CardStyle } from '../../../shared/types';
-import { IND, isDaycare } from '../../../shared/industry';
+import { APP } from '../../../shared/daycare';
 
 export interface CardLayerInput {
   copy: CardCopy;
@@ -18,7 +18,7 @@ export interface CardLayerInput {
 }
 
 export const SAFE = 72; // 안전 여백 시작값
-// 로고 높이: 100% = 64px, 도장 정보에서 60~200% (2026-10-22 파일럿: 로고가 너무 작음)
+// 로고 높이: 100% = 64px, 어린이집 정보에서 60~200% (2026-10-22 파일럿: 로고가 너무 작음)
 export const logoHeight = (scale = 120) => Math.round(64 * Math.min(200, Math.max(60, scale)) / 100);
 export const sizeOf = (s: CardSize) => (s === '1080x1080' ? { w: 1080, h: 1080 } : { w: 1080, h: 1350 });
 export const layoutOf = (style: CardStyle): 'top-text' | 'bottom-text' => (style === '깔끔한 정보형' ? 'bottom-text' : 'top-text');
@@ -27,9 +27,9 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const color = (c: string, d: string) => (/^#[0-9a-f]{6}$/i.test(c) ? c : d);
 const furl = (f: string) => pathToFileURL(f).href;
 
-// 띠 모양 줄 장식 (검정 + 강조색 = 태권도 띠). 어린이집판은 강조색 한 줄 · 제목은 굵은 본문 글꼴 (2026-10-27 기획안 v0.2 8장)
-const stripe = (accent: string) => (isDaycare ? accent : `linear-gradient(180deg,#111 0 50%,${accent} 50% 100%)`);
-const titleFont = (style: CardStyle) => (style === '교육 잡지형' || isDaycare ? 'NotoKR;font-weight:900' : 'BHS');
+// 줄 장식은 강조색 한 줄 · 제목은 굵은 본문 글꼴 (태권 글뚝딱의 띠 모양 줄 · 붓글씨 제목 대신, 2026-10-27 기획안 v0.2 8장)
+const stripe = (accent: string) => accent;
+const titleFont = (_style: CardStyle) => 'NotoKR;font-weight:900';
 
 // 템플릿 배경: AI 그림 없이 CSS 모양만 (AI 생성이라고 표시하지 않음)
 function templateBg(style: CardStyle, main: string, accent: string, index: number) {
@@ -53,7 +53,7 @@ function templateBg(style: CardStyle, main: string, accent: string, index: numbe
 export const SPLIT_IMAGE_RATIO = { '1080x1350': 0.6, '1080x1080': 0.56 } as const; // 정사각형은 가로 그림이 덜 잘리게 조금 더 크게
 function splitHtml(c: CardLayerInput) {
   const { w, h } = sizeOf(c.size);
-  const main = color(c.brand.main, IND.brand.main), accent = color(c.brand.accent, IND.brand.accent);
+  const main = color(c.brand.main, APP.brand.main), accent = color(c.brand.accent, APP.brand.accent);
   const imgH = Math.round(h * SPLIT_IMAGE_RATIO[c.size]);
   const logoH = logoHeight(c.logoScale);
   const foot = c.logoFile ? logoH + 40 : 104; // 로고가 커지면 글 상자가 그만큼 비켜 줌
@@ -72,7 +72,7 @@ function splitHtml(c: CardLayerInput) {
 html,body{width:${w}px;height:${h}px;overflow:hidden;background:${paper}}
 #c{position:relative;width:${w}px;height:${h}px;overflow:hidden;font-family:NotoKR,sans-serif;color:#1A1A1A;background:${paper}}
 #img{position:absolute;left:0;top:0;width:${w}px;height:${imgH}px;object-fit:cover;object-position:center ${sq ? '30%' : '40%'}}
-#band{position:absolute;left:0;right:0;top:${imgH}px;height:10px;background:${isDaycare ? `linear-gradient(90deg,${main} 0 50%,${accent} 50% 100%)` : `linear-gradient(90deg,#111 0 50%,${accent} 50% 100%)`}}
+#band{position:absolute;left:0;right:0;top:${imgH}px;height:10px;background:linear-gradient(90deg,${main} 0 50%,${accent} 50% 100%)}
 #num{position:absolute;left:${SAFE}px;top:${imgH - 30}px;font:700 28px NotoKR;color:#fff;background:${accent};border-radius:999px;padding:8px 22px;box-shadow:0 4px 14px rgba(0,0,0,.2)}
 #box{position:absolute;left:${SAFE}px;right:${SAFE}px;top:${boxTop}px;max-height:${boxH}px;overflow:hidden}
 #title{font-family:${titleFont(c.style)};font-size:${titleSize}px;line-height:1.22;word-break:keep-all;overflow-wrap:anywhere;color:${c.style === '깔끔한 정보형' ? main : '#1A1A1A'}}
@@ -92,7 +92,7 @@ html,body{width:${w}px;height:${h}px;overflow:hidden;background:${paper}}
 export function cardHtml(c: CardLayerInput) {
   if (c.backgroundFile) return splitHtml(c);
   const { w, h } = sizeOf(c.size);
-  const main = color(c.brand.main, IND.brand.main), accent = color(c.brand.accent, IND.brand.accent);
+  const main = color(c.brand.main, APP.brand.main), accent = color(c.brand.accent, APP.brand.accent);
   const layout = layoutOf(c.style);
   const font = c.fontDir;
   // 2026-10-27 카드 글이 2문장 60~110자로 길어짐 → 80자가 넘으면 한 단계 작은 글자 (AI 그림 카드 틀은 그대로 들어감)

@@ -5,7 +5,7 @@ import '@fontsource/noto-sans-kr/latin-400.css';
 import '@fontsource/noto-sans-kr/latin-700.css';
 import './styles.css';
 import { App } from './App';
-import { IND } from '../shared/industry';
+import { APP } from '../shared/daycare';
 
-document.title = IND.appName;
+document.title = APP.appName;
 createRoot(document.getElementById('root')!).render(<App />);

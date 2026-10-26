@@ -1,5 +1,5 @@
 // 설치 도우미 (전담 비서): 처음 켤 때 · 설정에서 [비서와 같이 하기]
-// 계정 연결 → 도장 정보 4칸 → OpenAI 가입 · 카드 · 충전 · 한도 · 키 → 키 가져오기 → 첫 글
+// 계정 연결 → 어린이집 정보 4칸 → OpenAI 가입 · 카드 · 충전 · 한도 · 키 → 키 가져오기 → 첫 글
 // 대본은 guide/script.json (A 그룹). 멈춘 단계는 이 PC에 기억해 다음에 이어서
 import { useEffect, useState } from 'react';
 import { useApp } from '../App';
@@ -8,14 +8,14 @@ import { Chips } from '../components/ui';
 import { AUDIENCES } from '../../shared/types';
 import type { LicenseStatus } from '../components/Account';
 import { Bubble, HelpBox, line, open } from './voice';
-import { IND, isDaycare } from '../../shared/industry';
+import { APP } from '../../shared/daycare';
 
 const OPENAI = 'https://platform.openai.com';
 type Step = { id: string; title: string; shot?: string; url?: string };
 export const STEPS: Step[] = [
   { id: 'A00', title: '시작' },
   { id: 'A01', title: '계정 연결' },
-  { id: 'A02', title: `${IND.place} 정보` },
+  { id: 'A02', title: `${APP.place} 정보` },
   { id: 'A03', title: 'AI 소개' },
   { id: 'A03b', title: '개인정보' },
   { id: 'A04', title: 'OpenAI 가입', shot: 'oa-1-home.jpg', url: `${OPENAI}/` },
@@ -127,14 +127,14 @@ export function SetupGuide({ start, onClose, firstRun }: { start?: string; onClo
   );
 }
 
-// 도장 정보 4칸 (이름은 계정에서 가져옴). 나머지는 도장 정보 화면에서 천천히
+// 어린이집 정보 4칸 (이름은 계정에서 가져옴). 나머지는 어린이집 정보 화면에서 천천히
 function MiniProfile({ dojang, onSaved }: { dojang: string; onSaved: () => void }) {
   const [p, setP] = useState<DojoProfile | null>(null);
   const [err, setErr] = useState('');
   useEffect(() => {
     call<DojoProfile | null>('profile:get').then((cur) => setP(cur ?? {
       id: 'default', name: dojang, region: '', address: '', audiences: [], philosophy: '', classFeatures: '', hours: '', classes: '', promoDay: '', strengths: [], strengthsEtc: '', otherFacts: '', credentials: '', contact: '', consultLink: '', blogUrl: '',
-      brand: IND.brand, tone: '따뜻한 설명형', avoidWords: '최고, 무조건', nearbyAreas: [],
+      brand: APP.brand, tone: '따뜻한 설명형', avoidWords: '최고, 무조건', nearbyAreas: [],
     })).catch(() => {});
   }, []); // eslint-disable-line
   if (!p) return null;
@@ -145,18 +145,18 @@ function MiniProfile({ dojang, onSaved }: { dojang: string; onSaved: () => void 
   };
   return (
     <div className="mini-form">
-      <label className="field"><span>{IND.place} 이름</span><input type="text" value={p.name || dojang} onChange={(e) => set({ name: e.target.value })} /></label>
+      <label className="field"><span>{APP.place} 이름</span><input type="text" value={p.name || dojang} onChange={(e) => set({ name: e.target.value })} /></label>
       <label className="field"><span>동네</span><input type="text" placeholder="예: 서울 마포구 망원동" value={p.region} onChange={(e) => set({ region: e.target.value })} /></label>
-      <div className="field"><span>{isDaycare ? '돌보는 나이' : '가르치는 나이'}</span><Chips multi options={AUDIENCES} value={p.audiences as any} onChange={(v) => set({ audiences: v })} /></div>
-      <label className="field"><span>{IND.philLabel}</span><input type="text" placeholder={isDaycare ? '예: 놀이 속에서 스스로 자라는 아이' : '예: 예절과 자신감'} value={p.philosophy} onChange={(e) => set({ philosophy: e.target.value })} /></label>
-      <label className="field"><span>{isDaycare ? '운영 시간' : '수업 시간'}</span><input type="text" placeholder={isDaycare ? '예: 평일 7시 30분~19시 30분' : '예: 평일 오후 1시~8시'} value={p.hours ?? ''} onChange={(e) => set({ hours: e.target.value })} /></label>
+      <div className="field"><span>{'돌보는 나이'}</span><Chips multi options={AUDIENCES} value={p.audiences as any} onChange={(v) => set({ audiences: v })} /></div>
+      <label className="field"><span>{APP.philLabel}</span><input type="text" placeholder={'예: 놀이 속에서 스스로 자라는 아이'} value={p.philosophy} onChange={(e) => set({ philosophy: e.target.value })} /></label>
+      <label className="field"><span>{'운영 시간'}</span><input type="text" placeholder={'예: 평일 7시 30분~19시 30분'} value={p.hours ?? ''} onChange={(e) => set({ hours: e.target.value })} /></label>
       <div className="row"><button type="button" className="btn primary" onClick={save}>저장하고 다음</button></div>
       {err && <div className="note err">{err}</div>}
     </div>
   );
 }
 
-// 키 가져오기: 관장님이 누를 때만 복사한 글자를 한 번 읽음 → 저장 → (test 가 있으면) 연결 확인
+// 키 가져오기: 원장님 · 선생님이 누를 때만 복사한 글자를 한 번 읽음 → 저장 → (test 가 있으면) 연결 확인
 // OpenAI · 네이버 검색광고(액세스라이선스 · 비밀키) · 카카오 REST API 키 공통
 type ImportName = 'openai' | 'naverApiKey' | 'naverSecret' | 'kakao';
 export function KeyImport({ name = 'openai', test: testKind = 'openai', label = '복사한 키 가져오기', placeholder = 'sk- 로 시작하는 키 붙여넣기', hasKey, onDone, onError }: {
@@ -199,9 +199,9 @@ export function KeyImport({ name = 'openai', test: testKind = 'openai', label = 
   );
 }
 
-// 첫 글: 메모 한 줄을 새 글 화면에 넣어 두고 이동 (만들기는 관장님이 직접 눌러 비용을 알고 시작)
+// 첫 글: 메모 한 줄을 새 글 화면에 넣어 두고 이동 (만들기는 원장님 · 선생님이 직접 눌러 비용을 알고 시작)
 function FirstPost({ onGo }: { onGo: () => void }) {
-  const [memo, setMemo] = useState(local.get('quick-memo', '') || (isDaycare ? '햇님반 친구들이 처음으로 바깥놀이터에서 낙엽 밟기 놀이를 했어요' : '유치부 친구들이 처음으로 줄넘기 열 개를 넘었어요'));
+  const [memo, setMemo] = useState(local.get('quick-memo', '') || ('햇님반 친구들이 처음으로 바깥놀이터에서 낙엽 밟기 놀이를 했어요'));
   return (
     <div className="mini-form">
       <textarea rows={3} value={memo} onChange={(e) => setMemo(e.target.value)} />

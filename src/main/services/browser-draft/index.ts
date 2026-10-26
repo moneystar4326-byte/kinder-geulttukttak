@@ -8,12 +8,12 @@ import { chromium, type BrowserContext, type Page } from 'playwright-core';
 import { findBrowser, NO_BROWSER } from './browser';
 import * as E from './editor';
 import { shortLines, tagLine } from '../../../shared/format';
-import { IND } from '../../../shared/industry';
+import { APP } from '../../../shared/daycare';
 
 export type DraftStep = 'open' | 'login' | 'editor' | 'title' | 'body' | 'headings' | 'cards' | 'map' | 'verify' | 'done';
 export const STEP_LABEL: Record<DraftStep, string> = {
   open: '브라우저 여는 중', login: '네이버 로그인 기다리는 중', editor: '글쓰기 화면 여는 중', title: '제목 입력 중', body: '본문 입력 중',
-  headings: '소제목 굵게', cards: '카드 올리는 중', map: `${IND.place} 지도 넣는 중`, verify: '입력 결과 확인 중', done: '입력 끝 (발행 전)',
+  headings: '소제목 굵게', cards: '카드 올리는 중', map: `${APP.place} 지도 넣는 중`, verify: '입력 결과 확인 중', done: '입력 끝 (발행 전)',
 };
 
 export interface DraftRequest {
@@ -88,7 +88,7 @@ export function createBrowserDraft(opts: { profileDir: string; browserPath?: () 
       const steps: DraftStep[] = [];
       const step = (s: DraftStep) => { steps.push(s); onStep(s); if (signal?.aborted) throw Object.assign(new Error('멈췄어요'), { name: 'AbortError' }); };
       const id = blogIdOf(req.blogUrl);
-      if (!id) throw new Error(`${IND.place} 정보에 네이버 블로그 주소가 없어요 (예: https://blog.naver.com/아이디)`);
+      if (!id) throw new Error(`${APP.place} 정보에 네이버 블로그 주소가 없어요 (예: https://blog.naver.com/아이디)`);
       for (const c of req.cardFiles) if (!fs.existsSync(c.file)) throw new Error(`카드 ${c.index + 1}번 파일이 없어요. 카드를 다시 만들어 주세요.`);
 
       step('open');

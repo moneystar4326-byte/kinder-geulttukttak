@@ -4,33 +4,23 @@ import { assetUrl, call, type DojoProfile } from '../api';
 import { Chips, Field, Msg, useMsg } from '../components/ui';
 import { AUDIENCES, TONES } from '../../shared/types';
 import { STRENGTHS } from '../../shared/strengths';
-import { IND, isDaycare, type Writer } from '../../shared/industry';
+import { APP, type Writer } from '../../shared/daycare';
 
 const EMPTY: DojoProfile = {
   id: 'default', name: '', region: '', address: '', audiences: [], philosophy: '', classFeatures: '', hours: '', classes: '', promoDay: '', strengths: [], strengthsEtc: '', otherFacts: '', credentials: '', contact: '', consultLink: '', blogUrl: '',
-  brand: IND.brand, tone: '따뜻한 설명형', avoidWords: '최고, 무조건', nearbyAreas: [],
+  brand: APP.brand, tone: '따뜻한 설명형', avoidWords: '최고, 무조건', nearbyAreas: [],
 };
 
-// 화면 문구 (태권도판은 2.2.6 그대로)
-const TX = isDaycare
-  ? {
-      region: '실제 동 · 구 · 시 (예: 서울 동작구 신대방동)', panel: '보육 · 운영 (사실만)', hours: '운영 시간', hoursHint: '예: 기본보육 07:30~16:00, 연장보육 16:00~19:30',
-      classesHint: '예: 햇님반 만 1세, 달님반 만 2세, 별님반 만 3~5세 혼합', promo: '정기 행사', promoHint: '예: 매달 마지막 주 금요일 생일잔치, 분기마다 부모 참여 수업',
-      strengths: '우리 어린이집 강점', etc: '그 밖의 강점 (쉼표로, 예: 텃밭 가꾸기, 영어 놀이)', other: '학부모에게 알려도 되는 자세한 내용 (예: 등원 시간, 급식 · 간식 방식, 특별활동 요일)',
-      cred: '원장 · 교사 경력 · 자격', logo: '그림 속 원복에 로고', logoHint: '켜면 AI 그림 속 아이 원복 왼쪽 가슴에 로고를 작게 그려요 (원복 참고 사진이 있을 때만). AI가 그려서 모양 · 글자가 조금 다를 수 있어요 (카드 아래 로고는 늘 원본 그대로)', logoBox: '원복에 로고 넣기',
-      refDobok: '원복 참고 사진', refDobokHint: '원복이 있으면 카드 그림의 아이들이 이 옷을 따라 입어요. 아이 얼굴이 나오지 않은 사진만 골라 주세요 (사진 속 로고 · 글자는 따라 그리지 않아요)',
-      refCoach: '교실 참고 사진', refCoachHint: '카드 그림의 교실 색 · 가구 느낌만 따라 그려요. 아이 · 선생님 얼굴이 나오지 않은 사진만 골라 주세요',
-      nearby: '"[롯데낙천대아파트 어린이집]"처럼 제목 앞에 붙일 이름이에요. 가까운 아파트를 먼저 써요. AI가 아니라 고른 이름을 그대로 붙여요.', areaPh: '예: 롯데낙천대아파트, 보라매초',
-    }
-  : {
-      region: '실제 동 · 구 · 시 (예: 서울 동작구 신대방동)', panel: '교육 · 수업 (사실만)', hours: '수업 시간', hoursHint: '예: 평일 12:00~20:00, 토요일 10:00~12:00',
-      classesHint: '예: 유치부 · 초등부 정규반 1시부~5시부, 6시10분부 국기원반, 7시부 시범단', promo: '승급심사', promoHint: '예: 매달 마지막 주 금요일, 정규 수업 시간에. 준비물은 흰 도복과 띠',
-      strengths: '우리 도장 강점', etc: '그 밖의 강점 (쉼표로, 예: 인성교육, 축구교실)', other: '학부모에게 알려도 되는 자세한 내용 (예: 픽업 방식, 줄넘기반 요일)',
-      cred: '지도진 경력 · 자격', logo: '그림 속 도복에 로고', logoHint: '켜면 AI 그림 속 아이 도복 왼쪽 가슴에 로고를 작게 그려요. AI가 그려서 모양 · 글자가 조금 다를 수 있어요 (카드 아래 로고는 늘 원본 그대로)', logoBox: '도복에 로고 넣기',
-      refDobok: '아이 도복 · 품띠 참고 사진', refDobokHint: '카드 그림의 아이들이 이 사진의 깃 색 · 띠를 그대로 따라 입어요 (사진 속 로고는 따라 그리지 않아요. 로고는 위 "도복에 로고 넣기"로)',
-      refCoach: '사범님 도복 참고 사진', refCoachHint: '사범님 깃 · 띠 색만 따라 그려요 (얼굴은 따라 그리지 않음)',
-      nearby: '"[보라매초 근처 태권도]"처럼 제목 앞에 붙일 이름이에요. AI가 아니라 고른 이름을 그대로 붙여요.', areaPh: '예: 보라매초, 롯데낙천대, 신대방역',
-    };
+// 화면 문구
+const TX = {
+  region: '실제 동 · 구 · 시 (예: 서울 동작구 신대방동)', panel: '보육 · 운영 (사실만)', hours: '운영 시간', hoursHint: '예: 기본보육 07:30~16:00, 연장보육 16:00~19:30',
+  classesHint: '예: 햇님반 만 1세, 달님반 만 2세, 별님반 만 3~5세 혼합', promo: '정기 행사', promoHint: '예: 매달 마지막 주 금요일 생일잔치, 분기마다 부모 참여 수업',
+  strengths: '우리 어린이집 강점', etc: '그 밖의 강점 (쉼표로, 예: 텃밭 가꾸기, 영어 놀이)', other: '학부모에게 알려도 되는 자세한 내용 (예: 등원 시간, 급식 · 간식 방식, 특별활동 요일)',
+  cred: '원장 · 교사 경력 · 자격', logo: '그림 속 원복에 로고', logoHint: '켜면 AI 그림 속 아이 원복 왼쪽 가슴에 로고를 작게 그려요 (원복 참고 사진이 있을 때만). AI가 그려서 모양 · 글자가 조금 다를 수 있어요 (카드 아래 로고는 늘 원본 그대로)', logoBox: '원복에 로고 넣기',
+  refDobok: '원복 참고 사진', refDobokHint: '원복이 있으면 카드 그림의 아이들이 이 옷을 따라 입어요. 아이 얼굴이 나오지 않은 사진만 골라 주세요 (사진 속 로고 · 글자는 따라 그리지 않아요)',
+  refCoach: '교실 참고 사진', refCoachHint: '카드 그림의 교실 색 · 가구 느낌만 따라 그려요. 아이 · 선생님 얼굴이 나오지 않은 사진만 골라 주세요',
+  nearby: '"[롯데낙천대아파트 어린이집]"처럼 제목 앞에 붙일 이름이에요. 가까운 아파트를 먼저 써요. AI가 아니라 고른 이름을 그대로 붙여요.', areaPh: '예: 롯데낙천대아파트, 보라매초',
+};
 
 // 어린이집 유형 (영유아보육법의 어린이집 종류)
 const FACILITY_TYPES = ['국공립', '사회복지법인', '법인 · 단체 등', '민간', '가정', '협동', '직장'] as const;
@@ -54,22 +44,22 @@ export function ProfilePage() {
 
   return (
     <>
-      <div className="head"><h1>{IND.place} 정보</h1><span className="hint">글마다 넣을 항목은 글 작성 화면에서 골라요.</span></div>
+      <div className="head"><h1>{APP.place} 정보</h1><span className="hint">글마다 넣을 항목은 글 작성 화면에서 골라요.</span></div>
       <div className="grid2">
         <div className="panel">
           <h2>기본</h2>
-          <Field label={IND.nameLabel} req hint="공식 표기"><input type="text" value={p.name} onChange={(e) => set({ name: e.target.value })} /></Field>
-          {isDaycare && <Field label="어린이집 유형"><Chips options={FACILITY_TYPES} value={(p.facilityType ?? '') as any} onChange={(v) => set({ facilityType: v === p.facilityType ? undefined : v })} /></Field>}
+          <Field label={APP.nameLabel} req hint="공식 표기"><input type="text" value={p.name} onChange={(e) => set({ name: e.target.value })} /></Field>
+          {<Field label="어린이집 유형"><Chips options={FACILITY_TYPES} value={(p.facilityType ?? '') as any} onChange={(v) => set({ facilityType: v === p.facilityType ? undefined : v })} /></Field>}
           <Field label="소재 지역" req hint={TX.region}><input type="text" value={p.region} onChange={(e) => set({ region: e.target.value })} /></Field>
           <Field label="상세 주소" hint="필요할 때만 본문에 넣어요. 주변 장소 찾기에도 써요"><input type="text" value={p.address ?? ''} onChange={(e) => set({ address: e.target.value })} /></Field>
-          <Field label={IND.audLabel} req><Chips options={AUDIENCES} value={p.audiences as any} multi onChange={(v) => set({ audiences: v })} /></Field>
+          <Field label={APP.audLabel} req><Chips options={AUDIENCES} value={p.audiences as any} multi onChange={(v) => set({ audiences: v })} /></Field>
           <Field label="기본 문체" req><Chips options={TONES} value={p.tone} onChange={(v) => set({ tone: v })} /></Field>
-          <Field label="네이버 지도 검색 이름" hint={`글 끝 ${IND.place} 지도 카드를 찾을 때 써요. 네이버 지도에 나오는 이름 그대로 (비우면 ${IND.nameLabel})`}><input type="text" value={p.mapName ?? ''} placeholder={p.name} onChange={(e) => set({ mapName: e.target.value })} /></Field>
+          <Field label="네이버 지도 검색 이름" hint={`글 끝 ${APP.place} 지도 카드를 찾을 때 써요. 네이버 지도에 나오는 이름 그대로 (비우면 ${APP.nameLabel})`}><input type="text" value={p.mapName ?? ''} placeholder={p.name} onChange={(e) => set({ mapName: e.target.value })} /></Field>
           <Field label="네이버 블로그 주소" hint="초안 입력에 필요 (예: https://blog.naver.com/아이디). 블로그가 여러 개면 글을 넣을 블로그"><input type="url" value={p.blogUrl ?? ''} onChange={(e) => set({ blogUrl: e.target.value })} /></Field>
         </div>
         <div className="panel">
           <h2>{TX.panel}</h2>
-          <Field label={IND.philLabel} req><textarea value={p.philosophy} onChange={(e) => set({ philosophy: e.target.value })} /></Field>
+          <Field label={APP.philLabel} req><textarea value={p.philosophy} onChange={(e) => set({ philosophy: e.target.value })} /></Field>
           <p className="hint" style={{ margin: '4px 0 12px' }}>아래 칸은 지금 실제로 운영하는 것만 적어 주세요. 글을 쓸 때 모아서 AI에게 전달해요.</p>
           <Field label={TX.hours} hint={TX.hoursHint}><input type="text" value={p.hours ?? ''} onChange={(e) => set({ hours: e.target.value })} /></Field>
           <Field label="반 구성" hint={TX.classesHint}><textarea value={p.classes ?? ''} onChange={(e) => set({ classes: e.target.value })} /></Field>
@@ -85,7 +75,7 @@ export function ProfilePage() {
           <Field label={TX.cred} hint="확인 가능한 내용만 적어 주세요. 글에는 고른 경우에만 들어가요"><textarea value={p.credentials ?? ''} onChange={(e) => set({ credentials: e.target.value })} /></Field>
           <Field label="피할 표현" hint="쉼표로 구분 (예: 최고, 무조건)"><input type="text" value={p.avoidWords} onChange={(e) => set({ avoidWords: e.target.value })} /></Field>
         </div>
-        {isDaycare && <Writers list={p.writers ?? []} onChange={(writers) => set({ writers })} />}
+        {<Writers list={p.writers ?? []} onChange={(writers) => set({ writers })} />}
         <div className="panel">
           <h2>연락 · 브랜드</h2>
           <Field label="연락처" hint="글마다 넣을지 골라요"><input type="text" value={p.contact ?? ''} onChange={(e) => set({ contact: e.target.value })} /></Field>
@@ -109,7 +99,7 @@ export function ProfilePage() {
             return (
               <Field key={kind} label={kind === 'dobok' ? TX.refDobok : TX.refCoach} hint={kind === 'dobok' ? TX.refDobokHint : TX.refCoachHint}>
                 <div className="row">
-                  {file ? <img src={assetUrl(info.dataDir, file)} alt="" style={{ height: 72, border: '1px solid var(--line)', borderRadius: 6, background: '#fff' }} /> : <span className="muted">{isDaycare ? '없음 (글로만 설명해서 그려요)' : '없음 (글로만 설명해서 색이 틀릴 수 있어요)'}</span>}
+                  {file ? <img src={assetUrl(info.dataDir, file)} alt="" style={{ height: 72, border: '1px solid var(--line)', borderRadius: 6, background: '#fff' }} /> : <span className="muted">{'없음 (글로만 설명해서 그려요)'}</span>}
                   <button className="btn small" onClick={async () => { try { const f = await call<string | null>('profile:pickRef', kind); if (f) set({ [key]: f } as any); } catch (e) { msg.err(e); } }}>사진 고르기</button>
                   {file && <button className="btn small danger" onClick={() => set({ [key]: undefined } as any)}>빼기</button>}
                 </div>
@@ -137,19 +127,17 @@ export function ProfilePage() {
                 </>
               : <button className="btn small" disabled={!area.trim()} onClick={() => { set({ nearbyAreas: [...areas, { name: area.trim(), kind: /초$/.test(area.trim()) ? '학교' : '직접 입력', source: 'manual' }] }); setArea(''); }}>추가</button>}
           </div>
-          {isDaycare && <p className="hint">이름을 누르면 위 칸에서 고쳐 쓸 수 있어요 (종류 · 거리는 그대로). 카카오 아파트 이름에는 제목 · 태그에서 "아파트"가 자동으로 붙어요 ("롯데낙천대" → [롯데낙천대아파트 어린이집]).</p>}
+          {<p className="hint">이름을 누르면 위 칸에서 고쳐 쓸 수 있어요 (종류 · 거리는 그대로). 카카오 아파트 이름에는 제목 · 태그에서 "아파트"가 자동으로 붙어요 ("롯데낙천대" → [롯데낙천대아파트 어린이집]).</p>}
           <div className="chips">
             {areas.map((a, i) => (
-              <span key={a.name + i} className="chip">{isDaycare
-                ? <button type="button" className="btn link" title="고쳐 쓰기" onClick={() => { setArea(a.name); setEditAt(i); }}>{a.name}</button>
-                : a.name} <span className="muted">{a.kind}{a.distance ? ` · ${a.distance}m` : ''}</span>
+              <span key={a.name + i} className="chip"><button type="button" className="btn link" title="고쳐 쓰기" onClick={() => { setArea(a.name); setEditAt(i); }}>{a.name}</button> <span className="muted">{a.kind}{a.distance ? ` · ${a.distance}m` : ''}</span>
                 <button className="btn link" onClick={() => { set({ nearbyAreas: areas.filter((_, j) => j !== i) }); if (editAt != null) { setEditAt(null); setArea(''); } }}>×</button></span>
             ))}
             {!areas.length && <span className="muted">아직 없어요</span>}
           </div>
         </div>
       </div>
-      <div className="row"><button className="btn primary" onClick={save}>{IND.place} 정보 저장</button></div>
+      <div className="row"><button className="btn primary" onClick={save}>{APP.place} 정보 저장</button></div>
       <Msg m={msg.m} />
     </>
   );
@@ -160,7 +148,7 @@ const PRESETS = [{ v: 80, label: '작게' }, { v: 120, label: '보통' }, { v: 1
 function LogoSize({ logo, scale, onChange }: { logo: string; scale: number; onChange: (v: number) => void }) {
   const h = Math.round(64 * scale / 100) / 3;
   return (
-    <Field label="카드에 들어가는 로고 크기" hint={`움직이면 미리보기가 바로 바뀌어요. [${IND.place} 정보 저장]을 누르면 새로 만드는 카드부터 적용돼요. 이미 만든 카드는 글 화면 카드 칸의 [이 문구로 스타일 · 크기만 바꾸기]를 누르면 새 크기로 바뀌어요 (스타일을 그대로 두면 AI 그림 비용 없음).`}>
+    <Field label="카드에 들어가는 로고 크기" hint={`움직이면 미리보기가 바로 바뀌어요. [${APP.place} 정보 저장]을 누르면 새로 만드는 카드부터 적용돼요. 이미 만든 카드는 글 화면 카드 칸의 [이 문구로 스타일 · 크기만 바꾸기]를 누르면 새 크기로 바뀌어요 (스타일을 그대로 두면 AI 그림 비용 없음).`}>
       <div className="logo-size">
         <div className="logo-size-ctl">
           <div className="row">

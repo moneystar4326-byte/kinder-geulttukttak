@@ -1,7 +1,7 @@
 // AI 응답 · IPC 입력 검증 스키마
 import { z } from 'zod';
 import { ARTICLE_KINDS, TONES } from './types';
-import { IND } from './industry';
+import { APP } from './daycare';
 
 export const GeneratedArticleSchema = z.object({
   titleCandidates: z.array(z.string().min(1)).length(3),
@@ -108,11 +108,11 @@ const s = (max = 4000) => z.string().max(max);
 const Writer = z.object({ id: s(64), role: z.enum(['원장', '교사']), name: s(30), className: s(30).optional() });
 export const ProfileInput = z.object({
   id: s(64),
-  name: s(80).min(1, `${IND.nameLabel}을 적어 주세요`),
+  name: s(80).min(1, `${APP.nameLabel}을 적어 주세요`),
   region: s(80).min(1, '소재 지역을 적어 주세요'),
   address: s(200).optional(),
-  audiences: z.array(s(30)).min(1, `${IND.audLabel}을 하나 이상 골라 주세요`),
-  philosophy: s().min(1, `${IND.philLabel}을 적어 주세요`),
+  audiences: z.array(s(30)).min(1, `${APP.audLabel}을 하나 이상 골라 주세요`),
+  philosophy: s().min(1, `${APP.philLabel}을 적어 주세요`),
   classFeatures: s(),
   hours: s(300).optional(),
   classes: s(2000).optional(),

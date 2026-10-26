@@ -7,7 +7,7 @@ import type { Db } from './db';
 import { SCHEMA_VERSION, openDb } from './db';
 import type { ArticleVersion, CardSet } from '../shared/types';
 import { markdownBody, plainBody, safeFileName } from '../shared/validation';
-import { IND } from '../shared/industry';
+import { APP } from '../shared/daycare';
 
 // 같은 이름이 있으면 덮어쓰지 않고 (2), (3)… 을 붙임 (덮어쓸지는 화면에서 먼저 물어봄)
 export function uniquePath(file: string) {
@@ -54,7 +54,7 @@ export function makeBackup(db: Db, dataDir: string, outFile: string, appVersion:
   db.raw.exec(`VACUUM INTO '${tmp.replaceAll("'", "''")}'`);
   try {
     const z: Zippable = {
-      'manifest.json': strToU8(JSON.stringify({ app: IND.backupApp, appVersion, schema: SCHEMA_VERSION, dataDir, createdAt: new Date().toISOString() }, null, 2)),
+      'manifest.json': strToU8(JSON.stringify({ app: APP.backupApp, appVersion, schema: SCHEMA_VERSION, dataDir, createdAt: new Date().toISOString() }, null, 2)),
       'app.db': fs.readFileSync(tmp),
     };
     addDir(z, path.join(dataDir, 'assets'), 'assets');
@@ -65,10 +65,10 @@ export function makeBackup(db: Db, dataDir: string, outFile: string, appVersion:
 
 export function readBackupManifest(file: string) {
   const files = unzipSync(fs.readFileSync(file), { filter: (f) => f.name === 'manifest.json' });
-  if (!files['manifest.json']) throw new Error(`${IND.appName} 백업 파일이 아니에요`);
+  if (!files['manifest.json']) throw new Error(`${APP.appName} 백업 파일이 아니에요`);
   const m = JSON.parse(Buffer.from(files['manifest.json']).toString('utf-8'));
-  if (m.app !== IND.backupApp) throw new Error(`${IND.appName} 백업 파일이 아니에요`);
-  if (m.schema > SCHEMA_VERSION) throw new Error(`더 새 버전의 ${IND.appName}에서 만든 백업이에요 (자료 버전 ${m.schema}). 프로그램을 먼저 업데이트해 주세요.`);
+  if (m.app !== APP.backupApp) throw new Error(`${APP.appName} 백업 파일이 아니에요`);
+  if (m.schema > SCHEMA_VERSION) throw new Error(`더 새 버전의 ${APP.appName}에서 만든 백업이에요 (자료 버전 ${m.schema}). 프로그램을 먼저 업데이트해 주세요.`);
   return m as { appVersion: string; schema: number; dataDir: string; createdAt: string };
 }
 

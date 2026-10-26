@@ -1,9 +1,9 @@
 {
-  "name": "geulttukttak2",
-  "productName": "태권 글뚝딱",
-  "version": "2.2.7",
+  "name": "geulttukttak-daycare",
+  "productName": "어린이집 글뚝딱",
+  "version": "1.0.0",
   "private": true,
-  "description": "태권 글뚝딱 버전 2 — 태권도 블로그 작가 (설치형)",
+  "description": "어린이집 글뚝딱 — 어린이집 블로그 작가 (설치형)",
   "main": "out/main/index.js",
   "scripts": {
     "build": "node scripts/build.mjs",
@@ -12,10 +12,7 @@
     "test": "tsx --test tests/unit/*.test.ts tests/integration/*.test.ts",
     "lint": "tsc --noEmit",
     "dist": "node scripts/build.mjs && electron-builder --win nsis",
-    "dist:mac": "node scripts/build.mjs && electron-builder --mac dir --arm64 --x64",
-    "build:daycare": "node scripts/build.mjs --daycare",
-    "dev:daycare": "node scripts/build.mjs --daycare && electron .",
-    "dist:daycare": "node scripts/build.mjs --daycare && electron-builder --win nsis --config electron-builder.daycare.cjs"
+    "dist:mac": "node scripts/build.mjs && electron-builder --mac dir --arm64 --x64"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
@@ -41,8 +38,8 @@
   },
   "author": "용감한개발자",
   "build": {
-    "appId": "kr.ddalkak.geulttukttak2",
-    "productName": "태권 글뚝딱",
+    "appId": "kr.ddalkak.geulttukttak-daycare",
+    "productName": "어린이집 글뚝딱",
     "copyright": "© 2026 그로우모먼트",
     "directories": {
       "output": "release",
@@ -75,7 +72,7 @@
           ]
         }
       ],
-      "artifactName": "태권글뚝딱-설치-${version}.${ext}",
+      "artifactName": "어린이집글뚝딱-설치-${version}.${ext}",
       "icon": "build/icon.png"
     },
     "nsis": {
@@ -85,7 +82,7 @@
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": false,
       "include": "build/installer.nsh",
-      "shortcutName": "태권 글뚝딱",
+      "shortcutName": "어린이집 글뚝딱",
       "createDesktopShortcut": true,
       "runAfterFinish": true,
       "language": "1042"
@@ -103,9 +100,9 @@
       "icon": "build/icon.png",
       "category": "public.app-category.productivity",
       "identity": null,
-      "artifactName": "태권글뚝딱-맥-${version}-${arch}.${ext}",
+      "artifactName": "어린이집글뚝딱-맥-${version}-${arch}.${ext}",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "수업 메모를 말로 넣을 때 마이크를 써요. 녹음은 글자로 바꾼 뒤 저장하지 않아요."
+        "NSMicrophoneUsageDescription": "보육 메모를 말로 넣을 때 마이크를 써요. 녹음은 글자로 바꾼 뒤 저장하지 않아요."
       }
     }
   }

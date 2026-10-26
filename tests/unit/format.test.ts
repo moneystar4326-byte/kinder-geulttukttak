@@ -6,8 +6,8 @@ import { buildBlocks } from '../../src/main/services/browser-draft';
 const doc = (headings: (string | undefined)[]) => ({ titleCandidates: [], tags: [], photoSuggestions: [], reviewFlags: [], sections: headings.map((h, i) => ({ id: `s${i + 1}`, heading: h, paragraphs: ['p'] })) });
 
 test('소제목마다 이모지 하나 (AI가 붙인 것은 떼고 같은 모양으로), 도입 · 마무리는 그대로', () => {
-  const d = decorateHeadings(doc([undefined, '줄넘기반은 언제?', '👀 수업은 이렇게', '■ 가정에서', '마무리하며']) as any);
-  assert.deepEqual(d.sections.map((s: any) => s.heading), [undefined, '🥋 줄넘기반은 언제?', '💡 수업은 이렇게', '📌 가정에서', '마무리하며']);
+  const d = decorateHeadings(doc([undefined, '낮잠은 언제?', '👀 수업은 이렇게', '■ 가정에서', '마무리하며']) as any);
+  assert.deepEqual(d.sections.map((s: any) => s.heading), [undefined, '🌱 낮잠은 언제?', '💡 수업은 이렇게', '📌 가정에서', '마무리하며']);
   assert.deepEqual(decorateHeadings(d).sections.map((s: any) => s.heading), d.sections.map((s: any) => s.heading)); // 두 번 해도 같음
   assert.equal(stripLeadEmoji('🗓️ 일정'), '일정');
 });

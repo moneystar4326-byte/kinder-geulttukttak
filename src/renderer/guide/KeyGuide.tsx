@@ -6,7 +6,7 @@ import { useApp } from '../App';
 import { call } from '../api';
 import { Bubble, HelpBox, line, open } from './voice';
 import { KeyImport } from './SetupGuide';
-import { IND } from '../../shared/industry';
+import { APP } from '../../shared/daycare';
 
 type Step = { id: string; title: string; shot?: string; url?: string };
 const FLOWS: Record<'naver' | 'kakao', { name: string; steps: Step[] }> = {
@@ -114,7 +114,7 @@ function CustomerId({ ready, onOk, onFail }: { ready: boolean; onOk: () => void;
     setBusy(true); setMsg(null);
     try {
       if (save) await call('secrets:set', { name: 'naverCustomer', value: v.replace(/\D/g, '') });
-      setMsg({ kind: 'ok', text: `연결을 확인하는 중이에요… "${IND.term}"를 한 번 검색해 봐요.` });
+      setMsg({ kind: 'ok', text: `연결을 확인하는 중이에요… "${APP.term}"를 한 번 검색해 봐요.` });
       await call('secrets:test', 'naver');
       setMsg({ kind: 'ok', text: '연결됐어요!' }); setTimeout(onOk, 900);
     } catch (e) { setMsg({ kind: 'err', text: (e as Error).message }); onFail(); } finally { setBusy(false); }

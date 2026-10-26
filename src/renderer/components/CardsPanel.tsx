@@ -8,7 +8,6 @@ import { CARD_STYLES, type CardMode, type CardSize, type CardStyle } from '../..
 export interface CardPref { style: CardStyle; size: CardSize; mode: CardMode }
 
 import { cardRoles } from '../../shared/cardRoles';
-import { isDaycare } from '../../shared/industry';
 
 function CardBox({ card, cs, articleId, busy, onChanged, kind }: { card: Card; cs: CardSet; articleId: string; busy: boolean; onChanged: () => void; kind?: string }) {
   const { info } = useApp();
@@ -100,7 +99,7 @@ export function CardsPanel({ articleId, cs, pref, setPref, busy, onChanged, hasV
           <ul style={{ margin: '4px 0 0', paddingLeft: 18, lineHeight: 1.7 }}>
             <li><b>문구 적용</b> — 큰 글씨 · 작은 글씨를 고친 뒤 눌러요. 그림은 그대로 두고 글자만 다시 얹어요 (비용 없음)</li>
             <li><b>문구만 다시</b> — AI가 그 카드 글만 새로 써서 칸에 넣어 줘요. 보고 마음에 들면 [문구 적용] (글 비용만 아주 조금, 그림 비용 없음)</li>
-            {cs.style.mode === 'ai' && <li><b>그림 다시</b> — {isDaycare ? '옷 · 손발 · 장면이 이상할 때' : '도복 · 띠 · 손발이 이상할 때'} 그 카드 그림만 새로 그려요 (<b>그림 1장 비용</b>)</li>}
+            {cs.style.mode === 'ai' && <li><b>그림 다시</b> — 옷 · 손발 · 장면이 이상할 때 그 카드 그림만 새로 그려요 (<b>그림 1장 비용</b>)</li>}
             <li><b>PNG 저장</b> — 그 카드 한 장을 사진 파일로 저장해요 (인스타 · 단톡방용). 네이버 초안에는 따로 저장하지 않아도 자동으로 들어가요</li>
           </ul>
         </div>

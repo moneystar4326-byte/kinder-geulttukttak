@@ -1,13 +1,11 @@
-// 어린이집판 (2026-10-27 기획안 v0.2): 업종 값은 모듈을 처음 불러올 때 정해져서, 이 파일만 GTD_INDUSTRY=daycare 로 불러옴
-// (node --test 는 파일마다 따로 된 프로세스라 다른 시험 파일의 태권도판에는 영향 없음). 앱 모듈은 모두 아래 before 에서 동적으로 불러옴
+// 어린이집 글뚝딱 규칙 시험 (2026-10-27 기획안 v0.2 · 버그 점검 · 요요유치원 시험에서 나온 것)
+// 앱 모듈은 아래 before 에서 불러옴
 import { before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ArticleDoc, ArticleInput, DojoProfile, NearbyArea } from '../../src/shared/types';
-import type { Writer } from '../../src/shared/industry';
+import type { Writer } from '../../src/shared/daycare';
 
-process.env.GTD_INDUSTRY = 'daycare';
-
-let I: typeof import('../../src/shared/industry');
+let I: typeof import('../../src/shared/daycare');
 let T: typeof import('../../src/shared/types');
 let P: typeof import('../../src/main/services/openai/prompts');
 let IMG: typeof import('../../src/main/services/openai/image-prompt');
@@ -24,7 +22,7 @@ let TPL: typeof import('../../src/main/services/card-renderer/template');
 let ART: typeof import('../../src/main/article');
 
 before(async () => {
-  I = await import('../../src/shared/industry');
+  I = await import('../../src/shared/daycare');
   T = await import('../../src/shared/types');
   P = await import('../../src/main/services/openai/prompts');
   IMG = await import('../../src/main/services/openai/image-prompt');
@@ -65,9 +63,9 @@ const doc = (text: string): ArticleDoc => ({
 });
 const TKD = /태권|도장|관장|사범|품새|도복|승급|국기원|dojang|taekwondo|dobok|belt/i;
 
-test('업종 설정: 어린이집으로 읽고, 화면 이름 · 글 종류 이름이 바뀜', () => {
-  assert.equal(I.INDUSTRY, 'daycare');
-  assert.equal(I.IND.appName, '어린이집 글뚝딱');
+test('기본 설정: 어린이집 이름 · 글 종류 이름 · 나이 · 글쓴이', () => {
+  assert.equal(I.PRODUCT, 'daycare');
+  assert.equal(I.APP.appName, '어린이집 글뚝딱');
   assert.equal(I.kindLabel('수업 후기'), '놀이 · 활동 이야기');
   assert.equal(I.kindLabel('모집 안내'), '입소 안내');
   assert.equal(I.kindLabel('교육 정보'), '보육 정보');

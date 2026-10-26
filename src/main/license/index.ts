@@ -11,7 +11,7 @@ import os from 'node:os';
 import type { Cipher } from '../credentials';
 import { ApiError } from '../services/errors';
 import { checkAccess, LICENSE_PUBLIC_KEY, verifyLicense, type Access, type LicenseClaims } from './token';
-import { IND, INDUSTRY, isDaycare } from '../../shared/industry';
+import { APP, PRODUCT } from '../../shared/daycare';
 
 export const SERVER = (process.env.GTD_SERVER || 'https://growmoment.co.kr').replace(/\/$/, '');
 const REFRESH_EVERY = 6 * 3600_000;
@@ -24,10 +24,10 @@ export type LicenseStatus =
   | { state: 'ok'; plan: 'trial' | 'paid'; daysLeft: number; inGrace: boolean; until: string | null; dojang: string; checkedAt: string | null }
   | { state: 'locked'; why: Exclude<Access, { canCreate: true }>['why'] | 'broken' | 'other-product'; message: string; dojang: string | null; checkedAt: string | null };
 
-// 업종 구분 (2026-10-27 어린이집 글뚝딱): 홈페이지 서버가 이용권에 product 를 넣어 주면 다른 업종 이용권은 잠금.
+// 상품 구분 (2026-10-27): 홈페이지 서버가 이용권에 product 를 넣어 주면 다른 상품(태권 글뚝딱) 이용권은 잠금.
 // 아직 product 가 없는 이용권(지금 서버)은 막지 않음 — 서버에서 구분을 넣기 전까지는 같은 계정이 두 앱을 다 쓸 수 있음
-// 어린이집판은 연결 · 갱신 요청에 product=daycare 를 같이 보냄 (태권도판 요청은 2.2.6 그대로)
-const productParam: Record<string, string> = isDaycare ? { product: INDUSTRY } : {};
+// 연결 · 갱신 요청에 product=daycare 를 같이 보냄
+const productParam: Record<string, string> = { product: PRODUCT };
 
 const WHY: Record<string, string> = {
   'trial-ended': '무료 체험이 끝났어요. 구독하시면 바로 이어서 쓸 수 있어요.',
@@ -38,7 +38,7 @@ const WHY: Record<string, string> = {
   'other-device': '다른 PC의 이용권이에요. [계정 연결]을 다시 해 주세요.',
   'other-dojang': '이용권 정보가 맞지 않아요. [계정 연결]을 다시 해 주세요.',
   broken: '이용권을 읽지 못했어요. [계정 연결]을 다시 해 주세요.',
-  'other-product': `${IND.appName}용 이용권이 아니에요. ${IND.appName} 계정으로 [계정 연결]을 다시 해 주세요.`,
+  'other-product': `${APP.appName}용 이용권이 아니에요. ${APP.appName} 계정으로 [계정 연결]을 다시 해 주세요.`,
 };
 export const NEED_CONNECT = '새 글 만들기는 계정 연결 뒤에 쓸 수 있어요. 왼쪽 아래 [계정 연결]을 눌러 주세요 (14일 무료).';
 
@@ -103,10 +103,10 @@ export function createLicense(d: LicenseDeps) {
     if (!v.ok) return { state: 'locked', why: 'broken', message: WHY.broken, dojang: null, checkedAt: s.checkedAt ?? null };
     const c = v.claims;
     const product = (c as LicenseClaims & { product?: string }).product;
-    if (product && product !== INDUSTRY) return { state: 'locked', why: 'other-product', message: WHY['other-product'], dojang: c.dojang, checkedAt: s.checkedAt ?? null };
+    if (product && product !== PRODUCT) return { state: 'locked', why: 'other-product', message: WHY['other-product'], dojang: c.dojang, checkedAt: s.checkedAt ?? null };
     const t = now();
     const lastSeen = s.lastSeen ? new Date(s.lastSeen) : undefined;
-    // 도장 이름은 이용권 안의 것으로 비교 (앱 도장 정보 이름과 계정 이름이 달라도 잠기지 않게)
+    // 어린이집 이름은 이용권 안의 것으로 비교 (앱 어린이집 정보 이름과 계정 이름이 달라도 잠기지 않게)
     const a = checkAccess(c, { device: d.device, dojang: c.dojang, now: t, lastSeen });
     // 시계를 되돌린 걸 알아채려고 본 시각 중 가장 늦은 것을 남김 (한 시간에 한 번만 저장)
     if (!lastSeen || t.getTime() > lastSeen.getTime() + 3600_000) { try { save({ ...s, lastSeen: t.toISOString() }); } catch { /* 다음에 */ } }
@@ -131,7 +131,7 @@ export function createLicense(d: LicenseDeps) {
     if (!v.ok || v.claims.device !== d.device) throw new Error('받은 이용권이 맞지 않아요. 잠시 뒤 다시 해 주세요.');
     // 다른 업종 이용권은 저장하지 않음: 연결은 실패로 알리고, 새로 받기면 쓰던 이용권을 그대로 둠 (2026-10-27 버그 점검)
     const product = (v.claims as LicenseClaims & { product?: string }).product;
-    if (product && product !== INDUSTRY) throw new Error(WHY['other-product']);
+    if (product && product !== PRODUCT) throw new Error(WHY['other-product']);
     return v.claims;
   }
 
@@ -222,7 +222,7 @@ export type License = ReturnType<typeof createLicense>;
 
 function page(title: string, body: string) {
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} · ${IND.appName}</title>
+  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)} · ${APP.appName}</title>
 <body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#FFFBF0;font-family:'Malgun Gothic',sans-serif;color:#1d1d1b">
 <div style="max-width:440px;margin:24px;padding:32px;background:#fff;border:2px solid #1d1d1b;border-radius:20px;box-shadow:6px 6px 0 #1d1d1b">
 <h1 style="margin:0 0 12px;font-size:26px">${esc(title)}</h1><p style="margin:0;font-size:16px;line-height:1.7">${esc(body)}</p></div></body>`;

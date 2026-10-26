@@ -8,7 +8,7 @@ import { CardsPanel, type CardPref } from '../components/CardsPanel';
 import { FirstTip } from '../guide/voice';
 import { localFlags } from '../../shared/validation';
 import type { DojoProfile, RevisionKind } from '../../shared/types';
-import { IND } from '../../shared/industry';
+import { APP } from '../../shared/daycare';
 
 const same = (a: Draft | null, b: Draft | null) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -229,7 +229,7 @@ export function ArticlePage({ id }: { id: string }) {
             <div className="panel">
               <h2>네이버 블로그에 초안 입력</h2>
               <FirstTip id="F01" />
-              <p>제목 · 본문 · 카드를 네이버 편집기에 넣고 멈춰요. <b>저장 · 발행은 {IND.owner}이 직접</b> 눌러 주세요.</p>
+              <p>제목 · 본문 · 카드를 네이버 편집기에 넣고 멈춰요. <b>저장 · 발행은 {APP.owner}이 직접</b> 눌러 주세요.</p>
               <p className="hint">처음이면 열린 창에서 직접 로그인해 주세요 (최대 5분 기다려요). 편집기에 쓰던 글이 있으면 덮어쓰지 않아요.</p>
               <JobBar job={naverJob} />
               {naverJob?.state === 'succeeded' && <div className={`note ${/못해|빠졌|사진 없이/.test(naverJob.step ?? '') ? 'warn' : 'ok'}`}>{naverJob.step} — 네이버 창에서 내용을 확인한 뒤 직접 저장 · 발행해 주세요. (프로그램은 네이버 저장 여부를 확인하지 않아요)</div>}
@@ -243,7 +243,7 @@ export function ArticlePage({ id }: { id: string }) {
                 <button className="btn primary" disabled={running(naverJob) || !b.version} onClick={() => naverFill('new')}>네이버에 초안 입력</button>
                 <button className="btn small" onClick={() => call('naver:openLogin').catch((e) => naverMsg.err(e))}>네이버 창 열기 · 로그인</button>
               </div>
-              <label className="row" style={{ marginTop: 8 }}><input type="checkbox" checked={naverMap} onChange={(e) => setNaverMap(e.target.checked)} /> 글 끝에 {IND.place} 지도 넣기 (네이버 지도 카드)</label>
+              <label className="row" style={{ marginTop: 8 }}><input type="checkbox" checked={naverMap} onChange={(e) => setNaverMap(e.target.checked)} /> 글 끝에 {APP.place} 지도 넣기 (네이버 지도 카드)</label>
               <label className="row"><input type="checkbox" checked={naverTyping} onChange={(e) => setNaverTyping(e.target.checked)} /> 타이핑처럼 넣기 (촬영용 · 초당 {info.settings.typingSpeed}자, 설정에서 속도 변경)</label>
               {naverTyping && draft && <p className="hint">본문 {draft.doc.sections.reduce((n, s) => n + (s.heading?.length ?? 0) + s.paragraphs.join('').length, 0).toLocaleString()}자 → 약 {Math.ceil(draft.doc.sections.reduce((n, s) => n + (s.heading?.length ?? 0) + s.paragraphs.join('').length, 0) / info.settings.typingSpeed / 60)}분 걸려요. 입력 중에는 네이버 창을 누르지 마세요.</p>}
               <p className="hint">네이버가 "작성 중인 글"을 물으면 새 글로 시작해요 (쓰던 글은 네이버 임시저장에 남아요). 편집기에 이미 글자가 있으면 덮어쓰지 않고 멈춰요.</p>
