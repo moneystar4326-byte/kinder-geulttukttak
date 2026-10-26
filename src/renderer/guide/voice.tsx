@@ -9,7 +9,6 @@ const LINES = new Map<string, Line>(script.groups.flatMap((g) => g.items as Line
 export const line = (id: string): Line => LINES.get(id) ?? { id, say: '' };
 
 export const KAKAO_CHAT = 'https://pf.kakao.com/_xiHmJX/chat';
-export const REMOTE_APP = 'https://rustdesk.com/';
 export const open = (url: string) => call('shell:open', url).catch(() => {});
 
 // 앱 전체에서 소리는 한 번에 하나만: 같은 화면에서 동시에 뜬 안내는 차례로, 그 뒤에 뜬 안내 · [다시 듣기]는 앞 소리를 끊고 재생
@@ -96,7 +95,7 @@ export function Bubble({ id, auto = true, children }: { id: string; auto?: boole
   );
 }
 
-// 담당자 부르기: 막힌 단계를 카톡 문구로 복사해 두고 카톡 채널 · 원격 프로그램 안내
+// 담당자 부르기: 막힌 단계를 카톡 문구로 복사해 두고 카톡 채널 열기 (2026-10-27: 원격 지원은 하지 않음 · 캡처로 안내)
 export function HelpBox({ where, onClose }: { where: string; onClose?: () => void }) {
   const [copied, setCopied] = useState(false);
   const text = `글뚝딱 ${where}에서 막혔어요. 도와주세요.`;
@@ -109,10 +108,9 @@ export function HelpBox({ where, onClose }: { where: string; onClose?: () => voi
       <Bubble id="E06" />
       <div className="row">
         <button type="button" className="btn primary" onClick={callStaff}>카톡으로 담당자 부르기</button>
-        <button type="button" className="btn" onClick={() => open(REMOTE_APP)}>원격 프로그램 받기</button>
         {onClose && <button type="button" className="btn link" onClick={onClose}>닫기</button>}
       </div>
-      <p className="hint">{copied ? `"${text}" 문구를 복사해 뒀어요. 카톡 대화창에 붙여 넣어 보내 주세요.` : `카톡이 열리면 "${text}"라고 보내 주세요.`}</p>
+      <p className="hint">{copied ? `"${text}" 문구를 복사해 뒀어요. 카톡 대화창에 붙여 넣어 보내 주세요.` : `카톡이 열리면 "${text}"라고 보내 주세요. 화면 캡처를 같이 보내 주시면 더 빨라요.`}</p>
     </div>
   );
 }

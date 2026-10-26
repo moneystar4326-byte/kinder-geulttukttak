@@ -398,7 +398,7 @@ export function registerIpc(ctx: AppCtx) {
     return { since: new Date(d.getFullYear(), d.getMonth(), 1).toISOString(), rows: db.usageSummary(new Date(d.getFullYear(), d.getMonth(), 1).toISOString()) };
   });
   // 외부 링크: 정해 둔 공식 주소만
-  const ALLOWED = /^https:\/\/(growmoment\.co\.kr|pf\.kakao\.com|rustdesk\.com|naver\.github\.io|github\.com\/naver|searchad\.naver\.com|manage\.searchad\.naver\.com|platform\.openai\.com|developers\.kakao\.com|blog\.naver\.com|searchadvisor\.naver\.com)(\/|$)/;
+  const ALLOWED = /^https:\/\/(growmoment\.co\.kr|pf\.kakao\.com|naver\.github\.io|github\.com\/naver|searchad\.naver\.com|manage\.searchad\.naver\.com|platform\.openai\.com|developers\.kakao\.com|blog\.naver\.com|searchadvisor\.naver\.com)(\/|$)/;
   handle('shell:open', z.string().url().max(300), (url) => {
     if (!ALLOWED.test(url)) throw new Error('열 수 없는 주소예요');
     return shell.openExternal(url);

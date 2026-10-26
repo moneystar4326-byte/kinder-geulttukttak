@@ -1,7 +1,7 @@
 {
   "name": "geulttukttak2",
   "productName": "태권 글뚝딱",
-  "version": "2.2.5",
+  "version": "2.2.6",
   "private": true,
   "description": "태권 글뚝딱 버전 2 — 태권도 블로그 작가 (설치형)",
   "main": "out/main/index.js",
