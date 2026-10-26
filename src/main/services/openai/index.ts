@@ -109,12 +109,19 @@ export function createOpenAI(opts: { apiKey: string; textModel: string; imageMod
     async paragraph(doc, sectionId, index, instruction, o) {
       return (await json('paragraph', 'text', P.SYSTEM_RULES, P.paragraphPrompt(doc, sectionId, index, instruction), PARAGRAPH_JSON, ParagraphSchema, o)).paragraph.trim();
     },
+    // 카드 글이 답 없이 끝나면(P.VAGUE_SUB) 한 번만 더 만들어 덜 막연한 쪽을 씀 (비용: 그때만 2번)
     async cardOne(doc, title, index, current, others, kind, o, writer) {
-      const r = await json('card_one', 'text', P.SYSTEM_RULES, P.cardOnePrompt(doc, title, index, current, others, kind, writer), CARD_ONE_JSON, CardOneSchema, o);
+      const make = () => json('card_one', 'text', P.SYSTEM_RULES, P.cardOnePrompt(doc, title, index, current, others, kind, writer), CARD_ONE_JSON, CardOneSchema, o);
+      let r = await make();
+      if (P.VAGUE_SUB.test(r.sub)) { const again = await make(); if (!P.VAGUE_SUB.test(again.sub)) r = again; }
       return { title: r.title.trim(), sub: r.sub.trim() };
     },
     async cardCopies(doc, title, kind, o, writer) {
-      return (await json('cards', 'text', P.SYSTEM_RULES, P.cardCopyPrompt(doc, title, kind, writer), CARD_COPY_JSON, CardCopySchema, o)).cards;
+      const make = async () => (await json('cards', 'text', P.SYSTEM_RULES, P.cardCopyPrompt(doc, title, kind, writer), CARD_COPY_JSON, CardCopySchema, o)).cards;
+      const vague = (cards: { sub: string }[]) => cards.filter((c) => P.VAGUE_SUB.test(c.sub)).length;
+      let cards = await make();
+      if (vague(cards)) { const again = await make(); if (vague(again) < vague(cards)) cards = again; }
+      return cards;
     },
     async splitMemo(memo, kind, topic, o) {
       const r = await json('memo', 'text', P.MEMO_RULES, P.memoPrompt(memo, kind, topic), MEMO_SPLIT_JSON, MemoSplitSchema, o);

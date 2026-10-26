@@ -123,7 +123,9 @@ test('카드 문구: 장면은 안전 · 생활 장면, 선생님 글은 반 시
   assert.match(t, /위험해 보이는 장면/);
   assert.match(t, /카드 문구 시점: "햇님반 친구들"처럼 반 시점/);
   assert.match(t, /카드3 = 글에 적힌 입소 상담 · 대기 신청 방법/);
-  assert.deepEqual(C.cardRoles('수업 후기').map((r) => r.label), ['학부모의 궁금함', '오늘 한 놀이 장면', '놀이로 자라는 것']);
+  assert.deepEqual(C.cardRoles('수업 후기').map((r) => r.label), ['학부모의 궁금함 · 답', '오늘 한 놀이 장면', '놀이로 자라는 것']);
+  assert.match(t, /sub 는 꼭 2문장/); // 2.2.7 카드 글 규칙도 같이 씀
+  assert.match(t, /블록은 쌓고 무너뜨리며 놀아요/);
 });
 
 test('카드 그림: 도복 · 띠 규칙 없이 영유아 · 교실 · 안전, 얼굴은 그림체로', () => {

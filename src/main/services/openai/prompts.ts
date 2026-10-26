@@ -224,6 +224,22 @@ ${bodyText(doc).slice(0, 3000)}
 ${s?.paragraphs[index] ?? ''}`;
 }
 
+// 카드 글 규칙 (2026-10-27 사용자: 제목은 묻는데 아래 글이 "궁금하지요 · 살펴봐요"로 끝나 부실 → 답 + 글 속 구체 내용 2문장)
+// 강담 실제 글 5개로 비교 확인: https://claude.ai/artifact/7uKPqZo24FEJZWp74yJmC4
+// 어린이집판은 예시만 놀이 · 생활 말로 (규칙은 같음)
+const CARD_TITLE_RULE = isDaycare
+  ? 'title 10~28자: 카드1만 학부모가 궁금해할 질문으로 쓸 수 있다. 카드2 · 카드3 title 은 물음표 없이, 답이 담긴 짧은 문장으로 쓴다 (예: "블록은 쌓고 무너뜨리며 놀아요").'
+  : 'title 10~28자: 카드1만 학부모가 궁금해할 질문으로 쓸 수 있다. 카드2 · 카드3 title 은 물음표 없이, 답이 담긴 짧은 문장으로 쓴다 (예: "품새는 한 동작씩 나눠 익혀요").';
+const CARD_SUB_RULE = `sub 는 꼭 2문장, 60~110자:
+- 첫 문장 = title 에 대한 답. title 이 질문이면 바로 답한다 (예: "${isDaycare ? '아니요, 처음엔 낯설어하는 게 당연해요.' : '아니요, 처음엔 서툰 게 당연해요.'}"). 질문으로 끝내지 않는다.
+- 둘째 문장 = 그 답을 보여 주는 글 속 구체적인 내용 하나 — ${isDaycare ? '놀이 · 활동 이름, 선생님이 도운 방법' : '동작 · 활동 이름, 지도 방법'}, 실제 장면, 날짜 · 행사 이름 중 글에 적힌 것을 그대로 쓴다.
+- "살펴요" · "짚어요" · "눈여겨봐요"처럼 막연한 말로 때우지 말고, 글에 적힌 대로 무엇을 했는지 · 무엇이 보였는지를 쓴다.
+- sub 에 쓰지 않는 것: 물음표, "궁금하지요" · "살펴봐요" · "살펴볼까요" · "함께 볼까요"처럼 답 없이 끝나는 말, 글에 없는 사실.
+과장 · 보장 금지, 이모지 금지.`;
+// 답 없이 끝나는 카드 글 (있으면 한 번 더 만듦)
+export const VAGUE_SUB = /\?|궁금하(시)?지요|살펴(봐요|볼까요|보세요)|함께 볼까요|알아볼까요|생각해 볼까요/;
+const sectionsFull = (doc: ArticleDoc) => doc.sections.map((s) => `(${s.id}) ${s.heading ?? ''}: ${s.paragraphs.join(' ')}`).join('\n');
+
 // 카드 장면 규칙: 태권도판은 띠 · 도복, 어린이집판은 안전 · 개인정보 (기획안 v0.2 8장)
 const SCENE_RULES = isDaycare
   ? `scene 은 배경 그림 장면을 영어로 한 문장 (예: "toddlers stacking soft blocks on a classroom rug, a teacher sitting beside them"). 글자 · 간판 · 숫자가 보이는 장면 금지. 실제 아이 사진이 아닌 일러스트 장면 (얼굴은 그림체로 또렷하게 — "faceless" 같은 말 쓰지 않기).
@@ -241,26 +257,29 @@ export function cardCopyPrompt(doc: ArticleDoc, title: string, kind?: string, wr
   return `아래 블로그 글로 카드뉴스 3장 문구를 만들어라. 글에 있는 사실과 메시지만 쓴다.
 카드1 = ${r[0].guide}, 카드2 = ${r[1].guide}, 카드3 = ${r[2].guide}.
 세 장이 이 글 주제 하나로 이어지게 쓴다. 글 주제와 상관없는 ${isDaycare ? '어린이집 정보(다른 서비스 · 활동)' : '도장 정보(다른 수업 · 서비스)'}는 카드에 쓰지 않는다. 날짜 · 행사 이름은 글에 적힌 그대로.${cardWriter(writer)}
-title 10~28자, sub 30~80자, 과장 · 보장 금지, 이모지 금지.
+${CARD_TITLE_RULE}
+${CARD_SUB_RULE}
 ${SCENE_RULES}
 afterSectionId 는 그 카드를 넣기 좋은 섹션 id (카드1은 도입 뒤, 카드2 · 카드3은 내용이 가장 가까운 섹션 뒤).
 
 [제목] ${title}
 [섹션]
-${doc.sections.map((s) => `(${s.id}) ${s.heading ?? ''}: ${s.paragraphs.join(' ').slice(0, 300)}`).join('\n')}`;
+${sectionsFull(doc)}`;
 }
 
 // 카드 한 장 문구만 새로 (그림 · 장면은 그대로라 장면과 어울리게)
 export function cardOnePrompt(doc: ArticleDoc, title: string, index: number, current: { title: string; sub: string; scene: string }, others: string[], kind?: string, writer?: Writer) {
   return `아래 블로그 글로 카드뉴스 ${index + 1}번 카드(${cardRoles(kind)[index]?.guide ?? '이 글의 메시지'})의 문구를 새로 만들어라. 글에 있는 사실과 메시지만 쓴다. 글 주제와 상관없는 ${IND.place} 정보는 쓰지 않는다.${cardWriter(writer)}
-지금 문구와 다른 표현으로 쓰고, 다른 카드 제목과 겹치지 않게. title 10~28자, sub 30~80자, 과장 · 보장 금지, 이모지 금지.${isDaycare ? ' 아이 이름 · 금액 · 입소 약속 · 진단하는 말 금지.' : ''}
+지금 문구와 다른 표현으로 쓰고, 다른 카드 제목과 겹치지 않게. 이 카드는 카드${index + 1}이다.${isDaycare ? ' 아이 이름 · 금액 · 입소 약속 · 진단하는 말 금지.' : ''}
+${CARD_TITLE_RULE}
+${CARD_SUB_RULE}
 그림은 바꾸지 않으므로 그림 장면과 어긋나지 않게 쓴다. 그림 장면: ${current.scene}
 
 [지금 문구] ${current.title} / ${current.sub}
 [다른 카드 제목] ${others.join(' / ') || '없음'}
 [글 제목] ${title}
 [섹션]
-${doc.sections.map((s) => `(${s.id}) ${s.heading ?? ''}: ${s.paragraphs.join(' ').slice(0, 300)}`).join('\n')}`;
+${sectionsFull(doc)}`;
 }
 
 const DAYCARE_MEMO_RULES = `너는 원장님 · 선생님이 말하듯 적은 보육 메모를 블로그 재료 칸에 나눠 담는 정리 담당이다.

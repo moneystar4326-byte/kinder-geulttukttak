@@ -95,8 +95,10 @@ export function cardHtml(c: CardLayerInput) {
   const main = color(c.brand.main, IND.brand.main), accent = color(c.brand.accent, IND.brand.accent);
   const layout = layoutOf(c.style);
   const font = c.fontDir;
-  const titleSize = c.size === '1080x1080' ? 76 : 84;
-  const subSize = c.size === '1080x1080' ? 38 : 42;
+  // 2026-10-27 카드 글이 2문장 60~110자로 길어짐 → 80자가 넘으면 한 단계 작은 글자 (AI 그림 카드 틀은 그대로 들어감)
+  const long = [...c.copy.sub].length > 80;
+  const titleSize = c.size === '1080x1080' ? (long ? 66 : 76) : long ? 74 : 84;
+  const subSize = c.size === '1080x1080' ? (long ? 32 : 38) : long ? 36 : 42;
   // 글자 상자 높이 상한 (나머지는 그림이 보이는 곳). 아래 상자는 안쪽 여백이 있어 조금 더 크게
   const onImage = !!c.backgroundFile;
   // 흰 판(안쪽 여백 88px)이 있으면 그만큼 더 줌 (2026-10-18 실사용: 여백만큼 넘침으로 잘못 판정)
@@ -159,6 +161,6 @@ export function copyHints(copy: CardCopy) {
   const t = [...copy.title].length, s = [...copy.sub].length;
   const hints: string[] = [];
   if (t > 28) hints.push(`제목이 ${t}자예요 (권장 10~28자)`);
-  if (s > 80) hints.push(`보조 문구가 ${s}자예요 (권장 30~80자)`);
+  if (s > 110) hints.push(`보조 문구가 ${s}자예요 (권장 60~110자)`);
   return hints;
 }

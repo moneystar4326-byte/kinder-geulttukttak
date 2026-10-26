@@ -128,7 +128,7 @@ import { CardOneSchema } from '../../src/shared/schemas';
 test('문구만 다시: 카드 역할 · 그림 장면 · 지금 문구 · 다른 카드 제목을 함께 보냄', () => {
   const doc = { titleCandidates: ['a', 'b', 'c'], sections: [{ id: 's1', paragraphs: ['승급심사는 10월 30일'] }], tags: [], photoSuggestions: [], reviewFlags: [] };
   const p = cardOnePrompt(doc, '제목', 2, { title: '띠 색보다 배움', sub: '설명', scene: 'children bowing' }, ['카드1 제목', '카드2 제목']);
-  assert.match(p, /3번 카드\(이 글의 교육 메시지\)/);
+  assert.match(p, /3번 카드\(이 글의 교육 메시지/);
   assert.match(p, /children bowing/);
   assert.match(p, /띠 색보다 배움/);
   assert.match(p, /카드1 제목 \/ 카드2 제목/);
@@ -145,5 +145,18 @@ test('행사 글 카드는 행사 소개 · 활동 · 참여 안내, 주제와 �
   assert.match(p, /카드2 = 행사에서 하는 활동/);
   assert.doesNotMatch(p, /실제 수업 장면/);
   assert.match(p, /상관없는 도장 정보/);
-  assert.match(cardCopyPrompt(doc, 't'), /카드2 = 이 글에 적힌 실제 수업 장면/);
+  assert.match(cardCopyPrompt(doc, 't'), /카드2 = 이 글에 적힌 실제 수업 — 무엇을 어떻게/);
+});
+
+test('카드 글은 제목에 대한 답 + 글 속 구체 내용, 글 전체를 보여 줌 (2026-10-27)', async () => {
+  const { VAGUE_SUB, cardOnePrompt } = await import('../../src/main/services/openai/prompts');
+  const long = '앞굽이 서기를 세 번 나눠 따라 했어요. '.repeat(20);
+  const doc = { titleCandidates: ['a', 'b', 'c'], sections: [{ id: 's1', paragraphs: [long] }], tags: [], photoSuggestions: [], reviewFlags: [] };
+  const p = cardCopyPrompt(doc, 't');
+  assert.match(p, /첫 문장 = title 에 대한 답/);
+  assert.ok(p.includes(long.trim()), '섹션을 300자로 자르지 않음');
+  assert.match(cardOnePrompt(doc, 't', 1, { title: 'x', sub: 'y', scene: 'z' }, []), /이 카드는 카드2이다/);
+  assert.ok(VAGUE_SUB.test('낯설어도 해보려는 마음을 살펴봐요.'));
+  assert.ok(VAGUE_SUB.test('몇 개를 넘었는지 궁금하시지요.'));
+  assert.ok(!VAGUE_SUB.test('아니요, 처음엔 서툰 게 당연해요. 오늘은 앞굽이를 세 번 나눠 익혔어요.'));
 });
