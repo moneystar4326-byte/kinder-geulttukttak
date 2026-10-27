@@ -1,7 +1,7 @@
 // 주변 장소 이름을 글에 쓰기 (태권 글뚝딱 2026-10-18 규칙에서 옴: 초등학교 1km · 역 1km · 아파트 500m 안만)
-// 어린이집은 아파트 기준 (2026-10-27 기획안 v0.2 9장). 이름은 AI가 만들지 않고 코드로만 붙임
+// 유치원도 아파트 기준 (2026-10-27 기획안 v0.2 9장 · v0.4 8장). 이름은 AI가 만들지 않고 코드로만 붙임
 import type { NearbyArea } from './types';
-import { APP } from './daycare';
+import { APP } from './kinder';
 
 const MAX: Record<string, number> = { 학교: 1000, 지하철역: 1000, 아파트: 500, 유치원: 800 };
 const near = (areas: NearbyArea[], kind: string) =>
@@ -9,10 +9,10 @@ const near = (areas: NearbyArea[], kind: string) =>
 
 export const dongOf = (region: string) => region.trim().split(/\s+/).pop()?.replace(new RegExp(`${APP.term}$`), '') ?? '';
 
-// 카카오 아파트 이름은 "아파트"를 떼고 모아서 다시 붙임 ("롯데낙천대" → [롯데낙천대아파트 어린이집])
-// 직접 적은 이름은 아파트 · 단지로 끝나면 그대로, 아니면 "○○ 근처" (다른 어린이집 이름처럼 읽히지 않게)
+// 카카오 아파트 이름은 "아파트"를 떼고 모아서 다시 붙임 ("롯데낙천대" → [롯데낙천대아파트 유치원])
+// 직접 적은 이름은 아파트 · 단지로 끝나면 그대로, 아니면 "○○ 근처" (다른 유치원 이름처럼 읽히지 않게)
 const aptName = (name: string) => (/(아파트|단지)$/.test(name) ? name : `${name}아파트`);
-export const daycarePrefix = (name: string, kakaoApt: boolean) =>
+export const kinderPrefix = (name: string, kakaoApt: boolean) =>
   kakaoApt ? `[${aptName(name)} ${APP.term}]` : /(아파트|단지)$/.test(name) ? `[${name} ${APP.term}]` : `[${name} 근처 ${APP.term}]`;
 
 // 제목 머리말 후보 (돌아가며 씀): 가까운 아파트 4곳 · 직접 적은 이름을 번갈아, 소재 동 이름은 세 편에 한 번 꼭
@@ -22,8 +22,8 @@ export function prefixRotation(region: string, areas: NearbyArea[]) {
   const dong = dongOf(region);
   const manual = areas.filter((a) => a.source === 'manual' && !KAKAO_KINDS.includes(a.kind) && a.name.trim() && a.name.trim() !== dong);
   const rest = [...new Set([
-    ...near(areas, '아파트').slice(0, 4).map((a) => daycarePrefix(a.name, true)),
-    ...manual.map((a) => daycarePrefix(a.name.trim(), false)),
+    ...near(areas, '아파트').slice(0, 4).map((a) => kinderPrefix(a.name, true)),
+    ...manual.map((a) => kinderPrefix(a.name.trim(), false)),
   ])];
   if (!dong) return rest;
   const own = `[${dong} ${APP.term}]`;
@@ -41,7 +41,7 @@ export function autoPrefix(region: string, areas: NearbyArea[], turn: number) {
   return r.length ? r[turn % r.length] : '';
 }
 
-// 지역 태그: 동네 + 가까운 아파트 2곳 (# 없이, "○○어린이집")
+// 지역 태그: 동네 + 가까운 아파트 2곳 (# 없이, "○○유치원")
 export function areaTags(region: string, areas: NearbyArea[]) {
   const names = [dongOf(region), ...near(areas, '아파트').slice(0, 2).map((a) => aptName(a.name))].filter(Boolean);
   return [...new Set(names.map((n) => `${n.replace(/\s/g, '')}${APP.term}`))];

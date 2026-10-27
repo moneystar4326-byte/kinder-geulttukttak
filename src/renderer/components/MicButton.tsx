@@ -2,7 +2,7 @@
 // 녹음은 메모리에만 있고 저장하지 않음. 마이크 권한은 main(index.ts)이 우리 화면의 소리만 허용
 import { useEffect, useRef, useState } from 'react';
 import { call } from '../api';
-import { APP } from '../../shared/daycare';
+import { APP } from '../../shared/kinder';
 
 const MAX_SEC = 60;
 const pickMime = () => ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((m) => MediaRecorder.isTypeSupported(m)) ?? '';

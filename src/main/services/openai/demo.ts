@@ -1,11 +1,11 @@
 // 샘플 자료: 시험 코드가 쓰는 가짜 AI · 샘플 입력 (앱의 데모 모드는 태권 글뚝딱 2.1에서 없앰)
-// 모든 결과는 미리 써 둔 샘플 · 가상 값. "새싹예시어린이집"은 실제 어린이집이 아님 (시험용 가상 이름)
+// 모든 결과는 미리 써 둔 샘플 · 가상 값. "새싹예시유치원"은 실제 유치원이 아님 (시험용 가상 이름)
 import type { ArticleDoc, ArticleInput, DojoProfile, KeywordRow } from '../../../shared/types';
 import type { ImageAI, TextAI } from './index';
 
 export const DEMO_PROFILE: DojoProfile = {
   id: 'default',
-  name: '새싹예시어린이집',
+  name: '새싹예시유치원',
   region: '시연용 가정 지역',
   audiences: ['유아 (만 3~5세)'],
   philosophy: '(시연용 예시 문구) 놀이 속에서 스스로 해 보는 경험을 소중히 여깁니다.',
@@ -28,10 +28,10 @@ export const DEMO_INPUT: ArticleInput = {
     extra: '',
     photoNotes: '낙엽 왕관을 쓴 뒷모습 사진',
   },
-  mainKeyword: '어린이집 낙엽 놀이',
+  mainKeyword: '유치원 낙엽 놀이',
   subKeywords: ['유아 바깥놀이'],
   tone: '따뜻한 설명형',
-  ending: '어린이집 소개로 마무리',
+  ending: '유치원 소개로 마무리',
   includeProfile: { philosophy: true, classFeatures: true, credentials: false, contact: false, address: false },
   withCards: true,
 };
@@ -40,7 +40,7 @@ export const DEMO_INPUT: ArticleInput = {
 export function demoKeywords(): KeywordRow[] {
   const at = new Date().toISOString();
   return [
-    ['어린이집 낙엽 놀이', '가상 300', '가상 2,100', '가상 낮음'],
+    ['유치원 낙엽 놀이', '가상 300', '가상 2,100', '가상 낮음'],
     ['유아 바깥놀이', '가상 200', '가상 1,500', '가상 낮음'],
     ['가을 놀이', '가상 900', '가상 5,100', '가상 중간'],
   ].map(([keyword, pc, mobile, competition]) => ({ keyword, pc, mobile, competition, source: 'demo' as const, fetchedAt: at }));
@@ -48,7 +48,7 @@ export function demoKeywords(): KeywordRow[] {
 
 const DEMO_DOC: ArticleDoc = {
   titleCandidates: [
-    '어린이집 낙엽 놀이, 손끝으로 만나는 가을',
+    '유치원 낙엽 놀이, 손끝으로 만나는 가을',
     '바깥놀이터에서 낙엽을 모으고 왕관을 만들었어요',
     '낙엽 한 장에서 시작된 유아들의 작은 자신감',
   ],
@@ -76,7 +76,7 @@ const DEMO_DOC: ArticleDoc = {
     { id: 's5', heading: '놀이로 자라는 마음', paragraphs: [
       '낙엽 놀이는 특별한 준비물이 없어도 아이들의 호기심을 깨워 줍니다. 보고 듣고 만지는 경험이 한데 모여 계절을 이해하는 바탕이 됩니다.',
       '내가 고른 잎으로 무언가를 완성해 보는 경험은 작은 자신감으로 이어집니다. 결과가 멋진지보다 스스로 정하고 해냈다는 기억이 아이에게 오래 남습니다.',
-      '새싹예시어린이집은 날씨가 좋은 날 오전에 바깥놀이를 하며, 계절마다 달라지는 자연을 놀이로 만나고 있습니다. 같은 놀이터도 계절에 따라 전혀 다른 놀이터가 됩니다.',
+      '새싹예시유치원은 날씨가 좋은 날 오전에 바깥놀이를 하며, 계절마다 달라지는 자연을 놀이로 만나고 있습니다. 같은 놀이터도 계절에 따라 전혀 다른 놀이터가 됩니다.',
       '친구들과 함께 낙엽을 모으는 동안 서로의 잎을 구경하고 나누는 모습도 보였습니다. 함께 노는 시간 속에서 친구를 바라보는 마음도 함께 자랍니다.',
     ] },
     { id: 's5b', heading: '선생님이 지켜본 모습', paragraphs: [
@@ -93,13 +93,13 @@ const DEMO_DOC: ArticleDoc = {
       '집에 가져온 낙엽을 책 사이에 끼워 두었다가 며칠 뒤 함께 꺼내 보는 것도 좋습니다. 달라진 모습을 보며 나누는 대화가 또 하나의 놀이가 됩니다.',
     ] },
   ],
-  tags: ['어린이집낙엽놀이', '유아바깥놀이', '가을놀이', '낙엽왕관', '어린이집놀이', '새싹예시어린이집'],
+  tags: ['유치원낙엽놀이', '유아바깥놀이', '가을놀이', '낙엽왕관', '유치원놀이', '새싹예시유치원'],
   photoSuggestions: [{ afterSectionId: 's4', caption: '낙엽 왕관을 쓴 뒷모습 사진' }],
   reviewFlags: [],
 };
 
 const ALT_TITLES = [
-  ['낙엽 왕관 만들기, 손끝에서 시작된 가을 놀이', '바깥놀이터 낙엽 놀이로 만난 작은 자신감', '어린이집 가을 낙엽 놀이 이야기'],
+  ['낙엽 왕관 만들기, 손끝에서 시작된 가을 놀이', '바깥놀이터 낙엽 놀이로 만난 작은 자신감', '유치원 가을 낙엽 놀이 이야기'],
   ['가을 낙엽으로 왕관을 만든 날', '유아 바깥놀이: 낙엽 모으기와 왕관 만들기', '낙엽 한 장으로 자라는 호기심'],
 ];
 
@@ -134,7 +134,7 @@ export const demoText: TextAI = {
   async keywordIdeas(region, topic, _k, o) {
     await wait(300, o?.signal);
     const r = region.replace(/\s/g, '');
-    return [`${r} 어린이집`, '유아 바깥놀이', '어린이집 가을 놀이', '낙엽 놀이', `${topic.split(/\s/)[0]} 놀이`];
+    return [`${r} 유치원`, '유아 바깥놀이', '유치원 가을 놀이', '낙엽 놀이', `${topic.split(/\s/)[0]} 놀이`];
   },
 };
 

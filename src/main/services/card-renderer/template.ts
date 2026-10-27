@@ -2,7 +2,7 @@
 // 글자가 넘치면 자동으로 줄이지 않고 overflow 로 알려 문구를 줄이게 함 (measure 스크립트)
 import { pathToFileURL } from 'node:url';
 import type { CardCopy, CardSize, CardStyle } from '../../../shared/types';
-import { APP } from '../../../shared/daycare';
+import { APP } from '../../../shared/kinder';
 
 export interface CardLayerInput {
   copy: CardCopy;
@@ -18,7 +18,7 @@ export interface CardLayerInput {
 }
 
 export const SAFE = 72; // 안전 여백 시작값
-// 로고 높이: 100% = 64px, 어린이집 정보에서 60~200% (2026-10-22 파일럿: 로고가 너무 작음)
+// 로고 높이: 100% = 64px, 유치원 정보에서 60~200% (2026-10-22 파일럿: 로고가 너무 작음)
 export const logoHeight = (scale = 120) => Math.round(64 * Math.min(200, Math.max(60, scale)) / 100);
 export const sizeOf = (s: CardSize) => (s === '1080x1080' ? { w: 1080, h: 1080 } : { w: 1080, h: 1350 });
 export const layoutOf = (style: CardStyle): 'top-text' | 'bottom-text' => (style === '깔끔한 정보형' ? 'bottom-text' : 'top-text');

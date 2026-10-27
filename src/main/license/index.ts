@@ -11,7 +11,7 @@ import os from 'node:os';
 import type { Cipher } from '../credentials';
 import { ApiError } from '../services/errors';
 import { checkAccess, LICENSE_PUBLIC_KEY, verifyLicense, type Access, type LicenseClaims } from './token';
-import { APP, PRODUCT } from '../../shared/daycare';
+import { APP, PRODUCT } from '../../shared/kinder';
 
 export const SERVER = (process.env.GTD_SERVER || 'https://growmoment.co.kr').replace(/\/$/, '');
 const REFRESH_EVERY = 6 * 3600_000;
@@ -26,7 +26,7 @@ export type LicenseStatus =
 
 // 상품 구분 (2026-10-27): 홈페이지 서버가 이용권에 product 를 넣어 주면 다른 상품(태권 글뚝딱) 이용권은 잠금.
 // 아직 product 가 없는 이용권(지금 서버)은 막지 않음 — 서버에서 구분을 넣기 전까지는 같은 계정이 두 앱을 다 쓸 수 있음
-// 연결 · 갱신 요청에 product=daycare 를 같이 보냄
+// 연결 · 갱신 요청에 product=kinder 를 같이 보냄
 const productParam: Record<string, string> = { product: PRODUCT };
 
 const WHY: Record<string, string> = {
@@ -106,7 +106,7 @@ export function createLicense(d: LicenseDeps) {
     if (product && product !== PRODUCT) return { state: 'locked', why: 'other-product', message: WHY['other-product'], dojang: c.dojang, checkedAt: s.checkedAt ?? null };
     const t = now();
     const lastSeen = s.lastSeen ? new Date(s.lastSeen) : undefined;
-    // 어린이집 이름은 이용권 안의 것으로 비교 (앱 어린이집 정보 이름과 계정 이름이 달라도 잠기지 않게)
+    // 유치원 이름은 이용권 안의 것으로 비교 (앱 유치원 정보 이름과 계정 이름이 달라도 잠기지 않게)
     const a = checkAccess(c, { device: d.device, dojang: c.dojang, now: t, lastSeen });
     // 시계를 되돌린 걸 알아채려고 본 시각 중 가장 늦은 것을 남김 (한 시간에 한 번만 저장)
     if (!lastSeen || t.getTime() > lastSeen.getTime() + 3600_000) { try { save({ ...s, lastSeen: t.toISOString() }); } catch { /* 다음에 */ } }

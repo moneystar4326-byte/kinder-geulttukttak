@@ -3,7 +3,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
 import type { Article, ArticleInput, ArticleStatus, ArticleSummary, ArticleVersion, Card, CardSet, DojoProfile, Job, JobState, KeywordRow } from '../../shared/types';
-import { APP } from '../../shared/daycare';
+import { APP } from '../../shared/kinder';
 
 export const SCHEMA_VERSION = 1;
 
@@ -41,7 +41,7 @@ export function openDb(file: string) {
   const get = (sql: string, ...a: any[]) => db.prepare(sql).get(...a) as any;
   const run = (sql: string, ...a: any[]) => db.prepare(sql).run(...a);
 
-  // ---------- 어린이집 프로필 (MVP는 기본 1개, 모델은 여러 개 가능) ----------
+  // ---------- 유치원 프로필 (MVP는 기본 1개, 모델은 여러 개 가능) ----------
   const rowToProfile = (r: any): DojoProfile => ({ ...p<any>(r.facts_json, {}), id: r.id, name: r.name, region: r.region, brand: p(r.brand_json, APP.brand), updatedAt: r.updated_at });
   function saveProfile(pr: DojoProfile) {
     const { id, name, region, brand, updatedAt: _u, ...facts } = pr;

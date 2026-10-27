@@ -25,7 +25,7 @@ export function withLocation(doc: ArticleDoc, profile: DojoProfile): ArticleDoc 
   return appendLine(doc, line);
 }
 
-// 본문에 어린이집 이름이 한 번도 없으면 마지막 섹션 끝에 한 줄 (2026-10-22 파일럿: 글에 상호명이 안 나옴)
+// 본문에 유치원 이름이 한 번도 없으면 마지막 섹션 끝에 한 줄 (2026-10-22 파일럿: 글에 상호명이 안 나옴)
 export function withDojoName(doc: ArticleDoc, profile: DojoProfile): ArticleDoc {
   const name = profile.name.trim();
   const flat = (t: string) => t.replace(/\s+/g, '');
@@ -36,7 +36,7 @@ export function withDojoName(doc: ArticleDoc, profile: DojoProfile): ArticleDoc 
   return appendLine(doc, `${name}${josa} ${where ? `${where}에서 ` : ''}아이들과 함께하고 있어요.`);
 }
 
-// 어린이집: 글 끝 글쓴이 한 줄 (고른 경우만, 적어 준 이름 · 반 그대로 — 기획안 v0.2 4장)
+// 유치원: 글 끝 글쓴이 한 줄 (고른 경우만, 적어 준 이름 · 반 그대로 — 기획안 v0.2 4장)
 export function writerSignLine(input: ArticleInput, profile: DojoProfile) {
   const w = input.writer;
   if (!w || !input.writerSign) return '';
@@ -90,7 +90,7 @@ export async function generateArticle(deps: { db: Db; ai: TextAI; profile: DojoP
       return [{ code: 'review-failed', message: 'AI 사실 점검을 하지 못했어요. 직접 확인해 주세요.' }];
     });
     ctx.signal.throwIfAborted();
-    // 지역 태그는 코드가 붙임 (동네 · 가까운 아파트 + 어린이집)
+    // 지역 태그는 코드가 붙임 (동네 · 가까운 아파트 + 유치원)
     const tags = [...new Set([...areaTags(profile.region, profile.nearbyAreas ?? []), ...doc.tags])].slice(0, 15);
     doc = decorateHeadings(withWriterSign(withDojoName(withLocation({ ...doc, tags }, profile), profile), input, profile)); // 소제목 이모지는 코드가 같은 모양으로
     doc = { ...doc, reviewFlags: mergeFlags(doc, profile, input, aiFlags) };
@@ -193,7 +193,7 @@ export async function reviseArticle(deps: { db: Db; ai: TextAI; profile: DojoPro
     doc = { ...doc, titleCandidates: base.doc.titleCandidates };
     note = label;
   }
-  // AI가 글 전체를 다시 쓰면 고른 글쓴이 줄이 빠질 수 있어 다시 붙임 (어린이집 · 2026-10-27 버그 점검)
+  // AI가 글 전체를 다시 쓰면 고른 글쓴이 줄이 빠질 수 있어 다시 붙임 (유치원 · 2026-10-27 버그 점검)
   doc = withWriterSign(doc, art.input, profile);
   doc = { ...doc, reviewFlags: mergeFlags({ ...doc, reviewFlags: [] }, profile, art.input, doc.reviewFlags.filter((f) => f.code === 'demo')) };
   // 사용자가 그동안 고쳐 저장했다면 base 와 현재가 달라 → 새 버전은 남기되 현재 글을 덮어쓰지 않음

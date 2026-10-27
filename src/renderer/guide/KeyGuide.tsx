@@ -6,7 +6,7 @@ import { useApp } from '../App';
 import { call } from '../api';
 import { Bubble, HelpBox, line, open } from './voice';
 import { KeyImport } from './SetupGuide';
-import { APP } from '../../shared/daycare';
+import { APP } from '../../shared/kinder';
 
 type Step = { id: string; title: string; shot?: string; url?: string };
 const FLOWS: Record<'naver' | 'kakao', { name: string; steps: Step[] }> = {

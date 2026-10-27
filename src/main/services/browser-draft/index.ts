@@ -8,7 +8,7 @@ import { chromium, type BrowserContext, type Page } from 'playwright-core';
 import { findBrowser, NO_BROWSER } from './browser';
 import * as E from './editor';
 import { shortLines, tagLine } from '../../../shared/format';
-import { APP } from '../../../shared/daycare';
+import { APP } from '../../../shared/kinder';
 
 export type DraftStep = 'open' | 'login' | 'editor' | 'title' | 'body' | 'headings' | 'cards' | 'map' | 'verify' | 'done';
 export const STEP_LABEL: Record<DraftStep, string> = {

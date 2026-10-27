@@ -43,22 +43,22 @@ test('동네 이름 줄이기 · 제목 머리말', () => {
   assert.equal(shortName('보라매롯데낙천대아파트', '아파트', ['보라매']), '롯데낙천대');
   assert.equal(shortName('정은아파트', '아파트', ['정은']), '정은');
   assert.equal(shortName('보라매역 7호선', '지하철역'), '보라매역');
-  // 어린이집: 동네 → 아파트 → 직접 적은 이름 → 학교 · 역("근처") 순서
+  // 유치원: 동네 → 아파트 → 직접 적은 이름 → 학교 · 역("근처") 순서
   assert.deepEqual(prefixOptions('서울 동작구 신대방동', [{ name: '보라매초', kind: '학교', source: 'kakao' }, { name: '롯데낙천대', kind: '아파트', source: 'kakao' }, { name: '보라매', kind: '직접 입력', source: 'manual' }]),
-    ['[신대방동 어린이집]', '[롯데낙천대아파트 어린이집]', '[보라매 근처 어린이집]', '[보라매초 근처 어린이집]']);
+    ['[신대방동 유치원]', '[롯데낙천대아파트 유치원]', '[보라매 근처 유치원]', '[보라매초 근처 유치원]']);
 });
 
 // 키워드 띄어 쓴 꼴 · 횟수 (2026-10-18 흐름 다듬기)
 import { keywordCount, spacedKeyword } from '../../src/shared/validation';
 test('검색어는 본문용으로 띄어 씀', () => {
-  assert.equal(spacedKeyword('신대방동어린이집'), '신대방동 어린이집');
-  assert.equal(spacedKeyword('신대방동국공립어린이집'), '신대방동 국공립어린이집');
+  assert.equal(spacedKeyword('신대방동유치원'), '신대방동 유치원');
+  assert.equal(spacedKeyword('신대방동국공립유치원'), '신대방동 국공립유치원');
   assert.equal(spacedKeyword('영아반 적응'), '영아반 적응');
-  assert.equal(spacedKeyword('어린이집'), '어린이집');
+  assert.equal(spacedKeyword('유치원'), '유치원');
   assert.equal(spacedKeyword('물놀이'), '물놀이'); // 한 낱말은 띄우지 않음
 });
 test('키워드 횟수는 띄어쓰기와 상관없이 셈', () => {
-  assert.equal(keywordCount('신대방동어린이집과 신대방동 어린이집, 신대방동  어린이집', '신대방동어린이집'), 3);
+  assert.equal(keywordCount('신대방동유치원과 신대방동 유치원, 신대방동  유치원', '신대방동유치원'), 3);
   assert.equal(keywordCount('영아반(만1세)', '영아반(만1세)'), 1);
   assert.equal(keywordCount('아무것도', ''), 0);
 });

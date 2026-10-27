@@ -1,7 +1,7 @@
 // AI 응답 · IPC 입력 검증 스키마
 import { z } from 'zod';
-import { ARTICLE_KINDS, TONES } from './types';
-import { APP } from './daycare';
+import { ARTICLE_KINDS, AUDIENCES, TONES } from './types';
+import { APP } from './kinder';
 
 export const GeneratedArticleSchema = z.object({
   titleCandidates: z.array(z.string().min(1)).length(3),
@@ -111,7 +111,7 @@ export const ProfileInput = z.object({
   name: s(80).min(1, `${APP.nameLabel}을 적어 주세요`),
   region: s(80).min(1, '소재 지역을 적어 주세요'),
   address: s(200).optional(),
-  audiences: z.array(s(30)).min(1, `${APP.audLabel}을 하나 이상 골라 주세요`),
+  audiences: z.array(s(30)).optional().transform(() => [...AUDIENCES]), // 유치원은 늘 만 3~5세
   philosophy: s().min(1, `${APP.philLabel}을 적어 주세요`),
   classFeatures: s(),
   hours: s(300).optional(),

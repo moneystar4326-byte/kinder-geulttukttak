@@ -5,7 +5,7 @@ export function Field({ label, req, hint, children }: { label: string; req?: boo
   return <label className="field"><span>{label}{req && <em>*</em>}</span>{children}{hint && <small>{hint}</small>}</label>;
 }
 
-// label: 저장 값과 보이는 이름이 다를 때 (어린이집판 글 종류: 수업 후기 → 놀이 · 활동 이야기)
+// label: 저장 값과 보이는 이름이 다를 때 (유치원판 글 종류: 수업 후기 → 놀이 · 활동 이야기)
 export function Chips<T extends string>({ options, value, onChange, multi, label }: { options: readonly T[]; value: T | T[]; onChange: (v: any) => void; multi?: boolean; label?: (o: T) => string }) {
   const on = (o: T) => (Array.isArray(value) ? value.includes(o) : value === o);
   return (

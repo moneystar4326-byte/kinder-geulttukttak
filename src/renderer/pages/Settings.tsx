@@ -6,7 +6,7 @@ import { AccountPanel } from '../components/Account';
 import { SetupGuide } from '../guide/SetupGuide';
 import { KeyGuide } from '../guide/KeyGuide';
 import { Speak } from '../guide/voice';
-import { APP } from '../../shared/daycare';
+import { APP } from '../../shared/kinder';
 
 type SecretName = 'openai' | 'naverApiKey' | 'naverSecret' | 'naverCustomer' | 'kakao';
 
@@ -112,7 +112,7 @@ export function SettingsPage() {
 
       <div className="panel">
         <h2 className="h2-row">카카오 로컬 (주변 학교 · 아파트 이름, 선택) <Speak ids={['P07', 'P08']} /></h2>
-        <p className="hint">제목 앞 "{'[○○아파트 어린이집]'}" 같은 동네 이름 후보를 모을 때만 써요. 없으면 {APP.place} 정보에서 직접 적으면 돼요.</p>
+        <p className="hint">제목 앞 "{'[○○아파트 유치원]'}" 같은 동네 이름 후보를 모을 때만 써요. 없으면 {APP.place} 정보에서 직접 적으면 돼요.</p>
         <div className="row" style={{ marginBottom: 10 }}><button className="btn primary" onClick={() => setKeyGuide('kakao')}>🔊 비서와 같이 연결하기</button></div>
         <SecretRow name="kakao" label="카카오 REST API 키" hint="카카오 개발자 → 앱 → [플랫폼 키] → REST API 키. 앱의 [제품 설정 → 카카오맵] 사용 설정도 켜야 해요" />
         <div className="row">

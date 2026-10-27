@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../App';
 import { call, type ArticleSummary } from '../api';
 import { fmtDate } from '../components/ui';
-import { kindLabel } from '../../shared/daycare';
+import { kindLabel } from '../../shared/kinder';
 
 const STATUS: Record<string, [string, string]> = {
   draft: ['입력 중', ''], generating: ['글 생성 중', 'warn'], validating: ['검증 중', 'warn'], review: ['검토 필요', 'warn'], ready: ['완료', 'ok'],

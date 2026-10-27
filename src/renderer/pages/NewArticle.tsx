@@ -10,7 +10,7 @@ import { hintWords, pickKeywords } from '../../shared/keywords';
 import { autoPrefix, dongOf, prefixNames } from '../../shared/areas';
 import { buildQuickInput, emptyInput, thinMemo } from '../../shared/quickInput';
 import { MicButton } from '../components/MicButton';
-import { APP, kindLabel, writerLabel, type Writer } from '../../shared/daycare';
+import { APP, kindLabel, writerLabel, type Writer } from '../../shared/kinder';
 
 // 말로 넣은 글은 적어 둔 메모 뒤에 이어 붙임
 const appendSpoken = (prev: string, text: string) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text);
@@ -18,18 +18,18 @@ const appendSpoken = (prev: string, text: string) => (prev.trim() ? `${prev.trim
 // 화면 문구
 const TX = {
   thinMemo: '아이들이 가장 좋아한 것이나 기억에 남는 장면을 한 줄만 더 적으면 글이 훨씬 구체적으로 나와요. (예: 분수대 앞에서 비눗방울을 불었어요)',
-  quickPh: ['예: 햇님반 친구들이랑 가을 낙엽 밟기 놀이를 했어요', '예: 만 1세 아기 어린이집 적응 기간은 얼마나 걸릴까요?', '예: 10월 30일 할로윈 파티 안내'],
-  quickHint: '주제나 오늘 있었던 일을 한 줄 적으면, 어린이집 정보(지역 · 보육 특징 · 보육 철학)와 함께 1,500자 이상 글을 만들어요 (행사 · 입소 안내는 1,000자 이상). 적지 않은 장면 · 대화 · 아이 이름 · 금액은 만들지 않으니, 실제 있었던 일을 적을수록 글이 풍성해져요.',
+  quickPh: ['예: 햇님반 친구들이랑 가을 낙엽 밟기 놀이를 했어요', '예: 7세반 아이 초등학교 입학 준비는 어떻게 하나요?', '예: 10월 30일 할로윈 파티 안내'],
+  quickHint: '주제나 오늘 있었던 일을 한 줄 적으면, 유치원 정보(지역 · 교육과정 특징 · 교육 철학)와 함께 1,500자 이상 글을 만들어요 (행사 · 입학 · 원아 모집 안내는 1,000자 이상). 적지 않은 장면 · 대화 · 아이 이름 · 금액은 만들지 않으니, 실제 있었던 일을 적을수록 글이 풍성해져요.',
   topicHint: '예: 낙엽 밟기 바깥놀이', memoHint: '오늘 있었던 놀이 · 생활을 말하듯 적고 버튼을 누르면 아래 칸에 나눠 넣어요. 메모에 없는 내용은 만들지 않아요.',
-  memoGrowth: '예: 만 2세 친구가 처음엔 엄마랑 안 떨어지려고 울었는데, 2주 동안 좋아하는 블록 놀이로 아침을 시작했더니 이제 웃으며 들어와요. 자신감 전하고 싶어요',
-  memoPh: '예: 오늘 햇님반은 밀가루 반죽 촉감놀이를 했어요. 손으로 조물조물 만져 보게 했고, 한 친구가 처음엔 망설이다가 끝에는 동그랗게 빚었어요. 호기심 전하고 싶어요',
+  memoGrowth: '예: 5세반 친구가 처음엔 엄마랑 안 떨어지려고 울었는데, 2주 동안 좋아하는 블록 놀이로 아침을 시작했더니 이제 웃으며 들어와요. 자신감 전하고 싶어요',
+  memoPh: '예: 오늘 6세반은 밀가루 반죽 촉감놀이를 했어요. 손으로 조물조물 만져 보게 했고, 한 친구가 처음엔 망설이다가 끝에는 동그랗게 빚었어요. 호기심 전하고 싶어요',
   act: '한 놀이 · 활동', actHint: '예: 밀가루 반죽 촉감놀이, 바깥 산책', coach: '선생님이 도운 점', coachHint: '구체적으로 (예: 먼저 손끝으로 만져 보게 하기)',
-  recruitWho: '입소 대상', recruitTrial: '상담 · 대기 신청 방법',
+  recruitWho: '모집 대상', recruitTrial: '입학설명회 · 신청 방법',
   values: ['호기심', '배려', '나눔', '자신감', '도전', '협동', '즐거움', '자립', '감사'],
   facts: '여기 적은 사실로만 글을 써요. 적지 않은 장면 · 대화 · 수상 · 경력 · 금액 · 일정은 만들지 않아요. 아이 이름은 적지 않아도 되고, 적어도 글에는 "한 친구"처럼 익명으로 써요.',
 };
 
-// 어린이집: 누가 쓰는 글인가요? (어린이집 정보의 글쓴이 목록, 없으면 원장님)
+// 유치원: 누가 쓰는 글인가요? (유치원 정보의 글쓴이 목록, 없으면 원장님)
 const DIRECTOR: Writer = { id: 'director', role: '원장', name: '' };
 function WriterPick({ writers, value, onChange, sign, onSign }: { writers: Writer[]; value?: Writer; onChange: (w: Writer) => void; sign: boolean; onSign: (v: boolean) => void }) {
   const list = writers.some((w) => w.role === '원장') ? writers : [DIRECTOR, ...writers];
@@ -73,8 +73,8 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
     call<DojoProfile | null>('profile:get').then((p) => {
       setProfile(p);
       if (!saved) setInput(emptyInput(p));
-      // 어린이집 정보에 있는 것은 다시 묻지 않음: 비어 있으면 채움
-      else if (p) setInput((cur) => ({ ...cur, region: cur.region || p.region, audience: cur.audience || p.audiences[0] || cur.audience }));
+      // 유치원 정보에 있는 것은 다시 묻지 않음: 비어 있으면 채움
+      else if (p) setInput((cur) => ({ ...cur, region: cur.region || p.region, audience: AUDIENCES[0] }));
     });
   }, []); // eslint-disable-line
   useEffect(() => { call<string[]>('profile:prefixOptions', { region: input.region }).then(setPrefixes).catch(() => {}); }, [input.region, profile]);
@@ -136,7 +136,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
   const miss = missingInputs(input);
   const regionDiff = profile && input.region && !input.region.replace(/\s/g, '').includes(profile.region.replace(/\s/g, '')) && !profile.region.replace(/\s/g, '').includes(input.region.replace(/\s/g, ''));
 
-  // 어린이집 글쓴이: 고른 사람 (이 PC에 기억), 없으면 목록 첫 사람 · 원장님
+  // 유치원 글쓴이: 고른 사람 (이 PC에 기억), 없으면 목록 첫 사람 · 원장님
   const writers = profile?.writers ?? [];
   const [writerId, setWriterIdState] = useState(local.get('writer-id', ''));
   const [writerSign, setWriterSignState] = useState(local.get('writer-sign', false));
@@ -158,7 +158,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
     } catch (e) { msg.err(e); setBusy(''); }
   };
 
-  // 빠른 작성: 주제(또는 메모) 한 줄 → 어린이집 정보 + 일반 교육 설명으로 바로 글 + 카드
+  // 빠른 작성: 주제(또는 메모) 한 줄 → 유치원 정보 + 일반 교육 설명으로 바로 글 + 카드
   const [quick, setQuick] = useState(local.get('quick-memo', ''));
   const [quickCards, setQuickCards] = useState(true);
   const [quickPrefix, setQuickPrefixState] = useState(local.get('quick-prefix', true));
@@ -181,7 +181,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
         } catch { /* 키워드 조회가 안 돼도 글은 만듦 */ }
         setBusy('quick');
       }
-      // 제목 앞 동네 이름: 글마다 돌아가며 ([신대방동 어린이집] → [롯데낙천대아파트 어린이집] → …)
+      // 제목 앞 동네 이름: 글마다 돌아가며 ([신대방동 유치원] → [롯데낙천대아파트 유치원] → …)
       const titlePrefix = quickPrefix ? autoPrefix(profile?.region ?? '', profile?.nearbyAreas ?? [], (await call<unknown[]>('article:list').catch(() => [])).length) : '';
       const q = buildQuickInput({ memo, profile, main, subs, withCards: quickCards, titlePrefix, writer, writerSign });
       const art = await call<{ id: string }>('article:create', { input: q, keywords: chosen });
@@ -192,7 +192,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
       go({ page: 'article', id: art.id });
     } catch (e) { msg.err(e); setBusy(''); }
   };
-  // 자비스가 넘긴 주제: 어린이집 정보를 불러온 뒤 한 번만 바로 시작
+  // 자비스가 넘긴 주제: 유치원 정보를 불러온 뒤 한 번만 바로 시작
   useEffect(() => {
     if (!jarvis || !profile || busy) return;
     onJarvisDone?.();
@@ -249,7 +249,6 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
           <div className="panel">
             {<WriterPick writers={writers} value={writer} onChange={(w) => setWriterId(w.id)} sign={writerSign} onSign={setWriterSign} />}
             <Field label="글 종류" req><Chips options={ARTICLE_KINDS} value={input.kind} label={kindLabel} onChange={(v) => set({ kind: v })} /></Field>
-            <Field label="주요 독자" req><Chips options={AUDIENCES} value={input.audience as any} onChange={(v) => set({ audience: v })} /></Field>
             <Field label="목표 지역" req hint={regionDiff ? `${APP.place} 소재지(${profile!.region})와 달라요. 글에는 그 지역에 있다고 쓰지 않아요.` : `${APP.place} 소재지가 기본값이에요`}>
               <input type="text" value={input.region} onChange={(e) => set({ region: e.target.value })} />
             </Field>

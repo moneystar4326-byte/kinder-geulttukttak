@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../App';
 import { assetUrl, call, type DojoProfile } from '../api';
 import { Chips, Field, Msg, useMsg } from '../components/ui';
-import { AUDIENCES, TONES } from '../../shared/types';
+import { TONES } from '../../shared/types';
 import { STRENGTHS } from '../../shared/strengths';
-import { APP, type Writer } from '../../shared/daycare';
+import { APP, KINDER_TYPES, type Writer } from '../../shared/kinder';
 
 const EMPTY: DojoProfile = {
   id: 'default', name: '', region: '', address: '', audiences: [], philosophy: '', classFeatures: '', hours: '', classes: '', promoDay: '', strengths: [], strengthsEtc: '', otherFacts: '', credentials: '', contact: '', consultLink: '', blogUrl: '',
@@ -13,23 +13,21 @@ const EMPTY: DojoProfile = {
 
 // 화면 문구
 const TX = {
-  region: '실제 동 · 구 · 시 (예: 서울 동작구 신대방동)', panel: '보육 · 운영 (사실만)', hours: '운영 시간', hoursHint: '예: 기본보육 07:30~16:00, 연장보육 16:00~19:30',
-  classesHint: '예: 햇님반 만 1세, 달님반 만 2세, 별님반 만 3~5세 혼합', promo: '정기 행사', promoHint: '예: 매달 마지막 주 금요일 생일잔치, 분기마다 부모 참여 수업',
-  strengths: '우리 어린이집 강점', etc: '그 밖의 강점 (쉼표로, 예: 텃밭 가꾸기, 영어 놀이)', other: '학부모에게 알려도 되는 자세한 내용 (예: 등원 시간, 급식 · 간식 방식, 특별활동 요일)',
+  region: '실제 동 · 구 · 시 (예: 서울 동작구 신대방동)', panel: '교육과정 · 운영 (사실만)', hours: '운영 시간', hoursHint: '예: 교육과정 09:00~13:30, 방과후과정 13:30~17:00, 아침 돌봄 08:00부터',
+  classesHint: '예: 햇님반 5세, 달님반 6세, 별님반 7세', promo: '정기 행사', promoHint: '예: 매달 마지막 주 금요일 생일잔치, 분기마다 부모 참여 수업',
+  strengths: '우리 유치원 강점', etc: '그 밖의 강점 (쉼표로, 예: 텃밭 가꾸기, 영어 놀이)', other: '학부모에게 알려도 되는 자세한 내용 (예: 등원 시간, 급식 · 간식 방식, 특성화 활동 요일)',
   cred: '원장 · 교사 경력 · 자격', logo: '그림 속 원복에 로고', logoHint: '켜면 AI 그림 속 아이 원복 왼쪽 가슴에 로고를 작게 그려요 (원복 참고 사진이 있을 때만). AI가 그려서 모양 · 글자가 조금 다를 수 있어요 (카드 아래 로고는 늘 원본 그대로)', logoBox: '원복에 로고 넣기',
   refDobok: '원복 참고 사진', refDobokHint: '원복이 있으면 카드 그림의 아이들이 이 옷을 따라 입어요. 아이 얼굴이 나오지 않은 사진만 골라 주세요 (사진 속 로고 · 글자는 따라 그리지 않아요)',
   refCoach: '교실 참고 사진', refCoachHint: '카드 그림의 교실 색 · 가구 느낌만 따라 그려요. 아이 · 선생님 얼굴이 나오지 않은 사진만 골라 주세요',
-  nearby: '"[롯데낙천대아파트 어린이집]"처럼 제목 앞에 붙일 이름이에요. 가까운 아파트를 먼저 써요. AI가 아니라 고른 이름을 그대로 붙여요.', areaPh: '예: 롯데낙천대아파트, 보라매초',
+  nearby: '"[롯데낙천대아파트 유치원]"처럼 제목 앞에 붙일 이름이에요. 가까운 아파트를 먼저 써요. AI가 아니라 고른 이름을 그대로 붙여요.', areaPh: '예: 롯데낙천대아파트, 보라매초',
 };
 
-// 어린이집 유형 (영유아보육법의 어린이집 종류)
-const FACILITY_TYPES = ['국공립', '사회복지법인', '법인 · 단체 등', '민간', '가정', '협동', '직장'] as const;
 
 export function ProfilePage() {
   const { info, reload } = useApp();
   const [p, setP] = useState<DojoProfile>(EMPTY);
   const [area, setArea] = useState('');
-  const [editAt, setEditAt] = useState<number | null>(null); // 어린이집: 주변 장소 이름 고쳐 쓰기 (종류 · 거리는 그대로)
+  const [editAt, setEditAt] = useState<number | null>(null); // 유치원: 주변 장소 이름 고쳐 쓰기 (종류 · 거리는 그대로)
   const msg = useMsg();
   useEffect(() => { call<DojoProfile | null>('profile:get').then((x) => x && setP({ ...EMPTY, ...x, ...(x.strengths ? {} : { strengths: [], otherFacts: x.otherFacts || x.classFeatures }) })); }, []);
   const set = (x: Partial<DojoProfile>) => setP({ ...p, ...x });
@@ -49,10 +47,9 @@ export function ProfilePage() {
         <div className="panel">
           <h2>기본</h2>
           <Field label={APP.nameLabel} req hint="공식 표기"><input type="text" value={p.name} onChange={(e) => set({ name: e.target.value })} /></Field>
-          {<Field label="어린이집 유형"><Chips options={FACILITY_TYPES} value={(p.facilityType ?? '') as any} onChange={(v) => set({ facilityType: v === p.facilityType ? undefined : v })} /></Field>}
+          {<Field label={`${APP.place} 유형`}><Chips options={KINDER_TYPES} value={(p.facilityType ?? '') as any} onChange={(v) => set({ facilityType: v === p.facilityType ? undefined : v })} /></Field>}
           <Field label="소재 지역" req hint={TX.region}><input type="text" value={p.region} onChange={(e) => set({ region: e.target.value })} /></Field>
           <Field label="상세 주소" hint="필요할 때만 본문에 넣어요. 주변 장소 찾기에도 써요"><input type="text" value={p.address ?? ''} onChange={(e) => set({ address: e.target.value })} /></Field>
-          <Field label={APP.audLabel} req><Chips options={AUDIENCES} value={p.audiences as any} multi onChange={(v) => set({ audiences: v })} /></Field>
           <Field label="기본 문체" req><Chips options={TONES} value={p.tone} onChange={(v) => set({ tone: v })} /></Field>
           <Field label="네이버 지도 검색 이름" hint={`글 끝 ${APP.place} 지도 카드를 찾을 때 써요. 네이버 지도에 나오는 이름 그대로 (비우면 ${APP.nameLabel})`}><input type="text" value={p.mapName ?? ''} placeholder={p.name} onChange={(e) => set({ mapName: e.target.value })} /></Field>
           <Field label="네이버 블로그 주소" hint="초안 입력에 필요 (예: https://blog.naver.com/아이디). 블로그가 여러 개면 글을 넣을 블로그"><input type="url" value={p.blogUrl ?? ''} onChange={(e) => set({ blogUrl: e.target.value })} /></Field>
@@ -127,7 +124,7 @@ export function ProfilePage() {
                 </>
               : <button className="btn small" disabled={!area.trim()} onClick={() => { set({ nearbyAreas: [...areas, { name: area.trim(), kind: /초$/.test(area.trim()) ? '학교' : '직접 입력', source: 'manual' }] }); setArea(''); }}>추가</button>}
           </div>
-          {<p className="hint">이름을 누르면 위 칸에서 고쳐 쓸 수 있어요 (종류 · 거리는 그대로). 카카오 아파트 이름에는 제목 · 태그에서 "아파트"가 자동으로 붙어요 ("롯데낙천대" → [롯데낙천대아파트 어린이집]).</p>}
+          {<p className="hint">이름을 누르면 위 칸에서 고쳐 쓸 수 있어요 (종류 · 거리는 그대로). 카카오 아파트 이름에는 제목 · 태그에서 "아파트"가 자동으로 붙어요 ("롯데낙천대" → [롯데낙천대아파트 유치원]).</p>}
           <div className="chips">
             {areas.map((a, i) => (
               <span key={a.name + i} className="chip"><button type="button" className="btn link" title="고쳐 쓰기" onClick={() => { setArea(a.name); setEditAt(i); }}>{a.name}</button> <span className="muted">{a.kind}{a.distance ? ` · ${a.distance}m` : ''}</span>
@@ -172,14 +169,14 @@ function LogoSize({ logo, scale, onChange }: { logo: string; scale: number; onCh
   );
 }
 
-// 어린이집 글쓴이 (원장님 · 선생님이 같이 씀, 기획안 v0.2 4장). 글 작성 화면에서 "누가 쓰는 글인가요?"로 고름
+// 유치원 글쓴이 (원장님 · 선생님이 같이 씀, 기획안 v0.2 4장). 글 작성 화면에서 "누가 쓰는 글인가요?"로 고름
 function Writers({ list, onChange }: { list: Writer[]; onChange: (w: Writer[]) => void }) {
   const add = (role: Writer['role']) => onChange([...list, { id: `w-${Date.now()}`, role, name: '', ...(role === '교사' ? { className: '' } : {}) }]);
   const edit = (i: number, x: Partial<Writer>) => onChange(list.map((w, j) => (j === i ? { ...w, ...x } : w)));
   return (
     <div className="panel">
       <h2>글쓴이 (원장님 · 선생님)</h2>
-      <p className="hint">글을 쓸 사람을 적어 두면 글 작성 화면에서 골라요. 선생님 글은 "저희 ○○반" 시점, 원장님 글은 어린이집 전체 시점으로 써요. 이름은 글 끝 글쓴이 한 줄을 넣을 때만 써요 (비워도 돼요).</p>
+      <p className="hint">글을 쓸 사람을 적어 두면 글 작성 화면에서 골라요. 선생님 글은 "저희 ○○반" 시점, 원장님 글은 유치원 전체 시점으로 써요. 이름은 글 끝 글쓴이 한 줄을 넣을 때만 써요 (비워도 돼요).</p>
       {list.map((w, i) => (
         <div className="row" key={w.id} style={{ marginBottom: 8 }}>
           <b style={{ minWidth: '4em' }}>{w.role === '원장' ? '원장님' : '선생님'}</b>

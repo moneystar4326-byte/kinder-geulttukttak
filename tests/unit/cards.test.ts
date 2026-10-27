@@ -10,7 +10,7 @@ import type { ImageAI } from '../../src/main/services/openai';
 import { DEMO_INPUT, DEMO_PROFILE } from '../../src/main/services/openai/demo';
 import { ApiError } from '../../src/main/services/errors';
 import { buildBlocks } from '../../src/main/services/browser-draft';
-import { daycareBackgroundPrompt } from '../../src/main/services/openai/image-prompt';
+import { kinderBackgroundPrompt } from '../../src/main/services/openai/image-prompt';
 
 const fakeShooter: Shooter = { async shoot(_h, _w, _hh, out) { fs.writeFileSync(out, 'png'); return { overflow: false, titleLines: 1, subLines: 2, broken: [], fontsOk: true }; } };
 
@@ -76,7 +76,7 @@ test('월 한도에 닿으면 이미지 요청을 보내지 않음', async () =>
 });
 
 test('배경 그림 지시문: 글자 금지 · 안전한 장면', () => {
-  const p = daycareBackgroundPrompt('toddlers stacking blocks', '따뜻한 일러스트', 'top-text');
+  const p = kinderBackgroundPrompt('toddlers stacking blocks', '따뜻한 일러스트', 'top-text');
   assert.match(p, /no text/i);
   assert.match(p, /Everything looks safe/);
 });
@@ -103,13 +103,13 @@ test('문구만 다시: 카드 역할 · 그림 장면 · 지금 문구 · 다�
 
 // 카드 역할은 글 종류에 맞게 (태권 글뚝딱 2026-10-18: 행사 글 카드에 다른 수업 이야기가 끼던 문제)
 import { cardCopyPrompt } from '../../src/main/services/openai/prompts';
-test('행사 글 카드는 행사 소개 · 활동 · 참여 안내, 주제와 상관없는 어린이집 정보 금지', () => {
+test('행사 글 카드는 행사 소개 · 활동 · 참여 안내, 주제와 상관없는 유치원 정보 금지', () => {
   const doc = { titleCandidates: ['a', 'b', 'c'], sections: [{ id: 's1', paragraphs: ['생일잔치'] }], tags: [], photoSuggestions: [], reviewFlags: [] };
   const p = cardCopyPrompt(doc, '10월 생일잔치', '행사 안내');
   assert.match(p, /카드1 = 행사 소개/);
   assert.match(p, /카드2 = 행사에서 하는 활동/);
   assert.doesNotMatch(p, /오늘 한 놀이/);
-  assert.match(p, /상관없는 어린이집 정보/);
+  assert.match(p, /상관없는 유치원 정보/);
   assert.match(cardCopyPrompt(doc, 't'), /카드2 = 이 글에 적힌 오늘 한 놀이 · 활동 — 무엇을 어떻게/);
 });
 

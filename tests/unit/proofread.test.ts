@@ -81,13 +81,13 @@ test('2차 점검 지시문: 어색한 낱말 · 억지 이음 · 말투 섞임 
   assert.match(P.SYSTEM_RULES, /해요체/);
 });
 
-test('키워드를 못 고르면 메모 통째 대신 "동네 어린이집"', () => {
-  assert.equal(fallbackKeyword('서울 동작구 신대방동', '장미반 아이들과 함께 보라매공원으로 소풍갔어요'), '신대방동 어린이집');
+test('키워드를 못 고르면 메모 통째 대신 "동네 유치원"', () => {
+  assert.equal(fallbackKeyword('서울 동작구 신대방동', '장미반 아이들과 함께 보라매공원으로 소풍갔어요'), '신대방동 유치원');
   assert.equal(fallbackKeyword('', '숲 체험'), '숲 체험');
   const q = buildQuickInput({ memo: '장미반 아이들과 함께 보라매공원으로 소풍갔어요', profile: { ...DEMO_PROFILE, region: '서울 동작구 신대방동' } as any, withCards: false, titlePrefix: '' });
-  assert.equal(q.mainKeyword, '신대방동 어린이집');
+  assert.equal(q.mainKeyword, '신대방동 유치원');
   assert.equal(buildQuickInput({ memo: '소풍', profile: null, main: '보라매공원 소풍', withCards: false, titlePrefix: '' }).mainKeyword, '보라매공원 소풍');
-  assert.equal(withKeywordFallback({ ...DEMO_INPUT, mainKeyword: '', region: '서울 마포구 망원동' }).mainKeyword, '망원동 어린이집');
+  assert.equal(withKeywordFallback({ ...DEMO_INPUT, mainKeyword: '', region: '서울 마포구 망원동' }).mainKeyword, '망원동 유치원');
 });
 
 test('메모가 한 줄뿐이면 얇은 메모', () => {

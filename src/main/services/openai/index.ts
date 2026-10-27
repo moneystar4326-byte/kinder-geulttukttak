@@ -10,7 +10,7 @@ import {
   PARAGRAPH_JSON, ParagraphSchema, PROOFREAD_JSON, ProofreadSchema, REVIEW_JSON, ReviewSchema, TITLES_JSON, TitlesSchema,
 } from '../../../shared/schemas';
 import type { ArticleDoc, ArticleInput, DojoProfile, ReviewFlag, RevisionKind } from '../../../shared/types';
-import { APP, type Writer } from '../../../shared/daycare';
+import { APP, type Writer } from '../../../shared/kinder';
 import * as P from './prompts';
 
 export interface Usage { model: string; kind: string; reported: unknown }
@@ -56,10 +56,10 @@ export function normalizeDoc(raw: z.infer<typeof GeneratedArticleSchema>): Artic
   };
 }
 
-// 메모 말로 넣기 (2026-10-26): 받아쓰기 모델 + 힌트(보육 낱말 + 그 어린이집의 이름 · 동네 · 주변 장소)
+// 메모 말로 넣기 (2026-10-26): 받아쓰기 모델 + 힌트(유치원 낱말 + 그 유치원의 이름 · 동네 · 주변 장소)
 // mini 는 첫마디 · 고유명사를 자주 틀려서(잡음 섞은 시험 98% vs 100%) 큰 모델로. 1분에 약 8원
 export const LISTEN_MODEL = 'gpt-4o-transcribe';
-const LISTEN_HINT = '어린이집 원장님 · 선생님의 보육 메모. 영아반, 유아반, 만 0세, 만 1세, 만 2세, 누리과정, 적응기간, 낮잠, 배변훈련, 바깥놀이, 숲체험, 오감놀이, 생일잔치, 연장보육, 담임 선생님.';
+const LISTEN_HINT = '유치원 원장님 · 선생님의 유치원 메모. 5세반, 6세반, 7세반, 만 3세, 만 4세, 만 5세, 누리과정, 방과후과정, 특성화 활동, 처음학교로, 입학설명회, 적응기간, 바깥놀이, 숲체험, 생일잔치, 담임 선생님.';
 export const listenHint = (names: string[]) => {
   const extra = [...new Set(names.map((n) => n.trim()).filter(Boolean))].slice(0, 20).join(', ');
   return (extra ? `${LISTEN_HINT} ${APP.place} · 동네 이름: ${extra}.` : LISTEN_HINT).slice(0, 600);
@@ -87,7 +87,7 @@ export function createOpenAI(opts: { apiKey: string; textModel: string; imageMod
     throw lastErr instanceof ApiError ? lastErr : new ApiError('schema', 'AI 응답 형식이 맞지 않았어요. 다시 시도해 주세요.', 'OpenAI', true);
   }
 
-  // 어린이집 카드 점검 (2026-10-27 요요유치원 시험: 제목 "밖에서 무엇을 하나요?"에 "풍경을 만나요"로 답함 · 카드끼리 같은 말 · 공원 글에 교실 그림)
+  // 유치원 카드 점검 (2026-10-27 요요유치원 시험: 제목 "밖에서 무엇을 하나요?"에 "풍경을 만나요"로 답함 · 카드끼리 같은 말 · 공원 글에 교실 그림)
   // 글처럼 만든 뒤 한 번 더 보고 고칠 곳만 고침. 실패하거나 모양이 다르면 처음 카드 그대로 (멈추기만 그대로 던짐)
   type CardCopyRow = { title: string; sub: string; scene: string; afterSectionId: string };
   async function checkCards(doc: ArticleDoc, title: string, cards: CardCopyRow[], kind?: string, o?: CallOpts, writer?: Writer, noQuestion = false): Promise<CardCopyRow[]> {

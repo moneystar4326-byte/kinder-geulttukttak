@@ -1,15 +1,15 @@
 // 앱 전체가 같이 쓰는 데이터 모양
-import type { Writer } from './daycare';
+import type { Writer } from './kinder';
 
 export const ARTICLE_KINDS = ['수업 후기', '성장 이야기', '행사 안내', '모집 안내', '교육 정보'] as const;
 export type ArticleKind = (typeof ARTICLE_KINDS)[number];
 
-// 어린이집판은 영아 · 유아 (2026-10-27 기획안 v0.2)
-export const AUDIENCES: readonly string[] = ['영아 (만 0~2세)', '유아 (만 3~5세)'];
+// 유치원은 늘 만 3~5세 (고르지 않음 — 예전 자료 · 글 재료 모양을 그대로 두려고 값만 하나로)
+export const AUDIENCES: readonly string[] = ['유아 (만 3~5세)'];
 export const TONES = ['따뜻한 설명형', '전문적인 교육형'] as const;
 export type Tone = (typeof TONES)[number];
 // 순서가 뜻: 0 소개 · 1 상담 · 2 가정 · 3 인사 (quick.ts 가 번호로 고름)
-export const ENDINGS: readonly string[] = ['어린이집 소개로 마무리', '입소 상담 안내로 마무리', '가정에서 해 볼 것으로 마무리', '마무리 인사만'];
+export const ENDINGS: readonly string[] = ['유치원 소개로 마무리', '입학 상담 안내로 마무리', '가정에서 해 볼 것으로 마무리', '마무리 인사만'];
 
 export interface DojoProfile {
   id: string;
@@ -22,14 +22,14 @@ export interface DojoProfile {
   hours?: string; // 수업 시간
   classes?: string; // 반 구성
   promoDay?: string; // 정기 행사 (생일잔치 등)
-  strengths?: string[]; // 우리 어린이집 강점 (체크한 것만 글에 씀)
+  strengths?: string[]; // 우리 유치원 강점 (체크한 것만 글에 씀)
   strengthsEtc?: string; // 그 밖의 강점 (쉼표)
   otherFacts?: string; // 그 밖의 운영 사실
   credentials?: string; // 확인 가능한 내용만
   contact?: string;
   consultLink?: string;
   blogUrl?: string;
-  mapName?: string; // 네이버 지도에서 검색할 어린이집 이름 (비우면 어린이집 이름) // https://blog.naver.com/아이디 (네이버 초안 입력에 필요)
+  mapName?: string; // 네이버 지도에서 검색할 유치원 이름 (비우면 유치원 이름) // https://blog.naver.com/아이디 (네이버 초안 입력에 필요)
   logoPath?: string; // 앱 폴더 assets 안으로 복사한 경로
   logoScale?: number; // 카드 로고 크기 % (60~200, 기본 120) · 2026-10-22 파일럿
   logoOnDobok?: boolean; // 카드 그림 속 아이 원복 왼쪽 가슴에 로고 (원복 사진이 있을 때만) (AI가 그려서 모양이 조금 다를 수 있음)
@@ -39,8 +39,8 @@ export interface DojoProfile {
   tone: Tone;
   avoidWords: string; // 쉼표 구분
   nearbyAreas?: NearbyArea[]; // 주변 학교 · 아파트 · 역 (카카오 로컬 또는 직접 입력)
-  facilityType?: string; // 어린이집 유형 (국공립 · 민간 · 가정 …) — 어린이집판만
-  writers?: Writer[]; // 글쓴이 (원장님 · 선생님) — 어린이집판만
+  facilityType?: string; // 유치원 유형 (국공립(단설) · 국공립(병설) · 사립 …)
+  writers?: Writer[]; // 글쓴이 (원장님 · 선생님)
   updatedAt?: string;
 }
 
@@ -82,8 +82,8 @@ export interface ArticleInput {
   ending: string;
   includeProfile: { philosophy: boolean; classFeatures: boolean; credentials: boolean; contact: boolean; address: boolean };
   withCards: boolean;
-  titlePrefix?: string; // 예: [롯데낙천대아파트 어린이집] — 코드가 제목 앞에 붙임 (AI에 동네 이름을 맡기지 않음)
-  writer?: Writer; // 이 글을 쓰는 사람 (어린이집판). 고른 때의 이름 · 반을 그대로 담음
+  titlePrefix?: string; // 예: [롯데낙천대아파트 유치원] — 코드가 제목 앞에 붙임 (AI에 동네 이름을 맡기지 않음)
+  writer?: Writer; // 이 글을 쓰는 사람. 고른 때의 이름 · 반을 그대로 담음
   writerSign?: boolean; // 글 끝에 글쓴이 한 줄 (코드가 붙임)
 }
 

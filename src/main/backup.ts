@@ -7,7 +7,7 @@ import type { Db } from './db';
 import { SCHEMA_VERSION, openDb } from './db';
 import type { ArticleVersion, CardSet } from '../shared/types';
 import { markdownBody, plainBody, safeFileName } from '../shared/validation';
-import { APP } from '../shared/daycare';
+import { APP } from '../shared/kinder';
 
 // 같은 이름이 있으면 덮어쓰지 않고 (2), (3)… 을 붙임 (덮어쓸지는 화면에서 먼저 물어봄)
 export function uniquePath(file: string) {

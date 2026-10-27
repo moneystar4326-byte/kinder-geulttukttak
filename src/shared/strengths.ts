@@ -1,21 +1,21 @@
-// 어린이집 운영 정보를 칸으로 나눠 받기 (태권 글뚝딱 2026-10-18 방식)
+// 유치원 운영 정보를 칸으로 나눠 받기 (태권 글뚝딱 2026-10-18 방식)
 // 글을 쓸 때는 칸을 모아 한 덩어리(classFeatures)로 AI에 전달. 체크 안 한 서비스가 글에 나오면 경고 (1버전 strengths.ts 방식)
-import { APP } from './daycare';
+import { APP } from './kinder';
 
 export interface Strength { id: string; label: string; words?: RegExp }
 
-// 어린이집 초안 (2026-10-27 기획안 v0.2 · GPT 검토 뒤 바뀔 수 있음)
+// 유치원 초안 (2026-10-27 기획안 v0.4 7장 · GPT 검토 뒤 바뀔 수 있음)
 export const STRENGTHS: Strength[] = [
-  { id: 'extended', label: '연장보육', words: /연장\s?보육|야간\s?연장|저녁\s?(보육|돌봄)/ },
-  { id: 'infant', label: '영아 전담', words: /영아\s?전담/ },
-  { id: 'inclusive', label: '장애아 통합', words: /장애아\s?(통합|전문)|통합\s?보육/ },
-  { id: 'car', label: '차량 운행', words: /차량\s?운행|셔틀|통학\s?차량|등하원\s?차량/ },
+  { id: 'afterschool', label: '방과후과정', words: /방과\s?후\s?과정|종일반|오후\s?돌봄/ },
+  { id: 'car', label: '통학 차량', words: /차량\s?운행|셔틀|통학\s?(차량|버스)|등하원\s?차량/ },
   { id: 'meal', label: '자체 조리 급식', words: /자체\s?조리|직접\s?조리/ },
   { id: 'outdoor', label: '바깥놀이' },
   { id: 'forest', label: '숲 체험', words: /숲\s?(체험|놀이|교실)/ },
-  { id: 'special', label: '특별활동', words: /특별\s?활동|외부\s?강사/ },
+  { id: 'special', label: '특성화 활동', words: /특성화\s?(활동|프로그램)|외부\s?강사/ },
   { id: 'parent', label: '부모 참여 프로그램', words: /부모\s?(참여|참관)|참여\s?수업/ },
-  { id: 'adapt', label: '입소 전 적응 기간' },
+  { id: 'adapt', label: '입학 전 적응 기간' },
+  { id: 'inclusive', label: '특수학급(통합)', words: /특수\s?학급|통합\s?(학급|교육)/ },
+  { id: 'vacation', label: '방학 중 돌봄', words: /방학\s?(중\s?)?(돌봄|운영)/ },
 ];
 
 export interface OpsFields { hours?: string; classes?: string; promoDay?: string; strengths?: string[]; strengthsEtc?: string; otherFacts?: string }

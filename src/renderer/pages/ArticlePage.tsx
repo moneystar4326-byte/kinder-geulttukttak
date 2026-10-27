@@ -8,7 +8,7 @@ import { CardsPanel, type CardPref } from '../components/CardsPanel';
 import { FirstTip } from '../guide/voice';
 import { localFlags } from '../../shared/validation';
 import type { DojoProfile, RevisionKind } from '../../shared/types';
-import { APP } from '../../shared/daycare';
+import { APP } from '../../shared/kinder';
 
 const same = (a: Draft | null, b: Draft | null) => JSON.stringify(a) === JSON.stringify(b);
 

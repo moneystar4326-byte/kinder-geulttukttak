@@ -58,7 +58,7 @@ test('필수 재료가 빠지면 생성하지 않음', async () => {
 
 test('행사 안내는 한 줄 메모가 없으면 일시 · 장소 · 대상 · 신청 방법이 있어야 함', async () => {
   const { db, profile } = setup();
-  const a = db.createArticle(profile.id, { ...DEMO_INPUT, kind: '행사 안내', facts: { ...DEMO_INPUT.facts, activities: '', event: { when: '', where: '어린이집', who: '', bring: '', apply: '' } } }, [], false);
+  const a = db.createArticle(profile.id, { ...DEMO_INPUT, kind: '행사 안내', facts: { ...DEMO_INPUT.facts, activities: '', event: { when: '', where: '유치원', who: '', bring: '', apply: '' } } }, [], false);
   await assert.rejects(() => generateArticle({ db, ai: fakeAI({}), profile }, a.id, ctx()), /행사 일시.*행사 대상.*신청 방법/);
 });
 
@@ -97,9 +97,9 @@ test('이전 버전으로 되돌리기', async () => {
 
 test('제목 머리말은 코드가 붙임', async () => {
   const { db, profile } = setup();
-  const a = db.createArticle(profile.id, { ...DEMO_INPUT, titlePrefix: '[롯데낙천대아파트 어린이집]' }, [], false);
+  const a = db.createArticle(profile.id, { ...DEMO_INPUT, titlePrefix: '[롯데낙천대아파트 유치원]' }, [], false);
   const g = await generateArticle({ db, ai: fakeAI({}), profile }, a.id, ctx());
-  assert.ok(g.version.title.startsWith('[롯데낙천대아파트 어린이집] '));
+  assert.ok(g.version.title.startsWith('[롯데낙천대아파트 유치원] '));
 });
 
 test('재실행 시 돌던 작업은 interrupted', () => {

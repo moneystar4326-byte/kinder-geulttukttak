@@ -2,7 +2,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import type { Db } from './db';
-import { APP } from '../shared/daycare';
+import { APP } from '../shared/kinder';
 
 export interface AppSettings {
   setupDone: boolean;

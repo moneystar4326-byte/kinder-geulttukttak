@@ -2,7 +2,7 @@
 import type { ArticleDoc, ArticleInput, DojoProfile, ReviewFlag } from './types';
 import { bodyText, countDoc, minCharsFor } from './count';
 import { uncheckedMentions } from './strengths';
-import { APP } from './daycare';
+import { APP } from './kinder';
 
 // 생성 전에 빠진 재료 (빠지면 먼저 보완 요청)
 export function missingInputs(input: ArticleInput): string[] {
@@ -12,7 +12,7 @@ export function missingInputs(input: ArticleInput): string[] {
   // 주요 키워드는 비워도 됨 (주제를 씀 — withKeywordFallback)
   if (input.subKeywords.length > 2) miss.push('보조 키워드는 2개까지');
   if (input.kind === '수업 후기' && !f.activities.trim()) miss.push('한 놀이 · 활동');
-  // 한 줄 메모(진행 활동)가 있으면 행사 · 모집 칸은 비어도 됨 — 메모에 있는 것만 쓰고 없는 건 "어린이집으로 문의" (2026-10-18)
+  // 한 줄 메모(진행 활동)가 있으면 행사 · 모집 칸은 비어도 됨 — 메모에 있는 것만 쓰고 없는 건 "유치원으로 문의" (2026-10-18)
   if (input.kind === '행사 안내' && !f.activities.trim()) {
     const e = f.event;
     if (!e?.when.trim()) miss.push('행사 일시');
@@ -20,7 +20,7 @@ export function missingInputs(input: ArticleInput): string[] {
     if (!e?.who.trim()) miss.push('행사 대상');
     if (!e?.apply.trim()) miss.push('신청 방법');
   }
-  if (input.kind === '모집 안내' && !f.activities.trim() && !f.recruit?.who.trim()) miss.push('입소 대상');
+  if (input.kind === '모집 안내' && !f.activities.trim() && !f.recruit?.who.trim()) miss.push('모집 대상');
   if (input.kind === '성장 이야기') {
     if (!f.growth?.before.trim()) miss.push('이전 모습');
     if (!f.growth?.now.trim()) miss.push('현재 관찰');
@@ -28,7 +28,7 @@ export function missingInputs(input: ArticleInput): string[] {
   return miss;
 }
 
-// 키워드를 고르지 않았으면 "동네 어린이집" (2026-10-27: 메모 한 줄이 통째로 키워드가 되어 본문에 띄어쓰기 틀린 채 3~5번 들어감)
+// 키워드를 고르지 않았으면 "동네 유치원" (2026-10-27: 메모 한 줄이 통째로 키워드가 되어 본문에 띄어쓰기 틀린 채 3~5번 들어감)
 // 동네를 모를 때만 주제
 export function fallbackKeyword(region: string, topic: string) {
   const dong = region.trim().split(/\s+/).pop()?.replace(new RegExp(`${APP.term}$`), '') ?? '';
@@ -38,7 +38,7 @@ export function withKeywordFallback(input: ArticleInput): ArticleInput {
   return input.mainKeyword.trim() ? input : { ...input, mainKeyword: fallbackKeyword(input.region, input.topic) };
 }
 
-// 목표 지역이 어린이집 소재지와 다르면 확인 안내 (그 지역에 있다고 쓰지 않게)
+// 목표 지역이 유치원 소재지와 다르면 확인 안내 (그 지역에 있다고 쓰지 않게)
 export function regionWarning(input: ArticleInput, profile: DojoProfile): string | null {
   const a = input.region.replace(/\s/g, ''), b = profile.region.replace(/\s/g, '');
   if (!a || !b) return null;
@@ -54,9 +54,10 @@ const BANNED: [RegExp, string][] = [
   [/(키가|성장판|면역력|ADHD|집중력이\s*좋아)/, '건강 · 의학 효과로 읽힐 수 있는 표현'],
   [/(최고의|최고|국내\s*1위|넘버원|No\.?\s*1)/i, '최상급 홍보 표현'],
 ];
-// 어린이집 (기획안 v0.2 6 · 10장): 입소 약속 · 진단 · 발달 효과
-const DAYCARE_BANNED: [RegExp, string][] = [
-  [/입소\s*(보장|확정|약속)|(바로|즉시|대기\s*없이)\s*입소|대기\s*없(이|어요|습니다)/, '입소를 약속하는 표현'],
+// 유치원 (기획안 v0.4 6장 · 법 · 금지 표현은 GPT 검토 대기): 입학 약속 · 진단 · 발달 효과 · 어린이집 말
+const KINDER_BANNED: [RegExp, string][] = [
+  [/입학\s*(보장|확정|약속)|(무조건|100\s*%|바로)\s*(입학|합격|당첨)|추첨\s*없이|대기\s*없(이|어요|습니다)/, '입학을 약속하는 표현'],
+  [/어린이집|보육료|보육\s*교사|연장\s*보육|입소|영아/, '어린이집 말 (유치원 글에는 입학 · 교육비 · 유치원 교사 · 방과후과정)'],
   // ADHD · 면역력은 위 BANNED 에 이미 있어 넣지 않음 (같은 말에 경고 두 번)
   [/발달\s*(지연|장애)|자폐|장애가\s*있|느린\s*아이|문제\s*행동/, '진단 · 평가로 읽힐 수 있는 표현'],
   [/(언어|두뇌|인지|신체)\s*발달(이|을)?\s*(빨라|좋아|향상|쑥쑥)|지능(이|을)?\s*(높|향상)/, '발달 · 건강 효과를 보장하는 표현'],
@@ -70,13 +71,13 @@ export function localFlags(doc: ArticleDoc, profile: DojoProfile, input?: Articl
   const avoid = profile.avoidWords.split(',').map((s) => s.trim()).filter(Boolean);
   for (const s of doc.sections) {
     const text = [s.heading ?? '', ...s.paragraphs].join('\n');
-    for (const [re, label] of [...BANNED, ...DAYCARE_BANNED]) if (re.test(text)) flags.push({ code: 'banned', message: `${label}: "${text.match(re)![0]}"`, sectionId: s.id });
+    for (const [re, label] of [...BANNED, ...KINDER_BANNED]) if (re.test(text)) flags.push({ code: 'banned', message: `${label}: "${text.match(re)![0]}"`, sectionId: s.id });
     for (const w of avoid) if (text.includes(w)) flags.push({ code: 'avoid-word', message: `피할 표현 "${w}"이 있어요`, sectionId: s.id });
   }
   for (const m of uncheckedMentions(bodyText(doc), profile)) flags.push({ code: 'unchecked-service', message: m });
   if (input) {
     const body = bodyText(doc);
-    for (const a of unknownAmounts(body, factsText(input, profile))) flags.push({ code: 'fee', message: `사실 칸에 없는 금액 "${a}"이 글에 있어요. 보육료 · 필요경비는 적어 준 그대로만 써요.` });
+    for (const a of unknownAmounts(body, factsText(input, profile))) flags.push({ code: 'fee', message: `사실 칸에 없는 금액 "${a}"이 글에 있어요. 교육비 · 원비는 적어 준 그대로만 써요.` });
     for (const n of childNames(memoText(input))) if (body.includes(n)) flags.push({ code: 'child-name', message: `메모에 있던 이름 "${n}"이 글에 있어요. 아이 이름이면 "한 친구"로 바꿔 주세요.` });
   }
   // 같은 문장 반복
@@ -95,9 +96,9 @@ export function localFlags(doc: ArticleDoc, profile: DojoProfile, input?: Articl
 }
 
 export const KEYWORD_MAX = 6;
-const KEYWORD_TAILS = ['국공립어린이집', '가정어린이집', '민간어린이집', '직장어린이집', '어린이집', '유치원']; // "놀이"는 넣지 않음 (물놀이 → 물 놀이)
+const KEYWORD_TAILS = ['국공립유치원', '병설유치원', '단설유치원', '사립유치원', '공립유치원', '유치원']; // "놀이"는 넣지 않음 (물놀이 → 물 놀이)
 
-// 검색어 → 본문에 쓸 띄어 쓴 꼴 ("신대방동어린이집" → "신대방동 어린이집", 이미 띄어 썼으면 그대로)
+// 검색어 → 본문에 쓸 띄어 쓴 꼴 ("신대방동유치원" → "신대방동 유치원", 이미 띄어 썼으면 그대로)
 export function spacedKeyword(kw: string) {
   const k = kw.trim();
   if (/\s/.test(k)) return k;
@@ -107,8 +108,8 @@ export function spacedKeyword(kw: string) {
   return k;
 }
 
-// ---------- 어린이집: 아이 이름 · 금액 (코드 점검, 2026-10-27) ----------
-// 원장님 · 선생님이 적은 재료(메모 · 칸)와 어린이집 정보를 한 덩어리로 — 여기 있는 금액 · 이름만 사실로 봄
+// ---------- 아이 이름 · 금액 (코드 점검, 2026-10-27) ----------
+// 원장님 · 선생님이 적은 재료(메모 · 칸)와 유치원 정보를 한 덩어리로 — 여기 있는 금액 · 이름만 사실로 봄
 export function factsText(input: ArticleInput, profile: DojoProfile) {
   const f = input.facts;
   return [input.topic, f.activities, f.coachingPoints, f.scenes, f.values, f.extra, f.photoNotes,
@@ -116,14 +117,14 @@ export function factsText(input: ArticleInput, profile: DojoProfile) {
     profile.otherFacts ?? '', profile.classFeatures, profile.hours ?? '', profile.classes ?? ''].join('\n');
 }
 
-// 이번 글 재료(주제 · 메모 · 칸)만 — 아이 이름은 여기서만 찾음 (어린이집 정보의 "자체 조리 급식이"까지 보지 않게)
+// 이번 글 재료(주제 · 메모 · 칸)만 — 아이 이름은 여기서만 찾음 (유치원 정보의 "자체 조리 급식이"까지 보지 않게)
 export function memoText(input: ArticleInput) {
   const f = input.facts;
   return [input.topic, f.activities, f.coachingPoints, f.scenes, f.extra, f.photoNotes,
     ...Object.values(f.event ?? {}), ...Object.values(f.recruit ?? {}), ...Object.values(f.growth ?? {})].join('\n');
 }
 
-// 재료가 주제 한 줄뿐인지 (주제를 뺀 활동 · 장면 · 도운 점 · 성장 · 행사 · 입소 · 추가 안내 칸이 거의 비었음)
+// 재료가 주제 한 줄뿐인지 (주제를 뺀 활동 · 장면 · 도운 점 · 성장 · 행사 · 모집 · 추가 안내 칸이 거의 비었음)
 // 이러면 글에 "무엇을 했는지" 같은 구체 답이 없어 카드 제목을 질문으로 쓰지 않음 (2026-10-27 요요유치원 시험)
 export function thinFacts(input: ArticleInput) {
   const f = input.facts;

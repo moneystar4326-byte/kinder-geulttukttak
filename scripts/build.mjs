@@ -8,4 +8,4 @@ const common = { bundle: true, platform: 'node', target: 'node22', format: 'cjs'
 await build({ ...common, entryPoints: ['src/main/index.ts'], outfile: 'out/main/index.js' });
 await build({ ...common, entryPoints: ['src/preload/index.ts'], outfile: 'out/preload/index.js' });
 await viteBuild({ configFile: 'vite.config.mjs', logLevel: 'warn' });
-console.log('빌드 완료: out/ (어린이집 글뚝딱)');
+console.log('빌드 완료: out/ (유치원 글뚝딱)');

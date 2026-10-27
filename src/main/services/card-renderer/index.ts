@@ -7,8 +7,8 @@ import type { Db } from '../../db';
 import type { Card, CardCopy, CardSet, DojoProfile } from '../../../shared/types';
 import { ApiError, toApiError } from '../errors';
 import type { CallOpts, ImageAI } from '../openai';
-import { ageFor, daycareBackgroundPrompt, daycareRefLead } from '../openai/image-prompt';
-import { APP } from '../../../shared/daycare';
+import { kinderBackgroundPrompt, kinderRefLead } from '../openai/image-prompt';
+import { APP } from '../../../shared/kinder';
 import { cardHtml, copyHints, sizeOf, type Measure } from './template';
 
 export interface Shooter { shoot(html: string, w: number, h: number, outFile: string): Promise<Measure> }
@@ -43,17 +43,14 @@ export function createCardService(deps: CardDeps) {
     if (used >= deps.monthlyImageLimit) throw new ApiError('limit', `이번 달 AI 그림 한도(${deps.monthlyImageLimit}장)에 닿았어요. 설정에서 한도를 바꾸거나 템플릿 모드를 써 주세요.`, 'OpenAI 이미지');
     // AI 그림은 가로로 그려 카드 위쪽에 통째로 (글과 겹치지 않음)
     const prof = deps.profile();
-    // 참고 그림 순서 = daycareRefLead 번호 순서: 원복 → 교실 → 로고(원복 로고를 켰을 때)
+    // 참고 그림 순서 = kinderRefLead 번호 순서: 원복 → 교실 → 로고(원복 로고를 켰을 때)
     const hasUniform = !!prof?.dobokRefPath && fs.existsSync(prof.dobokRefPath);
     const hasCoach = !!prof?.coachRefPath && fs.existsSync(prof.coachRefPath);
     // 원복 사진이 있을 때만 그림 속 로고 (원복이 없으면 로고 참고 그림도 보내지 않음)
     const logoRef = !!prof?.logoOnDobok && !!prof.logoPath && fs.existsSync(prof.logoPath) && hasUniform;
     const refs = [prof?.dobokRefPath, prof?.coachRefPath, logoRef ? prof?.logoPath : undefined].filter((f): f is string => !!f && fs.existsSync(f));
-    const ver = db.getVersion(cs.articleVersionId);
-    const input = ver ? db.getArticle(ver.articleId)?.input : undefined;
-    // 아이 나이는 글의 독자(영아 · 유아)와 주제로
-    const age = ageFor([input?.audience, input?.topic, ver?.title].filter(Boolean).join(' '));
-    const prompt = daycareRefLead(hasUniform, hasCoach, logoRef) + daycareBackgroundPrompt(card.copy.scene, cs.style.style, 'split', age, hasUniform, logoRef);
+    // 아이 나이는 유치원이라 늘 만 3~5세 (image-prompt.ts)
+    const prompt = kinderRefLead(hasUniform, hasCoach, logoRef) + kinderBackgroundPrompt(card.copy.scene, cs.style.style, 'split', hasUniform, logoRef);
     let lastErr: ApiError | null = null;
     for (let attempt = 0; attempt <= deps.autoRetry; attempt++) {
       try {

@@ -12,7 +12,7 @@ import { ArticleInputSchema, DocSchema, ProfileInput } from '../../shared/schema
 import { countDoc } from '../../shared/count';
 import { childNames, hideChildNames, memoText, plainBody, thinFacts, withKeywordFallback } from '../../shared/validation';
 import type { ArticleDoc, ArticleInput, CardSet, KeywordRow } from '../../shared/types';
-import { APP } from '../../shared/daycare';
+import { APP } from '../../shared/kinder';
 import { CARD_STYLES } from '../../shared/types';
 import { loadSettings, saveSettings, type AppSettings } from '../settings';
 import { composeClassFeatures } from '../../shared/strengths';
@@ -27,8 +27,8 @@ import { ApiError, toApiError } from '../services/errors';
 import { log } from '../log';
 import { SERVER, type License } from '../license';
 
-// 홈페이지가 어린이집 글뚝딱 최신 버전을 따로 알려 주게 되면 true (지금은 태권 글뚝딱 버전만 알려 줌)
-const LATEST_FOR_DAYCARE = false;
+// 홈페이지가 유치원 글뚝딱 최신 버전을 따로 알려 주게 되면 true (지금은 태권 글뚝딱 버전만 알려 줌)
+const LATEST_FOR_KINDER = false;
 
 export interface AppCtx {
   db: Db;
@@ -104,8 +104,8 @@ export function registerIpc(ctx: AppCtx) {
   handle('license:refresh', z.undefined(), () => ctx.license.refresh());
   handle('license:unlink', z.undefined(), () => ctx.license.unlink());
   handle('app:latest', z.undefined(), async () => {
-    // 홈페이지가 아직 어린이집 글뚝딱 최신 버전을 따로 알려 주지 않아 (태권 글뚝딱 2.x 를 새 버전으로 안내하게 됨) 묻지 않음 — 서버에 product 구분이 생기면 켬
-    if (!LATEST_FOR_DAYCARE) return null;
+    // 홈페이지가 아직 유치원 글뚝딱 최신 버전을 따로 알려 주지 않아 (태권 글뚝딱 2.x 를 새 버전으로 안내하게 됨) 묻지 않음 — 서버에 product 구분이 생기면 켬
+    if (!LATEST_FOR_KINDER) return null;
     const r = await fetch(`${SERVER}/api/app/version`, { signal: AbortSignal.timeout(10_000) });
     if (!r.ok) return null;
     const j = (await r.json()) as { latest?: string; minimum?: string; notes?: string[]; download?: string };
@@ -171,7 +171,7 @@ export function registerIpc(ctx: AppCtx) {
     return { apiKey, secret, customerId };
   }
 
-  // ---------- 어린이집 프로필 ----------
+  // ---------- 유치원 프로필 ----------
   handle('profile:get', z.undefined(), () => db.getProfile());
   handle('profile:save', ProfileInput, (p) => {
     const classFeatures = p.strengths ? composeClassFeatures(p) : p.classFeatures; // 칸으로 나눈 자료면 칸을 모아서

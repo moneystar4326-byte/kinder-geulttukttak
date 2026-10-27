@@ -7,7 +7,7 @@ import { NewArticle } from './pages/NewArticle';
 import { History } from './pages/History';
 import { ArticlePage } from './pages/ArticlePage';
 import { AccountChip, UpdateBar, type Latest, type LicenseStatus } from './components/Account';
-import { APP } from '../shared/daycare';
+import { APP } from '../shared/kinder';
 
 export type Route = { page: 'new' } | { page: 'history' } | { page: 'profile' } | { page: 'settings' } | { page: 'article'; id: string };
 

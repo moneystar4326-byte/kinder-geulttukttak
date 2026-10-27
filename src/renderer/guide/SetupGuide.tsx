@@ -1,14 +1,13 @@
 // 설치 도우미 (전담 비서): 처음 켤 때 · 설정에서 [비서와 같이 하기]
-// 계정 연결 → 어린이집 정보 4칸 → OpenAI 가입 · 카드 · 충전 · 한도 · 키 → 키 가져오기 → 첫 글
+// 계정 연결 → 유치원 정보 4칸 → OpenAI 가입 · 카드 · 충전 · 한도 · 키 → 키 가져오기 → 첫 글
 // 대본은 guide/script.json (A 그룹). 멈춘 단계는 이 PC에 기억해 다음에 이어서
 import { useEffect, useState } from 'react';
 import { useApp } from '../App';
 import { call, local, type DojoProfile } from '../api';
 import { Chips } from '../components/ui';
-import { AUDIENCES } from '../../shared/types';
 import type { LicenseStatus } from '../components/Account';
 import { Bubble, HelpBox, line, open } from './voice';
-import { APP } from '../../shared/daycare';
+import { APP } from '../../shared/kinder';
 
 const OPENAI = 'https://platform.openai.com';
 type Step = { id: string; title: string; shot?: string; url?: string };
@@ -127,7 +126,7 @@ export function SetupGuide({ start, onClose, firstRun }: { start?: string; onClo
   );
 }
 
-// 어린이집 정보 4칸 (이름은 계정에서 가져옴). 나머지는 어린이집 정보 화면에서 천천히
+// 유치원 정보 4칸 (이름은 계정에서 가져옴). 나머지는 유치원 정보 화면에서 천천히
 function MiniProfile({ dojang, onSaved }: { dojang: string; onSaved: () => void }) {
   const [p, setP] = useState<DojoProfile | null>(null);
   const [err, setErr] = useState('');
@@ -147,9 +146,8 @@ function MiniProfile({ dojang, onSaved }: { dojang: string; onSaved: () => void 
     <div className="mini-form">
       <label className="field"><span>{APP.place} 이름</span><input type="text" value={p.name || dojang} onChange={(e) => set({ name: e.target.value })} /></label>
       <label className="field"><span>동네</span><input type="text" placeholder="예: 서울 마포구 망원동" value={p.region} onChange={(e) => set({ region: e.target.value })} /></label>
-      <div className="field"><span>{'돌보는 나이'}</span><Chips multi options={AUDIENCES} value={p.audiences as any} onChange={(v) => set({ audiences: v })} /></div>
       <label className="field"><span>{APP.philLabel}</span><input type="text" placeholder={'예: 놀이 속에서 스스로 자라는 아이'} value={p.philosophy} onChange={(e) => set({ philosophy: e.target.value })} /></label>
-      <label className="field"><span>{'운영 시간'}</span><input type="text" placeholder={'예: 평일 7시 30분~19시 30분'} value={p.hours ?? ''} onChange={(e) => set({ hours: e.target.value })} /></label>
+      <label className="field"><span>{'운영 시간'}</span><input type="text" placeholder={'예: 교육과정 9시~13시 30분, 방과후과정 17시까지'} value={p.hours ?? ''} onChange={(e) => set({ hours: e.target.value })} /></label>
       <div className="row"><button type="button" className="btn primary" onClick={save}>저장하고 다음</button></div>
       {err && <div className="note err">{err}</div>}
     </div>

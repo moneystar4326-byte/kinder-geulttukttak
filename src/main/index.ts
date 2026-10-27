@@ -14,14 +14,14 @@ import { loadSettings } from './settings';
 import { restoreBackup } from './backup';
 import { initLog, log } from './log';
 import { createLicense, readDeviceHash } from './license';
-import { APP } from '../shared/daycare';
+import { APP } from '../shared/kinder';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'gtd-asset', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
 // 시험용: 데이터 폴더를 따로 (실사용 자료와 섞이지 않게)
 if (process.env.GTD_DATA_DIR) app.setPath('userData', process.env.GTD_DATA_DIR);
 // 자료 폴더 옮기기: %APPDATA%\글뚝딱-자료위치.txt 에 적힌 폴더를 씀 (2026-10-18 사용자: D 드라이브에 두고 싶음)
-// 위치 파일 · 기본 자료 폴더가 태권 글뚝딱과 따로 (%APPDATA%\어린이집글뚝딱-자료위치.txt · %APPDATA%\어린이집 글뚝딱) — 한 PC에 두 앱을 깔아도 섞이지 않게
+// 위치 파일 · 기본 자료 폴더가 태권 글뚝딱과 따로 (%APPDATA%\유치원글뚝딱-자료위치.txt · %APPDATA%\유치원 글뚝딱) — 한 PC에 두 앱을 깔아도 섞이지 않게
 else {
   app.setPath('userData', path.join(app.getPath('appData'), APP.appName));
   let where = '';

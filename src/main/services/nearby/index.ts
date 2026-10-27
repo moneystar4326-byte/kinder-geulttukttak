@@ -1,10 +1,10 @@
-// 어린이집 주변 학교 · 유치원 · 아파트 · 역 이름 (카카오 로컬 API, 선택 기능)
+// 유치원 주변 학교 · 유치원 · 아파트 · 역 이름 (카카오 로컬 API, 선택 기능)
 // 1버전(태권 글뚝딱 nearby.ts)의 규칙을 옮김: 초등 1km · 아파트 500m · 역 1km, 학부모가 검색할 짧은 이름으로
 // 이름은 AI에 맡기지 않고 사용자가 골라 제목 머리말 · 키워드 후보로만 씀
 import { ApiError, fromHttp, toApiError } from '../errors';
 import type { NearbyArea } from '../../../shared/types';
-import { cleanAreaName, daycarePrefix, dongOf } from '../../../shared/areas';
-import { APP } from '../../../shared/daycare';
+import { cleanAreaName, kinderPrefix, dongOf } from '../../../shared/areas';
+import { APP } from '../../../shared/kinder';
 
 async function get(url: string, key: string, signal?: AbortSignal) {
   let r: Response;
@@ -66,10 +66,10 @@ export async function collectNearby(key: string, address: string, regionWords: s
   return cleaned.filter((a) => (seen.has(a.name) ? false : (seen.add(a.name), true)));
 }
 
-// 제목 머리말 후보: 동네 → 아파트("[○○아파트 어린이집]") → 직접 적은 이름 → 학교 · 역("○○ 근처")
+// 제목 머리말 후보: 동네 → 아파트("[○○아파트 유치원]") → 직접 적은 이름 → 학교 · 역("○○ 근처")
 export function prefixOptions(region: string, areas: NearbyArea[]) {
   const r = dongOf(region);
   const rank = (k: string) => (k === '아파트' ? 0 : k === '학교' || k === '지하철역' || k === '유치원' ? 2 : 1);
   const sorted = [...areas].sort((a, b) => rank(a.kind) - rank(b.kind));
-  return [...new Set([...(r ? [`[${r} ${APP.term}]`] : []), ...sorted.map((a) => (a.kind === '아파트' && a.source === 'kakao' ? daycarePrefix(a.name, true) : rank(a.kind) === 2 ? `[${a.name} 근처 ${APP.term}]` : daycarePrefix(a.name, false)))])];
+  return [...new Set([...(r ? [`[${r} ${APP.term}]`] : []), ...sorted.map((a) => (a.kind === '아파트' && a.source === 'kakao' ? kinderPrefix(a.name, true) : rank(a.kind) === 2 ? `[${a.name} 근처 ${APP.term}]` : kinderPrefix(a.name, false)))])];
 }
