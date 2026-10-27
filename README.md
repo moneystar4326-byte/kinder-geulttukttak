@@ -125,6 +125,6 @@ docs/음성안내-대본.json           안내 음성 녹음용 대본 (녹음 �
 
 ## 배포 (GitHub 릴리스)
 
-- 저장소: https://github.com/moneystar4326-byte/kinder-geulttukttak (비공개)
+- 저장소: https://github.com/moneystar4326-byte/kinder-geulttukttak (공개 — 2026-10-27 사용자 결정, 로그인 없이 설치 파일을 받게)
 - `npm run dist` → `gh release create v<버전> release/Kinder-Geulttukttak-Setup-<버전>.exe` — 받는 곳: 저장소 [Releases]
 - 함께 일하는 분 요청(2026-10-27): 새 앱은 모노레포 `ssudaya0/taekwondo` 의 `apps/` 아래로. 이 저장소는 그전까지 쓰는 임시 자리 (사용자 결정 2026-10-27)
