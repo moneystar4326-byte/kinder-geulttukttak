@@ -176,7 +176,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
         setBusy('quick-kw');
         try {
           const r = await call<{ rows: KeywordRow[] }>('keywords:naver', hintWords(memo, profile?.region ?? ''));
-          const pick = pickKeywords(r.rows, memo, profile?.region ?? '');
+          const pick = pickKeywords(r.rows, memo, profile?.region ?? '', profile);
           if (pick.main) { main = pick.main; subs = pick.subs; chosen = r.rows.filter((x) => x.keyword === pick.main || pick.subs.includes(x.keyword)); }
         } catch { /* 키워드 조회가 안 돼도 글은 만듦 */ }
         setBusy('quick');
