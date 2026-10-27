@@ -72,7 +72,7 @@
           ]
         }
       ],
-      "artifactName": "유치원글뚝딱-설치-${version}.${ext}",
+      "artifactName": "Kinder-Geulttukttak-Setup-${version}.${ext}",
       "icon": "build/icon.png"
     },
     "nsis": {
@@ -100,7 +100,7 @@
       "icon": "build/icon.png",
       "category": "public.app-category.productivity",
       "identity": null,
-      "artifactName": "유치원글뚝딱-맥-${version}-${arch}.${ext}",
+      "artifactName": "Kinder-Geulttukttak-Mac-${version}-${arch}.${ext}",
       "extendInfo": {
         "NSMicrophoneUsageDescription": "유치원 메모를 말로 넣을 때 마이크를 써요. 녹음은 글자로 바꾼 뒤 저장하지 않아요."
       }
