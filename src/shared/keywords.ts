@@ -12,8 +12,8 @@ const T = APP.term; // 유치원
 export function topicTerms(memo: string) {
   const t = memo.replace(/\s/g, '');
   const found = TOPIC_TERMS.filter((w) => t.includes(w));
-  // "승급심사"가 있으면 "심사"는 겹치므로 뺌
-  return found.filter((w) => !found.some((o) => o !== w && o.includes(w)));
+  // "승급심사"가 있으면 "심사"는 겹치므로 뺌. 메모에 먼저 나온 주제부터 (2026-10-27 요요유치원 시험: 방과후과정 글에 "유치원 바깥놀이"가 주요로)
+  return found.filter((w) => !found.some((o) => o !== w && o.includes(w))).sort((a, b) => t.indexOf(a) - t.indexOf(b));
 }
 
 // 지역 이름: "서울 동작구 신대방동" → ["신대방동", "신대방", "동작구", "동작"]

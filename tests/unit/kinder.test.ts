@@ -311,3 +311,12 @@ test('글쓴이 한 줄 · 소제목 이모지', () => {
   assert.equal(ART.withWriterSign(out, input({ writer: TEACHER, writerSign: true }), prof()), out); // 두 번 붙이지 않음
   assert.equal(F.decorateHeadings(doc('x')).sections[1].heading, '🌱 오늘 놀이');
 });
+
+test('실제 시험 (2026-10-27 요요유치원 글 3편): 사실 점검이 글쓴이를 앎 · 키워드 주제는 메모에 먼저 나온 것', () => {
+  // "원장으로서" · "햇님반 담임으로서"를 사실에 없다고 경고하던 문제 — 사실 점검에 글쓴이를 넘기지 않았음
+  assert.match(P.reviewPrompt(doc('x'), prof(), input({ writer: TEACHER })), /글쓴이: 햇님반 김하늘 선생님 \(담임\)/);
+  assert.match(P.reviewPrompt(doc('x'), prof(), input({ writer: { id: 'd', role: '원장', name: '' } })), /글쓴이: 새싹예시유치원 원장님/);
+  assert.doesNotMatch(P.reviewPrompt(doc('x'), prof(), input()), /글쓴이:/);
+  // 방과후과정 글에 "유치원 바깥놀이"가 주요 키워드가 되던 문제 — 목록 순서가 아니라 메모에 나온 순서
+  assert.deepEqual(K.topicTerms('방과후과정 소개해요. 날씨 좋은 날은 바깥놀이터에서 놀아요'), ['방과후과정', '바깥놀이']);
+});

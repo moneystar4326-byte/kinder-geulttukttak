@@ -168,11 +168,14 @@ export function reviewPrompt(doc: ArticleDoc, p: DojoProfile, input: ArticleInpu
 ${profileBlock(p, input)}
 
 [사실 — 이번 글]
-${factsBlock(input)}
+${reviewWriter(p, input.writer)}${factsBlock(input)}
 
 [글]
 ${doc.sections.map((s) => `(${s.id}) ${s.heading ?? ''}\n${s.paragraphs.join('\n')}`).join('\n\n')}`;
 }
+// 글쓴이도 사실 (2026-10-27 요요유치원 시험: "원장으로서" · "햇님반 담임으로서"를 사실에 없다고 경고 — 점검에 글쓴이를 넘기지 않았음)
+const reviewWriter = (p: DojoProfile, w?: Writer) =>
+  !w ? '' : w.role === '원장' ? `글쓴이: ${p.name} 원장님${w.name.trim() ? ` (${w.name.trim()})` : ''}\n` : `글쓴이: ${writerLabel(w)} (담임)\n`;
 
 const REVISE: Record<Exclude<RevisionKind, 'titles' | 'paragraph'>, string> = {
   warmer: '전체를 더 따뜻하고 다정한 말투로 바꿔라. 학부모에게 말을 건네듯.',
