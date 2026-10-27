@@ -1,5 +1,6 @@
 // "주제 한 줄로 바로 쓰기"의 글 재료 만들기 — 컴퓨터판(NewArticle) · 휴대폰판(mobile/)이 같이 씀 (2026-10-26 휴대폰판 시작하며 뺌)
 import { ENDINGS, type ArticleInput, type DojoProfile } from './types';
+import { fallbackKeyword } from './validation';
 import { quickEnding, quickKind, quickWhen } from './quick';
 import { daycareAge, type Writer } from './daycare';
 
@@ -31,7 +32,7 @@ export function buildQuickInput(o: { memo: string; profile: DojoProfile | null; 
   const kind = quickKind(memo);
   return {
     ...base,
-    kind, topic, audience: quickAudience(memo, o.profile), mainKeyword: o.main || topic.replace(/…$/, ''), subKeywords: o.subs ?? [], ending: quickEnding(kind, o.writer?.role === '교사'),
+    kind, topic, audience: quickAudience(memo, o.profile), mainKeyword: o.main || fallbackKeyword(base.region, topic), subKeywords: o.subs ?? [], ending: quickEnding(kind, o.writer?.role === '교사'),
     ...(o.writer ? { writer: o.writer, writerSign: !!o.writerSign } : {}),
     facts: { ...base.facts, activities: memo, event: { ...base.facts.event!, when: kind === '행사 안내' ? quickWhen(memo) : '' } },
     includeProfile: { philosophy: true, classFeatures: true, credentials: true, contact: false, address: false },
@@ -39,3 +40,10 @@ export function buildQuickInput(o: { memo: string; profile: DojoProfile | null; 
     titlePrefix: o.titlePrefix,
   };
 }
+
+// 메모가 첫 문장(주제) 하나뿐인지 → 화면에 "한 줄만 더" 안내 (2026-10-27 보라매공원 글: 한 줄 메모로 1,500자를 일반론으로 채움)
+export const thinMemo = (memo: string) => {
+  const m = memo.trim();
+  const flat = (t: string) => t.replace(/[\s.,!?…]/g, '');
+  return !!m && flat(m.split(quickTopic(m).replace(/…$/, '')).join('')).length < 10;
+};

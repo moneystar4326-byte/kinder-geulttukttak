@@ -170,3 +170,17 @@ export const DocSchema = z.object({
   photoSuggestions: z.array(z.object({ afterSectionId: s(40), caption: s(300) })),
   reviewFlags: z.array(z.object({ code: s(40), message: s(1000), sectionId: s(40).optional() })),
 });
+
+// 흐름 2차 점검: 고칠 문장만 (before 는 글에 있는 문장 그대로, after 가 빈 문자열이면 지움)
+export const ProofreadSchema = z.object({
+  fixes: z.array(z.object({ sectionId: z.string(), before: z.string(), after: z.string(), reason: z.string() })),
+});
+export const PROOFREAD_JSON = {
+  type: 'object', additionalProperties: false, required: ['fixes'],
+  properties: {
+    fixes: {
+      type: 'array',
+      items: { type: 'object', additionalProperties: false, required: ['sectionId', 'before', 'after', 'reason'], properties: { sectionId: str, before: str, after: str, reason: str } },
+    },
+  },
+} as const;

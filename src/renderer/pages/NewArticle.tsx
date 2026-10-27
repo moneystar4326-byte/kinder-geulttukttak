@@ -5,10 +5,10 @@ import { Chips, Field, Msg, useMsg } from '../components/ui';
 import { LockBanner } from '../components/Account';
 import { SetupGuide } from '../guide/SetupGuide';
 import { ARTICLE_KINDS, AUDIENCES, CARD_STYLES, ENDINGS, TONES, type CardMode, type CardSize, type CardStyle } from '../../shared/types';
-import { missingInputs } from '../../shared/validation';
+import { fallbackKeyword, missingInputs } from '../../shared/validation';
 import { hintWords, pickKeywords } from '../../shared/keywords';
 import { autoPrefix, dongOf, prefixNames } from '../../shared/areas';
-import { buildQuickInput, emptyInput } from '../../shared/quickInput';
+import { buildQuickInput, emptyInput, thinMemo } from '../../shared/quickInput';
 import { MicButton } from '../components/MicButton';
 import { APP, kindLabel, writerLabel, type Writer } from '../../shared/daycare';
 
@@ -17,6 +17,7 @@ const appendSpoken = (prev: string, text: string) => (prev.trim() ? `${prev.trim
 
 // 화면 문구
 const TX = {
+  thinMemo: '아이들이 가장 좋아한 것이나 기억에 남는 장면을 한 줄만 더 적으면 글이 훨씬 구체적으로 나와요. (예: 분수대 앞에서 비눗방울을 불었어요)',
   quickPh: ['예: 햇님반 친구들이랑 가을 낙엽 밟기 놀이를 했어요', '예: 만 1세 아기 어린이집 적응 기간은 얼마나 걸릴까요?', '예: 10월 30일 할로윈 파티 안내'],
   quickHint: '주제나 오늘 있었던 일을 한 줄 적으면, 어린이집 정보(지역 · 보육 특징 · 보육 철학)와 함께 1,500자 이상 글을 만들어요 (행사 · 입소 안내는 1,000자 이상). 적지 않은 장면 · 대화 · 아이 이름 · 금액은 만들지 않으니, 실제 있었던 일을 적을수록 글이 풍성해져요.',
   topicHint: '예: 낙엽 밟기 바깥놀이', memoHint: '오늘 있었던 놀이 · 생활을 말하듯 적고 버튼을 누르면 아래 칸에 나눠 넣어요. 메모에 없는 내용은 만들지 않아요.',
@@ -213,6 +214,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
         {<WriterPick writers={writers} value={writer} onChange={(w) => setWriterId(w.id)} sign={writerSign} onSign={setWriterSign} />}
         <textarea rows={4} value={quick} onChange={(e) => setQuick(e.target.value)}
           placeholder={TX.quickPh.join(String.fromCharCode(10))} />
+        {thinMemo(quick) && <p className="hint">💡 {TX.thinMemo}</p>}
         <div className="row" style={{ marginTop: 8 }}><MicButton disabled={!info.secrets.openai || !!busy} onText={(t) => setQuick((q) => appendSpoken(q, t))} /></div>
         <div className="row" style={{ marginTop: 10 }}>
           <label className="row"><input type="checkbox" checked={quickPrefix} onChange={(e) => setQuickPrefix(e.target.checked)} /> 제목 앞에 동네 이름 붙이기 <span className="hint">({prefixNames(profile?.region ?? '', profile?.nearbyAreas ?? []).join(' · ') || `${APP.place} 정보에 지역 · 주변 장소가 없어요`} 중 돌아가며{dongOf(profile?.region ?? '') ? `, [${dongOf(profile?.region ?? '')} ${APP.term}]는 세 편에 한 번` : ''})</span></label>
@@ -220,7 +222,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
         </div>
         <div className="row" style={{ marginTop: 10 }}>
           <button className="btn primary" disabled={!quick.trim() || !!busy || !profile} onClick={() => quickStart()}>{busy === 'quick-kw' ? '키워드 고르는 중…' : busy === 'quick' ? '시작하는 중…' : '바로 글 만들기'}</button>
-          <span className="hint">지역: {profile?.region ?? '-'} · 문체: {profile?.tone ?? '-'} · 키워드: {naverReady ? '네이버 검색량으로 자동 선택' : '주제 그대로 (설정에 검색광고 키가 없음)'}</span>
+          <span className="hint">지역: {profile?.region ?? '-'} · 문체: {profile?.tone ?? '-'} · 키워드: {naverReady ? '네이버 검색량으로 자동 선택' : `${fallbackKeyword(profile?.region ?? '', '주제')} (설정에 검색광고 키가 없음)`}</span>
         </div>
         <Msg m={msg.m} />
       </div>

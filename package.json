@@ -1,7 +1,7 @@
 {
   "name": "geulttukttak-daycare",
   "productName": "어린이집 글뚝딱",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "어린이집 글뚝딱 — 어린이집 블로그 작가 (설치형)",
   "main": "out/main/index.js",

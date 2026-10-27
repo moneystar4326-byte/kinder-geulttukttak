@@ -115,6 +115,7 @@ export const demoText: TextAI = {
   async generate(_p, _i, _r, o) { await wait(900, o?.signal); const d = clone(DEMO_DOC); d.reviewFlags = [flag]; return d; },
   async expand(doc, _c, o) { await wait(300, o?.signal); return clone(doc); },
   async polish(doc, _i, o) { await wait(300, o?.signal); return clone(doc); },
+  async proofread(_d, _i, o) { await wait(300, o?.signal); return []; },
   async review(_d, _p, _i, o) { await wait(400, o?.signal); return []; },
   async revise(_k, doc, o) { await wait(600, o?.signal); const d = clone(doc); d.reviewFlags = [{ code: 'demo', message: '데모 모드에서는 문체가 실제로 바뀌지 않아요 (같은 글을 새 버전으로 저장).' }]; return d; },
   async titles(_d, _i, o) { await wait(400, o?.signal); return ALT_TITLES[titleTurn++ % ALT_TITLES.length]; },

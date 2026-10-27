@@ -1,12 +1,12 @@
 // 글 생성 파이프라인 (기획서 6장)
-// 입력 검증 → 지침 조립 → AI 초안 → 로컬 길이 · 반복 검사 → 모자라면 최대 2회 보완 → AI 사실 비교(보조 점검) → 새 버전 저장
+// 입력 검증 → 지침 조립 → AI 초안 → 로컬 길이 · 반복 검사 → 모자라면 최대 2회 보완 → 흐름 다듬기 → 흐름 2차 점검 → AI 사실 비교(보조 점검) → 새 버전 저장
 import type { Db } from './db';
 import type { ArticleDoc, ArticleInput, DojoProfile, RevisionKind } from '../shared/types';
 import { bodyText, countDoc, minCharsFor } from '../shared/count';
 import { localFlags, missingInputs, regionWarning } from '../shared/validation';
 import { areaTags, dongOf, locationLine, mentionsNearby } from '../shared/areas';
 import { decorateHeadings } from '../shared/format';
-import type { CallOpts, TextAI } from './services/openai';
+import type { CallOpts, Fix, TextAI } from './services/openai';
 
 export const MAX_EXPAND = 2;
 
@@ -80,6 +80,9 @@ export async function generateArticle(deps: { db: Db; ai: TextAI; profile: DojoP
     }
     ctx.step('흐름 다듬는 중');
     doc = await polishDoc(ai, doc, input, o, ctx.signal, min);
+    ctx.step('흐름 2차 점검 중');
+    const checked = await proofreadDoc(ai, doc, input, o, ctx.signal, min);
+    doc = checked.doc;
     ctx.step('사실 비교 점검 중');
     // 점검 실패는 표시만 하고 넘어가되, 멈추기를 눌렀으면 저장하지 않고 멈춤 (2026-10-18 버그 점검)
     const aiFlags = await ai.review(doc, profile, input, o).catch((e) => {
@@ -94,7 +97,7 @@ export async function generateArticle(deps: { db: Db; ai: TextAI; profile: DojoP
     const counts = countDoc(doc);
     const short = counts.withoutSpaces < min;
     const title = titleWithPrefix(doc.titleCandidates[0] ?? input.topic, input.titlePrefix);
-    const r = db.addVersion({ articleId, title, doc, counts, note: expands ? `AI 생성 (분량 보완 ${expands}회)` : 'AI 생성' }, { baseVersionId });
+    const r = db.addVersion({ articleId, title, doc, counts, note: `AI 생성${[expands ? `분량 보완 ${expands}회` : '', checked.count ? `흐름 2차 점검 ${checked.count}곳` : ''].filter(Boolean).map((x) => ` (${x})`).join('')}` }, { baseVersionId });
     db.setArticleStatus(articleId, 'review');
     return { version: r.version, current: r.current, short, expands };
   } catch (e) {
@@ -116,6 +119,40 @@ export async function polishDoc(ai: TextAI, doc: ArticleDoc, input: ArticleInput
   } catch (e: any) {
     if (signal.aborted || e?.name === 'AbortError' || e?.code === 'cancelled') throw e;
     return doc;
+  }
+}
+
+// 흐름 2차 점검의 고칠 문장을 글에 적용. 글에 그대로 있는 문장만, 사실에 없던 숫자가 생기거나 분량이 기준 아래로 내려가면 건너뜀
+export function applyFixes(doc: ArticleDoc, fixes: Fix[], min: number): { doc: ArticleDoc; count: number } {
+  let out = doc;
+  let count = 0;
+  const digits = (t: string): string[] => t.match(/\d+/g) ?? [];
+  for (const f of fixes) {
+    const before = f.before.trim();
+    const after = f.after.trim();
+    if (!before || before === after || digits(after).some((d) => !digits(before).includes(d))) continue;
+    // 섹션 id 가 틀려도 글 전체에서 찾음 (그 섹션 먼저)
+    const order = [...out.sections.filter((s) => s.id === f.sectionId), ...out.sections.filter((s) => s.id !== f.sectionId)];
+    const sec = order.find((s) => s.paragraphs.some((p) => p.includes(before)));
+    if (!sec) continue;
+    const sections = out.sections.map((s) => (s !== sec ? s : {
+      ...s,
+      paragraphs: s.paragraphs.map((p) => (p.includes(before) ? p.replace(before, after).replace(/\s{2,}/g, ' ').trim() : p)).filter(Boolean),
+    }));
+    const next = { ...out, sections };
+    if (countDoc(next).withoutSpaces < min && countDoc(next).withoutSpaces < countDoc(out).withoutSpaces) continue;
+    out = next;
+    count++;
+  }
+  return { doc: out, count };
+}
+
+export async function proofreadDoc(ai: TextAI, doc: ArticleDoc, input: ArticleInput, o: CallOpts, signal: AbortSignal, min = minCharsFor(input.kind)) {
+  try {
+    return applyFixes(doc, await ai.proofread(doc, input, o), min);
+  } catch (e: any) {
+    if (signal.aborted || e?.name === 'AbortError' || e?.code === 'cancelled') throw e;
+    return { doc, count: 0 };
   }
 }
 

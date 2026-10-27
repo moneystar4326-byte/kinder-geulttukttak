@@ -28,9 +28,14 @@ export function missingInputs(input: ArticleInput): string[] {
   return miss;
 }
 
-// 키워드를 고르지 않았으면 주제를 주요 키워드로
+// 키워드를 고르지 않았으면 "동네 어린이집" (2026-10-27: 메모 한 줄이 통째로 키워드가 되어 본문에 띄어쓰기 틀린 채 3~5번 들어감)
+// 동네를 모를 때만 주제
+export function fallbackKeyword(region: string, topic: string) {
+  const dong = region.trim().split(/\s+/).pop()?.replace(new RegExp(`${APP.term}$`), '') ?? '';
+  return dong ? `${dong} ${APP.term}` : topic.replace(/…$/, '').trim();
+}
 export function withKeywordFallback(input: ArticleInput): ArticleInput {
-  return input.mainKeyword.trim() ? input : { ...input, mainKeyword: input.topic.trim() };
+  return input.mainKeyword.trim() ? input : { ...input, mainKeyword: fallbackKeyword(input.region, input.topic) };
 }
 
 // 목표 지역이 어린이집 소재지와 다르면 확인 안내 (그 지역에 있다고 쓰지 않게)

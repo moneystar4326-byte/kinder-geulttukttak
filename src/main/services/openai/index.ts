@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { ApiError, toApiError } from '../errors';
 import {
   CARD_COPY_JSON, CardCopySchema, CARD_ONE_JSON, CardOneSchema, MEMO_SPLIT_JSON, MemoSplitSchema, GENERATED_ARTICLE_JSON, GeneratedArticleSchema, KEYWORD_IDEAS_JSON, KeywordIdeasSchema,
-  PARAGRAPH_JSON, ParagraphSchema, REVIEW_JSON, ReviewSchema, TITLES_JSON, TitlesSchema,
+  PARAGRAPH_JSON, ParagraphSchema, PROOFREAD_JSON, ProofreadSchema, REVIEW_JSON, ReviewSchema, TITLES_JSON, TitlesSchema,
 } from '../../../shared/schemas';
 import type { ArticleDoc, ArticleInput, DojoProfile, ReviewFlag, RevisionKind } from '../../../shared/types';
 import { APP, type Writer } from '../../../shared/daycare';
@@ -15,11 +15,14 @@ import * as P from './prompts';
 
 export interface Usage { model: string; kind: string; reported: unknown }
 export interface CallOpts { signal?: AbortSignal; onUsage?: (u: Usage) => void }
+// 흐름 2차 점검이 돌려주는 고칠 문장 (after 가 빈 문자열이면 지움)
+export interface Fix { sectionId: string; before: string; after: string }
 
 export interface TextAI {
   generate(p: DojoProfile, input: ArticleInput, regionNote: string | null, o?: CallOpts): Promise<ArticleDoc>;
   expand(doc: ArticleDoc, current: number, o?: CallOpts, min?: number): Promise<ArticleDoc>;
   polish(doc: ArticleDoc, input: ArticleInput, o?: CallOpts): Promise<ArticleDoc>;
+  proofread(doc: ArticleDoc, input: ArticleInput, o?: CallOpts): Promise<Fix[]>;
   review(doc: ArticleDoc, p: DojoProfile, input: ArticleInput, o?: CallOpts): Promise<ReviewFlag[]>;
   revise(kind: Exclude<RevisionKind, 'titles' | 'paragraph'>, doc: ArticleDoc, o?: CallOpts, min?: number): Promise<ArticleDoc>;
   titles(doc: ArticleDoc, input: ArticleInput, o?: CallOpts): Promise<string[]>;
@@ -108,6 +111,10 @@ export function createOpenAI(opts: { apiKey: string; textModel: string; imageMod
     },
     async polish(doc, input, o) {
       return normalizeDoc(await json('article', 'text', P.SYSTEM_RULES, P.polishPrompt(doc, input), GENERATED_ARTICLE_JSON, GeneratedArticleSchema, o));
+    },
+    async proofread(doc, input, o) {
+      const r = await json('proofread', 'text', P.SYSTEM_RULES, P.proofreadPrompt(doc, input), PROOFREAD_JSON, ProofreadSchema, o);
+      return r.fixes.map(({ sectionId, before, after }) => ({ sectionId, before, after }));
     },
     async review(doc, p, input, o) {
       const r = await json('review', 'text', '너는 사실 확인 담당이다. 근거 없는 지적은 하지 않는다.', P.reviewPrompt(doc, p, input), REVIEW_JSON, ReviewSchema, o);
