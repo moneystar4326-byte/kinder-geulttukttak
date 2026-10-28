@@ -105,7 +105,7 @@ test('문구만 다시: 카드 역할 · 그림 장면 · 지금 문구 · 다�
 import { cardCopyPrompt } from '../../src/main/services/openai/prompts';
 test('행사 글 카드는 행사 소개 · 활동 · 참여 안내, 주제와 상관없는 유치원 정보 금지', () => {
   const doc = { titleCandidates: ['a', 'b', 'c'], sections: [{ id: 's1', paragraphs: ['생일잔치'] }], tags: [], photoSuggestions: [], reviewFlags: [] };
-  const p = cardCopyPrompt(doc, '10월 생일잔치', '행사 안내');
+  const p = cardCopyPrompt(doc, '10월 생일잔치', { kind: '행사 안내' });
   assert.match(p, /카드1 = 행사 소개/);
   assert.match(p, /카드2 = 행사에서 하는 활동/);
   assert.doesNotMatch(p, /오늘 한 놀이/);

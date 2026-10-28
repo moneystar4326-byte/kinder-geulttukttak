@@ -1,12 +1,12 @@
 // 본문 편집: 소제목 · 문단을 안정적인 id 로 유지
 import type { ArticleDoc } from '../../shared/types';
-import { countChars, countDoc, minCharsFor } from '../../shared/count';
+import { countChars, countDoc, minCharsFor, STORY_MIN } from '../../shared/count';
 
 export interface Draft { title: string; doc: ArticleDoc }
 export interface ParaSel { sectionId: string; index: number }
 
-export function DocEditor({ draft, onChange, sel, onSelect, prefix, readOnly, kind }: { draft: Draft; onChange: (d: Draft) => void; sel: ParaSel | null; onSelect: (s: ParaSel | null) => void; prefix?: string; readOnly?: boolean; kind?: string }) {
-  const MIN = minCharsFor(kind);
+export function DocEditor({ draft, onChange, sel, onSelect, prefix, readOnly, kind, story }: { draft: Draft; onChange: (d: Draft) => void; sel: ParaSel | null; onSelect: (s: ParaSel | null) => void; prefix?: string; readOnly?: boolean; kind?: string; story?: boolean }) {
+  const MIN = story ? STORY_MIN : minCharsFor(kind);
   const { doc } = draft;
   const counts = countDoc(doc);
   const setDoc = (d: Partial<ArticleDoc>) => onChange({ ...draft, doc: { ...doc, ...d } });

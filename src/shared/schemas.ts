@@ -1,6 +1,6 @@
 // AI 응답 · IPC 입력 검증 스키마
 import { z } from 'zod';
-import { ARTICLE_KINDS, AUDIENCES, TONES } from './types';
+import { ARTICLE_KINDS, AUDIENCES, BRIEF_PURPOSES, TONES } from './types';
 import { APP } from './kinder';
 
 export const GeneratedArticleSchema = z.object({
@@ -72,6 +72,39 @@ export const CARD_COPY_JSON = {
   },
 } as const;
 
+// 자세히 쓰기 검색어 확인: 주요 1 · 보조 최대 2 + 바꿀 때 보여 줄 후보, 각각 넣을 문장 예시
+const planItem = { type: 'object', additionalProperties: false, required: ['keyword', 'sentence', 'why'], properties: { keyword: str, sentence: str, why: str } } as const;
+export const KEYWORD_PLAN_JSON = {
+  type: 'object', additionalProperties: false, required: ['main', 'subs', 'others'],
+  properties: { main: planItem, subs: { type: 'array', items: planItem }, others: { type: 'array', items: planItem } },
+} as const;
+const PlanItemSchema = z.object({ keyword: z.string(), sentence: z.string(), why: z.string() });
+export const KeywordPlanSchema = z.object({ main: PlanItemSchema, subs: z.array(PlanItemSchema), others: z.array(PlanItemSchema) });
+// 자세히 쓰기 글 성격 정리 (check 가 없으면 빈 문자열)
+export const BRIEF_JSON = {
+  type: 'object', additionalProperties: false, required: ['purpose', 'note', 'facts', 'check', 'notes', 'exclude', 'topicGap', 'asks'],
+  properties: {
+    purpose: { type: 'string', enum: ['소식', '안내', '교육', '성장', '모집'] },
+    note: str,
+    facts: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['text', 'quote', 'unclear'], properties: { text: str, quote: str, unclear: { type: 'boolean' } } } },
+    check: { type: 'object', additionalProperties: false, required: ['quote', 'question'], properties: { quote: str, question: str } },
+    notes: { type: 'array', items: str },
+    exclude: { type: 'array', items: str },
+    topicGap: str,
+    asks: { type: 'array', items: str },
+  },
+} as const;
+export const BriefSchema = z.object({
+  purpose: z.enum(['소식', '안내', '교육', '성장', '모집']), note: z.string(),
+  facts: z.array(z.object({ text: z.string(), quote: z.string(), unclear: z.boolean() })),
+  check: z.object({ quote: z.string(), question: z.string() }), notes: z.array(z.string()), exclude: z.array(z.string()), topicGap: z.string(), asks: z.array(z.string()),
+});
+// 지어낸 문장 검사: 고칠 문장과 고친 문장 (지울 거면 fix 빈 문자열)
+export const VERIFY_JSON = {
+  type: 'object', additionalProperties: false, required: ['issues'],
+  properties: { issues: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['sentence', 'type', 'fix'], properties: { sentence: str, type: { type: 'string', enum: ['지어냄', '틀림', '해설', '되풀이'] }, fix: str } } } },
+} as const;
+export const VerifySchema = z.object({ issues: z.array(z.object({ sentence: z.string(), type: z.enum(['지어냄', '틀림', '해설', '되풀이']), fix: z.string() })) });
 export const KeywordIdeasSchema = z.object({ keywords: z.array(z.string()) });
 export const KEYWORD_IDEAS_JSON = {
   type: 'object', additionalProperties: false, required: ['keywords'],
@@ -140,6 +173,7 @@ export const ProfileInput = z.object({
 });
 
 const FactsInput = z.object({
+  story: s(3000).optional(),
   activities: s(), coachingPoints: s(), scenes: s(), values: s(500), extra: s(), photoNotes: s(),
   event: z.object({ when: s(200), where: s(200), who: s(200), bring: s(500), apply: s(500) }).optional(),
   recruit: z.object({ who: s(500), trial: s(1000) }).optional(),
@@ -158,9 +192,19 @@ export const ArticleInputSchema = z.object({
   ending: s(60),
   includeProfile: z.object({ philosophy: z.boolean(), classFeatures: z.boolean(), credentials: z.boolean(), contact: z.boolean(), address: z.boolean() }),
   withCards: z.boolean(),
+  keywordPlan: z.array(z.object({ role: z.enum(['주요', '보조']), keyword: s(60), sentence: s(300), why: s(100).optional() })).max(3).optional(),
   titlePrefix: s(60).optional(),
   writer: Writer.optional(),
   writerSign: z.boolean().optional(),
+  brief: z.object({
+    purpose: z.enum(BRIEF_PURPOSES), note: s(200),
+    facts: z.array(z.object({ text: s(300), quote: s(300), unclear: z.boolean() })).max(12),
+    check: z.object({ quote: s(300), question: s(300) }).optional(),
+    answer: z.enum(['맞아요', '빼기']).optional(),
+    notes: z.array(s(300)).max(8), exclude: z.array(s(100)).max(8),
+    topicGap: s(300).optional(), topicAnswer: s(500).optional(),
+    asks: z.array(z.object({ question: s(300), answer: s(500).optional() })).max(3).optional(),
+  }).optional(),
 });
 
 export const DocSchema = z.object({

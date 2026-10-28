@@ -41,4 +41,14 @@ export const TARGET_RANGE = [1800, 2200] as const;
 // → 행사 · 모집 안내는 알릴 사실이 정해져 있어 1,000자 (목표 1,200~1,600)
 export const SHORT_KINDS = ['행사 안내', '모집 안내'];
 export const minCharsFor = (kind?: string) => (kind && SHORT_KINDS.includes(kind) ? 1000 : MIN_CHARS);
+// 2026-10-28 자세히 쓰기 "이야기" 글: 재료만큼만 쓰고 일반론으로 늘리지 않음 → 최소 900 (목표 1,000~1,400)
+// 같은 날 실사용(재료 한 줄 → 절반이 일반론) 뒤 GPT 검토: 짧은 재료는 짧은 글이 맞음 → 최소 600 (목표 700~1,100), 분량 보완 안 함
+// 2026-10-28 사용자: 600자는 짧다 → 주제 설명 글감을 더 써서 최소 800 (목표 900~1,200), ② 단계 물음에 답하면 목표 1,200~1,500
+export const STORY_MIN = 800;
+type CountInput = { kind?: string; facts?: { story?: string }; brief?: { asks?: { answer?: string }[] } };
+const hasStory = (input?: CountInput) => !!input?.facts?.story?.trim();
+export const storyAnswers = (input?: CountInput) => (input?.brief?.asks ?? []).filter((a) => a.answer?.trim()).length;
+export const minCharsForInput = (input: CountInput) => (hasStory(input) ? STORY_MIN : minCharsFor(input.kind));
+export const targetRangeForInput = (input: CountInput): readonly [number, number] =>
+  hasStory(input) ? (storyAnswers(input) ? [1200, 1500] : [900, 1200]) : targetRangeFor(input.kind);
 export const targetRangeFor = (kind?: string): readonly [number, number] => (kind && SHORT_KINDS.includes(kind) ? [1200, 1600] : TARGET_RANGE);

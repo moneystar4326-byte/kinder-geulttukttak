@@ -1,12 +1,12 @@
 // 글 생성 파이프라인 (기획서 6장)
-// 입력 검증 → 지침 조립 → AI 초안 → 로컬 길이 · 반복 검사 → 모자라면 최대 2회 보완 → 흐름 다듬기 → 흐름 2차 점검 → AI 사실 비교(보조 점검) → 새 버전 저장
+// 입력 검증 → 지침 조립 → AI 초안 → 로컬 길이 · 반복 검사 → 모자라면 최대 2회 보완 → 흐름 다듬기 → 흐름 2차 점검 → (이야기 글) 지어낸 문장 검사 → AI 사실 비교(보조 점검) → 새 버전 저장
 import type { Db } from './db';
 import type { ArticleDoc, ArticleInput, DojoProfile, RevisionKind } from '../shared/types';
-import { bodyText, countDoc, minCharsFor } from '../shared/count';
+import { bodyText, countDoc, minCharsForInput } from '../shared/count';
 import { localFlags, missingInputs, regionWarning } from '../shared/validation';
 import { areaTags, dongOf, locationLine, mentionsNearby } from '../shared/areas';
 import { decorateHeadings } from '../shared/format';
-import type { CallOpts, Fix, TextAI } from './services/openai';
+import type { CallOpts, Fix, TextAI, VerifyIssue } from './services/openai';
 
 export const MAX_EXPAND = 2;
 
@@ -72,8 +72,10 @@ export async function generateArticle(deps: { db: Db; ai: TextAI; profile: DojoP
     let expands = 0;
     ctx.step('검증 중');
     db.setArticleStatus(articleId, 'validating');
-    const min = minCharsFor(input.kind);
-    while (countDoc(doc).withoutSpaces < min && expands < MAX_EXPAND) {
+    const min = minCharsForInput(input);
+    const story = !!input.facts.story?.trim();
+    // 이야기 글은 분량 보완을 하지 않음 (보완 지시가 일반론 · 가정 조언으로 늘림 — 2026-10-28 GPT 검토)
+    while (!story && countDoc(doc).withoutSpaces < min && expands < MAX_EXPAND) {
       expands++;
       ctx.step(`분량 보완 중 (${expands}/${MAX_EXPAND})`);
       doc = await ai.expand(doc, countDoc(doc).withoutSpaces, o, min);
@@ -83,6 +85,10 @@ export async function generateArticle(deps: { db: Db; ai: TextAI; profile: DojoP
     ctx.step('흐름 2차 점검 중');
     const checked = await proofreadDoc(ai, doc, input, o, ctx.signal, min);
     doc = checked.doc;
+    if (story) {
+      ctx.step('지어낸 문장 검사 중');
+      doc = await verifyDoc(ai, doc, profile, input, o, ctx.signal);
+    }
     ctx.step('사실 비교 점검 중');
     // 점검 실패는 표시만 하고 넘어가되, 멈추기를 눌렀으면 저장하지 않고 멈춤 (2026-10-18 버그 점검)
     const aiFlags = await ai.review(doc, profile, input, o).catch((e) => {
@@ -107,7 +113,7 @@ export async function generateArticle(deps: { db: Db; ai: TextAI; profile: DojoP
 }
 
 // 흐름 다듬기 (2026-10-18). 실패하거나 분량 · 섹션이 줄면 다듬기 전 글을 그대로 씀 — 멈추기만 그대로 던짐
-export async function polishDoc(ai: TextAI, doc: ArticleDoc, input: ArticleInput, o: CallOpts, signal: AbortSignal, min = minCharsFor(input.kind)): Promise<ArticleDoc> {
+export async function polishDoc(ai: TextAI, doc: ArticleDoc, input: ArticleInput, o: CallOpts, signal: AbortSignal, min = minCharsForInput(input)): Promise<ArticleDoc> {
   try {
     const p = await ai.polish(doc, input, o);
     const before = countDoc(doc).withoutSpaces;
@@ -147,7 +153,7 @@ export function applyFixes(doc: ArticleDoc, fixes: Fix[], min: number): { doc: A
   return { doc: out, count };
 }
 
-export async function proofreadDoc(ai: TextAI, doc: ArticleDoc, input: ArticleInput, o: CallOpts, signal: AbortSignal, min = minCharsFor(input.kind)) {
+export async function proofreadDoc(ai: TextAI, doc: ArticleDoc, input: ArticleInput, o: CallOpts, signal: AbortSignal, min = minCharsForInput(input)) {
   try {
     return applyFixes(doc, await ai.proofread(doc, input, o), min);
   } catch (e: any) {
@@ -156,11 +162,47 @@ export async function proofreadDoc(ai: TextAI, doc: ArticleDoc, input: ArticleIn
   }
 }
 
+// 이야기 글 지어낸 문장 검사 (태권 글뚝딱 2026-10-28에서 옮김): 지어낸 문장 · 틀린 숫자 · 해설 · 되풀이를 그 문장만 고침. 검사가 실패하면 고치지 않은 글 그대로 (멈추기만 던짐)
+export async function verifyDoc(ai: TextAI, doc: ArticleDoc, profile: DojoProfile, input: ArticleInput, o: CallOpts, signal: AbortSignal): Promise<ArticleDoc> {
+  try {
+    return applyVerifyFixes(doc, await ai.verify(doc, profile, input, o), [input.mainKeyword, ...input.subKeywords]);
+  } catch (e: any) {
+    if (signal.aborted || e?.name === 'AbortError' || e?.code === 'cancelled') throw e;
+    return doc;
+  }
+}
+
+// 문단 안에서 그 문장만 바꾸거나 지움. 검색어가 든 문장은 지우지 않음 (태권 글뚝딱 2026-10-28 시험: 검사가 검색어 문장을 지움)
+// 흐름 2차 점검의 applyFixes 와 달리 분량 기준은 보지 않음 (이야기 글은 짧아도 됨). 비게 된 문단 · 섹션은 뺌 (첫 섹션 도입은 남김)
+export function applyVerifyFixes(doc: ArticleDoc, issues: VerifyIssue[], keywords: string[] = []): ArticleDoc {
+  const flat = (t: string) => t.replace(/\s+/g, '');
+  const kws = keywords.map(flat).filter(Boolean);
+  let sections = doc.sections.map((s) => ({ ...s, paragraphs: [...s.paragraphs] }));
+  for (const it of issues) {
+    const from = it.sentence.trim();
+    if (from.length < 4) continue;
+    const to = it.fix.trim();
+    if (!to && kws.some((k) => flat(from).includes(k))) continue;
+    for (const s of sections) {
+      const i = s.paragraphs.findIndex((p) => p.includes(from));
+      if (i < 0) continue;
+      s.paragraphs[i] = s.paragraphs[i].replace(from, to).replace(/ {2,}/g, ' ').trim();
+      break;
+    }
+  }
+  sections = sections.map((s) => ({ ...s, paragraphs: s.paragraphs.filter((p) => p.trim()) })).filter((s, i) => i === 0 || s.paragraphs.length);
+  return { ...doc, sections };
+}
+
 // AI 메모 + 코드 점검을 합침 (중복 제거). 분량 부족은 추가 재료 요청으로
 export function mergeFlags(doc: ArticleDoc, profile: DojoProfile, input: ArticleInput, aiFlags: ArticleDoc['reviewFlags']) {
-  const flags = [...doc.reviewFlags, ...aiFlags, ...localFlags(doc, profile, input)];
-  const min = minCharsFor(input.kind);
-  if (countDoc(doc).withoutSpaces < min) flags.push({ code: 'need-more-facts', message: `보완해도 ${min.toLocaleString()}자에 모자라요. 진행 활동 · 지도 포인트 · 관찰 장면을 조금 더 적어 주시면 다시 만들 수 있어요.` });
+  const story = !!input.facts.story?.trim();
+  // 이야기 글은 짧아도 실패가 아님 → "짧아요" 경고 대신 아래 재료 안내 하나만
+  const flags = [...doc.reviewFlags, ...aiFlags, ...localFlags(doc, profile, input).filter((f) => !(story && f.code === 'too-short'))];
+  const min = minCharsForInput(input);
+  if (countDoc(doc).withoutSpaces < min) flags.push({ code: 'need-more-facts', message: story
+    ? `재료가 짧아 글도 짧게 썼어요 (지어내지 않으려고요). ② 단계 물음에 답하거나 "어떤 일이 있었나요?"에 장면 · 아이들 모습을 한 줄 더 적으면 ${min.toLocaleString()}자 넘게 쓸 수 있어요.`
+    : `보완해도 ${min.toLocaleString()}자에 모자라요. 한 놀이 · 활동, 선생님이 도운 점, 관찰 장면을 조금 더 적어 주시면 다시 만들 수 있어요.` });
   const seen = new Set<string>();
   return flags.filter((f) => { const k = `${f.code}|${f.message}`; return seen.has(k) ? false : (seen.add(k), true); });
 }
@@ -189,7 +231,7 @@ export async function reviseArticle(deps: { db: Db; ai: TextAI; profile: DojoPro
   } else {
     ctx.step('글 다듬는 중');
     const label = { warmer: '더 따뜻하게', professional: '더 전문적으로', 'less-promo': '홍보 줄이기' }[req.kind];
-    doc = decorateHeadings(await ai.revise(req.kind, base.doc, o, minCharsFor(art.input.kind)));
+    doc = decorateHeadings(await ai.revise(req.kind, base.doc, o, minCharsForInput(art.input)));
     doc = { ...doc, titleCandidates: base.doc.titleCandidates };
     note = label;
   }

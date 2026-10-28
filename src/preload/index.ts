@@ -5,7 +5,7 @@ const CHANNELS = [
   'app:info', 'app:latest', 'license:status', 'license:connect', 'license:refresh', 'license:unlink', 'settings:save', 'settings:pickDir',
   'secrets:set', 'secrets:remove', 'secrets:test', 'secrets:fromClipboard', 'guide:copy', 'voice:transcribe',
   'profile:get', 'profile:save', 'profile:pickLogo', 'profile:pickRef', 'profile:nearby', 'profile:prefixOptions',
-  'keywords:naver', 'keywords:ai', 'facts:fromMemo',
+  'keywords:naver', 'keywords:ai', 'keywords:plan', 'article:brief', 'facts:fromMemo',
   'article:list', 'article:create', 'article:updateInput', 'article:get', 'article:delete', 'article:generate', 'article:revise',
   'article:saveEdit', 'article:setCurrent', 'article:getVersion', 'article:markReady', 'article:copy', 'article:applyPrefix',
   'cards:plan', 'cards:renderFailed', 'cards:renderOne', 'cards:updateCopy', 'cards:suggestCopy', 'cards:restyle', 'cards:saveAs',

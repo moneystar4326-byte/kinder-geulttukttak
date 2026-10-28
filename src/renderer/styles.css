@@ -184,3 +184,33 @@ details.optional-group > summary { font-size: 16px; color: var(--ink, #1a1a1a); 
 /* 메모 말로 넣기 (MicButton) */
 .mic { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .mic .note { flex-basis: 100%; margin: 0; }
+
+/* 자세히 쓰기 ① 이야기 칸 · ② 검색어 확인 (2026-10-28) */
+.row.end { justify-content: flex-end; }
+.row.split-row { justify-content: space-between; margin-top: 12px; }
+textarea.story { min-height: 140px; font-size: 16px; }
+.grid2.more { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.plan-status { display: grid; gap: 6px; font-size: 15px; padding: 8px 0 4px; }
+.plan-status .done { color: var(--ok); }
+.plan-status .done::before { content: '✓ '; font-weight: 700; }
+.plan-status .doing { color: var(--text); font-weight: 700; }
+.plan-status .doing::before { content: '… '; }
+.plan-status .wait { color: var(--muted); }
+.plan-lead { font-weight: 700; font-size: 16px; margin: 0 0 12px; }
+.brief { margin-bottom: 14px; }
+.brief-note { font-weight: 700; color: var(--ok); margin: 0 0 8px; }
+.brief-check { background: var(--main-soft); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 4px; }
+.brief-check p { margin: 0; }
+.brief-check + .brief-check { margin-top: 8px; }
+.brief-check textarea { width: 100%; resize: vertical; }
+.brief-ask { display: grid; gap: 4px; margin-top: 6px; }
+.brief-ask input { width: 100%; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); font: inherit; }
+.kwcard { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; }
+.kwcard-top { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.kwcard-top b { font-size: 17px; }
+.kwcard .role { font-size: 12px; font-weight: 700; border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; color: var(--muted); }
+.kwcard .role.main { border-color: var(--main); color: var(--main); }
+.kwcard-ex { margin: 6px 0; font-size: 15px; background: var(--bg); border-radius: 8px; padding: 8px 10px; }
+.kwcard-change { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+details.kw-vol { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin: 8px 0; }
+details.kw-vol summary { cursor: pointer; font-weight: 700; font-size: 14px; }

@@ -90,6 +90,17 @@ test('"유치원" 뒤에 오는 말은 보지 않음 (유치원가정통신문),
   assert.equal(foreignKeyword('어린이집소풍', '서울 동작구 신대방동', SARIP), true);
 });
 
+test('우리 유치원 이름의 일부는 우리 이름으로 침 (태권 글뚝딱 2026-10-27에서 옮김)', () => {
+  const region = '서울 동작구 신대방동';
+  const real = { name: '신대방햇살푸른숲유치원', facilityType: '사립(개인)', nearbyAreas: [] };
+  for (const k of ['햇살푸른숲유치원', '푸른숲유치원', '신대방햇살유치원', '햇살유치원']) assert.equal(foreignKeyword(k, region, real), false, k);
+  // 이름에 없는 다른 유치원 이름은 여전히 뺌
+  assert.equal(foreignKeyword('신대방푸르니유치원', region, real), true);
+  // 한 글자만 겹치는 건 우리 이름으로 보지 않음
+  assert.equal(foreignKeyword('숲유치원', region, { ...real, name: '햇살숲유치원' }), true);
+  assert.equal(foreignKeyword('별유치원', region, real), true);
+});
+
 test('원장 · 창업자 쪽 검색어(매매 · 임대 · 채용)는 뺌', () => {
   for (const k of ['유치원매매', '관리동유치원임대', '유치원교사채용', '유치원창업']) assert.equal(foreignKeyword(k, '서울 동작구 신대방동', SARIP), true, k);
   const r = pickKeywords([row('유치원', '5480', '32700'), row('유치원매매', '270', '920'), row('신대방동유치원', '< 10', '< 10')], '낙엽 놀이', '서울 동작구 신대방동', SARIP);

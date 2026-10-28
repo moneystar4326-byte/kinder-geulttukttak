@@ -83,7 +83,7 @@ test('글 지시문 어디에도 태권도 말이 없음 (글 종류 5개 · 다
     const i = input({ kind, writer: TEACHER });
     for (const [name, text] of Object.entries({
       article: P.articlePrompt(prof(), i, null), polish: P.polishPrompt(d, i), review: P.reviewPrompt(d, prof(), i),
-      card: P.cardCopyPrompt(d, '제목', kind, TEACHER), cardOne: P.cardOnePrompt(d, '제목', 1, { title: 't', sub: 's', scene: 'x' }, [], kind, TEACHER),
+      card: P.cardCopyPrompt(d, '제목', { kind }, TEACHER), cardOne: P.cardOnePrompt(d, '제목', 1, { title: 't', sub: 's', scene: 'x' }, [], { kind }, TEACHER),
       memo: P.memoPrompt('메모', kind, '주제'), ideas: P.keywordIdeasPrompt('서울', '낮잠', kind),
     })) assert.doesNotMatch(text, TKD, `${kind} · ${name}`);
   }
@@ -123,7 +123,7 @@ test('흐름 다듬기 · 사실 점검에 유치원 확인 항목이 더해짐 
 });
 
 test('카드 문구: 장면은 안전 · 생활 장면, 선생님 글은 반 시점, 카드 역할은 유치원 흐름', () => {
-  const t = P.cardCopyPrompt(doc('x'), '제목', '모집 안내', TEACHER);
+  const t = P.cardCopyPrompt(doc('x'), '제목', { kind: '모집 안내' }, TEACHER);
   assert.match(t, /kindergarteners building a block tower/);
   assert.match(t, /위험해 보이는 장면/);
   assert.match(t, /카드 문구 시점: "햇님반 친구들"처럼 반 시점/);
@@ -140,13 +140,13 @@ test('카드 제목 · 답 맞추기 + 만든 뒤 한 번 더 점검 (요요유�
     { title: '보라매공원으로 소풍을 다녀왔어요', sub: '보라매공원으로 소풍을 가 일상과 다른 바깥 풍경을 만났어요. 아이의 눈길이 어디에 머무는지에 마음을 둡니다.', scene: 'children looking around a green park', afterSectionId: 's2' },
     { title: '자기 관심을 표현하며 함께 지내요', sub: '소풍은 자기 관심을 표현하는 경험이에요. 각자의 관심을 따라갈 수 있어요.', scene: 'children on a grassy park', afterSectionId: 's4' },
   ];
-  const make = P.cardCopyPrompt(doc('공원에서 낙엽을 모았어요.'), '장미반 소풍', '수업 후기');
+  const make = P.cardCopyPrompt(doc('공원에서 낙엽을 모았어요.'), '장미반 소풍', { kind: '수업 후기' });
   assert.match(make, /제목과 답 맞추기/);
   assert.match(make, /"무엇을" → 한 일 · 놀이 이름/);
   assert.match(make, /"풍경을 만나요" · "경험을 해요"/);
   assert.match(make, /title 을 글 제목 그대로 옮기지 않는다/);
-  assert.match(P.cardOnePrompt(doc('x'), 't', 0, bad[0], [], '수업 후기'), /제목과 답 맞추기/);
-  const chk = P.cardCheckPrompt(doc('공원에서 낙엽을 모았어요.'), '장미반 소풍', bad, '수업 후기', TEACHER);
+  assert.match(P.cardOnePrompt(doc('x'), 't', 0, bad[0], [], { kind: '수업 후기' }), /제목과 답 맞추기/);
+  const chk = P.cardCheckPrompt(doc('공원에서 낙엽을 모았어요.'), '장미반 소풍', bad, { kind: '수업 후기' }, TEACHER);
   assert.match(chk, /틀린 곳만 고쳐 같은 JSON 형식으로 3장 모두/);
   assert.match(chk, /카드1: title="아이들은 밖에서 무엇을 하나요\?"/);
   assert.match(chk, /scene 이 그 카드 문구와 같은 장소/);
@@ -160,10 +160,10 @@ test('재료가 주제 한 줄뿐이면 카드 제목을 질문으로 쓰지 않
   const thin = input({ topic: memo, facts: { ...QI.emptyInput().facts, activities: memo } });
   assert.equal(V.thinFacts(thin), true);
   assert.equal(V.thinFacts(input({ topic: '소풍', facts: { ...QI.emptyInput().facts, activities: '보라매공원에서 낙엽을 모아 왕관을 만들고, 돗자리에 앉아 도시락을 먹었어요' } })), false);
-  assert.match(P.cardCopyPrompt(doc('x'), 't', '수업 후기', undefined, true), /세 장 모두 title 을 물음표 없는 문장으로/);
-  assert.doesNotMatch(P.cardCopyPrompt(doc('x'), 't', '수업 후기'), /물음표 없는 문장으로 쓴다 \(카드1도\)/);
-  assert.match(P.cardCheckPrompt(doc('x'), 't', [], '수업 후기', undefined, true), /카드1도/);
-  assert.match(P.cardOnePrompt(doc('x'), 't', 0, { title: 'a', sub: 'b', scene: 'c' }, [], '수업 후기', undefined, true), /카드1도/);
+  assert.match(P.cardCopyPrompt(doc('x'), 't', { kind: '수업 후기' }, undefined, true), /세 장 모두 title 을 물음표 없는 문장으로/);
+  assert.doesNotMatch(P.cardCopyPrompt(doc('x'), 't', { kind: '수업 후기' }), /물음표 없는 문장으로 쓴다 \(카드1도\)/);
+  assert.match(P.cardCheckPrompt(doc('x'), 't', [], { kind: '수업 후기' }, undefined, true), /카드1도/);
+  assert.match(P.cardOnePrompt(doc('x'), 't', 0, { title: 'a', sub: 'b', scene: 'c' }, [], { kind: '수업 후기' }, undefined, true), /카드1도/);
 });
 
 test('카드 그림 장소는 장면을 따름: 공원이면 공원, 아니면 교실', () => {

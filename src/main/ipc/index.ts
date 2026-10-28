@@ -11,6 +11,7 @@ import { generateArticle, reviseArticle, titleWithPrefix } from '../article';
 import { ArticleInputSchema, DocSchema, ProfileInput } from '../../shared/schemas';
 import { countDoc } from '../../shared/count';
 import { childNames, hideChildNames, memoText, plainBody, thinFacts, withKeywordFallback } from '../../shared/validation';
+import { planCandidates } from '../../shared/keywords';
 import type { ArticleDoc, ArticleInput, CardSet, KeywordRow } from '../../shared/types';
 import { APP } from '../../shared/kinder';
 import { CARD_STYLES } from '../../shared/types';
@@ -223,6 +224,27 @@ export function registerIpc(ctx: AppCtx) {
     db.saveLookup(query, 'naver', r.raw, r.rows);
     return { rows: r.rows, demo: false };
   });
+  // 자세히 쓰기 검색어 확인: 네이버 조회 결과(없어도 됨)에서 우리와 맞지 않는 것을 거르고, AI가 이야기에 맞는 것 + 넣을 문장 예시를 고름
+  handle('keywords:plan', z.object({ kind: S, topic: S, story: z.string().max(3000), rows: z.array(z.any()).max(200) }), async ({ kind, topic, story, rows }) => {
+    const p = db.getProfile();
+    const region = p?.region ?? '';
+    const cands = planCandidates(rows as KeywordRow[], `${topic} ${story}`, region, p);
+    const r = await ai().text.keywordPlan({ region, kind, topic, story, candidates: cands }, { onUsage: onUsage() });
+    // 유치원판: 넣을 문장 예시에 이야기 속 아이 이름이 나오면 "한 친구"로 (화면에 보이고 글에 그대로 쓰일 수 있음)
+    const names = childNames(`${topic}\n${story}`);
+    if (!names.length) return r;
+    const hide = (x: typeof r.main) => ({ ...x, sentence: hideChildNames(x.sentence, names) });
+    return { main: hide(r.main), subs: r.subs.map(hide), others: r.others.map(hide) };
+  });
+  // 자세히 쓰기 ① → ②: 글 성격 · 사실 · 애매한 숫자 확인 · 주제 설명 글감 (화면에서 검색어 고르기와 같이 부름)
+  handle('article:brief', z.object({ kind: S, topic: S, story: z.string().max(3000) }), async (q) => {
+    const b = await ai().text.brief(q, { onUsage: onUsage() });
+    // 유치원판: 정리한 사실 · 확인 질문에 아이 이름이 나오면 "한 친구"로 (원문 인용 quote 는 그대로)
+    const names = childNames(`${q.topic}\n${q.story}`);
+    if (!names.length) return b;
+    const hide = (t: string) => hideChildNames(t, names);
+    return { ...b, facts: b.facts.map((f) => ({ ...f, text: hide(f.text) })), check: b.check && { ...b.check, question: hide(b.check.question) } };
+  });
   handle('keywords:ai', z.object({ region: S, topic: S, kind: S }), async ({ region, topic, kind }) => {
     const a = ai();
     const words = await a.text.keywordIdeas(region, topic, kind, { onUsage: onUsage() });
@@ -301,7 +323,7 @@ export function registerIpc(ctx: AppCtx) {
     noCardJob(articleId);
     return runner.start('cards', articleId, '카드 문구 만드는 중', async ({ signal, step, jobId }) => {
       const v = db.getVersion(art.currentVersionId!)!;
-      const copies = safeCopies(await a.text.cardCopies(v.doc, v.title, art.input.kind, { signal, onUsage: onUsage(jobId) }, art.input.writer, thinFacts(art.input)), art.input);
+      const copies = safeCopies(await a.text.cardCopies(v.doc, v.title, art.input, { signal, onUsage: onUsage(jobId) }, art.input.writer, thinFacts(art.input)), art.input);
       const cs = db.createCardSet(v.id, { ...style, mode }, copies);
       await cardService(a.image, jobId).renderSet(cs.id, { signal, onStep: step });
     }).job;
@@ -327,7 +349,7 @@ export function registerIpc(ctx: AppCtx) {
     const v = db.getVersion(cs.articleVersionId)!;
     const others = cs.cards.filter((x) => x.id !== cardId).map((x) => x.copy.title);
     const input = db.getArticle(articleId)?.input;
-    return safeCopies([await ai().text.cardOne(v.doc, v.title, c.index, c.copy, others, input?.kind, { onUsage: onUsage() }, input?.writer, !!input && thinFacts(input))], input)[0];
+    return safeCopies([await ai().text.cardOne(v.doc, v.title, c.index, c.copy, others, input, { onUsage: onUsage() }, input?.writer, !!input && thinFacts(input))], input)[0];
   });
   handle('cards:updateCopy', z.object({ cardId: Id, copy: z.object({ title: z.string().max(80), sub: z.string().max(200), scene: z.string().max(500) }) }), ({ cardId, copy }) => { noCardJob(articleOfCard(cardId)); return cardService(null).updateCopy(cardId, copy); });
   // 스타일 · 크기만 바꿈 (템플릿 모드면 API 없이 다시 합성, AI 배경은 있던 그림을 새 비율로 다시 자름)

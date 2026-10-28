@@ -131,6 +131,18 @@ export const demoText: TextAI = {
   },
   // 데모: AI 대신 메모를 그대로 활동 칸에 (나누지 않음)
   async splitMemo(memo, _k, _t, o) { await wait(300, o?.signal); return { activities: memo.trim() }; },
+  // 데모: 재료를 그대로 사실 하나로 (확인 질문 · 글감 없음)
+  async brief(q, o) {
+    await wait(300, o?.signal);
+    return { purpose: '소식', note: '데모 모드: 적어 주신 재료 그대로 글을 만들어요.', facts: [{ text: q.story.slice(0, 300), quote: q.story.slice(0, 300), unclear: false }], notes: [], exclude: [] };
+  },
+  async verify(_d, _p, _i, o) { await wait(200, o?.signal); return []; },
+  // 데모: 이야기 첫 낱말들로 가짜 계획 (검색량 없음)
+  async keywordPlan(q, o) {
+    await wait(300, o?.signal);
+    const kw = q.candidates[0]?.keyword ?? q.topic.split(/\s/).slice(0, 2).join(' ');
+    return { main: { keyword: kw, sentence: `${q.topic}에 대해 전해 드려요.`, why: '데모 · 가상 값이에요.' }, subs: [], others: [] };
+  },
   async keywordIdeas(region, topic, _k, o) {
     await wait(300, o?.signal);
     const r = region.replace(/\s/g, '');

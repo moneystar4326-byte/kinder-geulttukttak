@@ -1,9 +1,9 @@
 // 글 · 카드 문구 지시문 (기획서 6.1 생성 규칙)
-import type { ArticleDoc, ArticleInput, DojoProfile, RevisionKind } from '../../../shared/types';
-import { bodyText, MIN_CHARS, minCharsFor, TARGET_RANGE, targetRangeFor } from '../../../shared/count';
+import type { ArticleBrief, ArticleDoc, ArticleInput, DojoProfile, RevisionKind } from '../../../shared/types';
+import { bodyText, MIN_CHARS, minCharsForInput, TARGET_RANGE, targetRangeForInput } from '../../../shared/count';
 import { nearbyLine } from '../../../shared/areas';
 import { spacedKeyword } from '../../../shared/validation';
-import { cardRoles } from '../../../shared/cardRoles';
+import { cardRoles, storyBrief } from '../../../shared/cardRoles';
 import { APP, kindLabel, writerLabel, type Writer } from '../../../shared/kinder';
 
 // 글 규칙 (태권 글뚝딱 규칙에 유아 개인정보 · 입학 · 비용 · 진단 금지를 더함 — 2026-10-27 유치원 기획안 v0.4 6장, 법 · 금지 표현은 GPT 검토 대기)
@@ -37,7 +37,7 @@ export const SYSTEM_RULES = `너는 유치원 원장님 · 선생님의 블로�
 const KIND_GUIDE: Record<string, string> = {
   '수업 후기': '흐름(기본): 학부모의 관심 → 오늘 한 놀이 · 활동 → 관찰한 아이들 모습 → 놀이로 배우는 것(누리과정의 놀이 중심 의미) → 유치원 · 반의 지도 방향 → 마무리. 글마다 같은 틀로 복제하지 말고 재료에 맞게 순서 · 소제목을 바꿔도 된다.',
   '성장 이야기': '흐름: 이전 모습 → 선생님이 도운 과정 → 지금 관찰 → 의미 → 마무리. 변화는 사실 칸에 적힌 만큼만. 과장 금지. 특정 아이를 알아볼 수 있게 쓰지 않는다.',
-  '행사 안내': '흐름: 행사 소개(언제 · 무엇) → 하는 활동을 구체적으로(재료에 적힌 놀이 · 먹거리 그대로) → 일시 · 장소 · 대상 · 준비물 · 신청 방법(사실 칸에 있는 것만, 한 문단에 모아) → 아이들이 느낄 즐거움 · 의미는 짧게 → 마무리. 사실 칸에 없는 장소 · 준비물 · 신청 방법은 지어내지 말고 "자세한 안내는 유치원으로 문의해 주세요" 한 문장으로.',
+  '행사 안내': '행사 날짜가 [오늘]보다 앞이면 이미 끝난 행사의 후기 글이다 — 지난 일로 쓰고, 흐름은 그날 한 놀이 · 활동(재료에 적힌 그대로) → 그날 아이들 모습 → 선생님이 준비하며 도운 것 → 전하고 싶은 마음 → 마무리. 앞으로 열릴 행사면 흐름: 행사 소개(언제 · 무엇) → 하는 활동을 구체적으로(재료에 적힌 놀이 · 먹거리 그대로) → 일시 · 장소 · 대상 · 준비물 · 신청 방법(사실 칸에 있는 것만, 한 문단에 모아) → 아이들이 느낄 즐거움 · 의미는 짧게 → 마무리. 사실 칸에 없는 장소 · 준비물 · 신청 방법은 지어내지 말고 "자세한 안내는 유치원으로 문의해 주세요" 한 문장으로.',
   '모집 안내': '흐름: 학부모의 고민(첫 유치원 고르기 · 유치원 생활 적응) → 우리 유치원의 하루 · 교육과정 · 방과후과정(사실) → 모집 대상 · 입학설명회 · 신청 방법(사실 칸 그대로) → 마무리. 교육비 · 원비 · 할인 · 혜택 · 모집 인원 · 입학 확정 · 추첨 결과를 만들지 않는다. 신청 방법이 사실 칸에 없으면 "입학 상담은 유치원으로 문의해 주세요" 한 문장으로.',
   '교육 정보': '흐름: 학부모 질문 → 일반적인 설명 → 유치원에서 실제로 하는 방식(사실 칸) → 가정에서 도울 점 → 마무리. 건강 · 발달은 일반적인 수준만 설명하고 진단하지 않는다.',
 };
@@ -64,12 +64,15 @@ export function factsBlock(input: ArticleInput) {
   const f = input.facts;
   const L: string[] = [];
   const add = (k: string, v?: string) => { if (v && v.trim()) L.push(`${k}: ${v.trim()}`); };
+  add('원장님 · 선생님 이야기', f.story);
   add(LB.act, f.activities); add(LB.coach, f.coachingPoints);
-  add('관찰 장면', f.scenes || '(없음 — 구체 사례를 만들지 말 것)');
+  // 이야기가 있으면 장면은 이야기 안에 있음 → "없음" 표시를 붙이지 않음
+  add('관찰 장면', f.scenes || (f.story?.trim() ? '' : '(없음 — 구체 사례를 만들지 말 것)'));
   add('전달 가치', f.values); add('추가 안내', f.extra); add('사진 설명', f.photoNotes);
-  if (input.kind === '행사 안내' && f.event) { add('행사 일시', f.event.when); add('행사 장소', f.event.where); add('행사 대상', f.event.who); add('준비물', f.event.bring); add('신청 방법', f.event.apply); }
-  if (input.kind === '모집 안내' && f.recruit) { add(LB.recruitWho, f.recruit.who); add(LB.recruitTrial, f.recruit.trial); }
-  if (input.kind === '성장 이야기' && f.growth) { add('이전 모습', f.growth.before); add('현재 관찰', f.growth.now); add('지도 과정', f.growth.process); }
+  // 글 종류별 칸은 종류가 달라도 적혀 있으면 보냄 (태권 글뚝딱 2026-10-28 실사용: 행사 안내 글에서 [성장 이야기] 칸에 적은 결과가 빠짐)
+  if (f.event) { add('행사 일시', f.event.when); add('행사 장소', f.event.where); add('행사 대상', f.event.who); add('준비물', f.event.bring); add('신청 방법', f.event.apply); }
+  if (f.recruit) { add(LB.recruitWho, f.recruit.who); add(LB.recruitTrial, f.recruit.trial); }
+  if (f.growth) { add('이전 모습', f.growth.before); add('현재 관찰', f.growth.now); add('지도 과정', f.growth.process); }
   return L.join('\n');
 }
 
@@ -81,26 +84,73 @@ export function writerLine(w?: Writer) {
     : `\n[글쓴이] ${writerLabel(w)} — 담임 선생님 시점으로, "저희 ${w.className?.trim() || '반'}" 아이들과 지낸 이야기로 쓴다. 원장님 시점의 말("원장으로서" 등)을 섞지 않는다.`;
 }
 
+// 오늘 날짜 (태권 글뚝딱 2026-10-28 실사용: AI가 오늘을 몰라 지난 행사 날짜를 "미래 날짜"로 표시)
+export function todayLine(now = new Date()) {
+  const d = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(now);
+  return `[오늘] ${d} — 이보다 앞선 날짜는 이미 지난 일이다`;
+}
+
+// 자세히 쓰기 글 성격별 흐름 (brief 가 있을 때 [구성]으로 씀 — 태권 글뚝딱 2026-10-28에서 옮김). 재료에 없는 부분은 건너뜀
+const PURPOSE_GUIDE: Record<string, string> = {
+  '소식': '흐름: 무슨 일이었나(짧게) → 그날 한 놀이 · 장면을 하나씩, 각각 바로 뒤에 그것을 이해시키는 주제 설명 → 짧은 인사 · 마무리. 입학 안내 · 반 소개 · 가정 조언 섹션을 만들지 않는다.',
+  '안내': '흐름: 무엇을 언제 하는지 → 재료에 적힌 활동 · 준비 · 신청을 그대로 → 주제 설명으로 이해를 돕기 → 마무리. 재료에 없는 장소 · 준비물 · 신청 방법은 "자세한 안내는 유치원으로 문의해 주세요" 한 문장으로.',
+  '교육': '흐름: 무엇을 하며 지냈나 → 놀이 · 생활에서 있었던 일 하나씩 + 바로 뒤에 그 놀이 · 생활 습관이 어떤 것인지 설명 → 마무리.',
+  '성장': '흐름: 처음 모습 → 선생님이 도운 과정 → 지금 모습, 각 장면 뒤에 그것을 이해시키는 설명 → 마무리. 변화는 재료에 적힌 만큼만. 아이를 평가 · 진단하지 않는다.',
+  '모집': '흐름: 어떤 아이 · 가정을 위한 유치원인지 → 우리 유치원의 하루 · 교육과정 · 방과후과정(사실) → 모집 대상 · 입학설명회 · 신청 방법(재료 그대로) → 마무리. 교육비 · 원비 · 혜택 · 모집 인원 · 입학 확정 · 추첨 결과를 만들지 않는다.',
+};
+
+// ② 단계 물음에 원장님 · 선생님이 적은 답 — 재료와 같은 사실로 씀
+const askLines = (b: ArticleBrief) => (b.asks ?? []).filter((a) => a.answer?.trim()).map((a) => `\n- ${a.answer!.trim()} (물음 "${a.question}"에 원장님 · 선생님이 적은 답)`).join('');
+
+// 재료를 나눈 사실 + 주제 설명 글감. 애매한 숫자는 원장님 · 선생님이 "맞아요" 해야 씀
+export function briefBlock(b: NonNullable<ArticleInput['brief']>) {
+  const facts = b.facts.map((f) => (f.unclear && b.answer !== '맞아요' ? `- ${f.text} (숫자가 어디에 붙는지 확인 안 됨 — 인원 · 숫자는 쓰지 않는다)` : `- ${f.text}`));
+  return `[있었던 일 — 모두 쓴다. 숫자는 그대로, 합계를 내지 않는다]
+${facts.join('\n')}${askLines(b)}${b.topicAnswer ? `\n- 원장님 · 선생님 설명 (주제에 대해 — 뜻을 바꾸지 않고 풀어 쓴다): ${b.topicAnswer}` : b.topicGap ? '\n[주제와 재료] 주제에 담긴 이유 · 주장은 재료에 없으니 지어내지 않는다. 제목 · 도입은 재료에 있는 일로 쓴다' : ''}
+[주제 설명 글감 — 4개 이상 골라 관련된 사실 바로 뒤에 풀어 쓴다. 분량은 이 글감으로 채우고, 이 글감에 없는 일반론은 쓰지 않는다]
+${b.notes.map((x) => `- ${x}`).join('\n')}${b.exclude.length ? `
+[이 글에 넣지 않을 것] ${b.exclude.join(', ')}` : ''}`;
+}
+
+// 자세히 쓰기 "이야기" 글 (태권 글뚝딱 2026-10-28): 칸별 항목표 · 일반론 채우기 · 키워드 3~5번 때문에 문장이 어색하던 것을 고침
+const isStory = (input: ArticleInput) => !!input.facts.story?.trim();
+function keywordLines(input: ArticleInput) {
+  const plan = input.keywordPlan ?? [];
+  if (plan.length) return `[검색어 계획] 아래 문장 예시처럼 자연스러운 자리에만 넣는다. 주요는 2~3번, 보조는 1번씩. 횟수를 채우려고 문장을 만들지 않는다. 띄어쓰기 · 조사 변형은 괜찮다 ("유치원소풍" → "유치원 소풍").
+${plan.map((k) => `- ${k.role} "${k.keyword}" 예: ${k.sentence}`).join('\n')}`;
+  return `[주요 키워드] ${input.mainKeyword} (본문에는 "${spacedKeyword(input.mainKeyword)}"처럼 자연스럽게, ${isStory(input) ? '2~3번. 횟수를 채우려고 문장을 만들지 않는다' : '3~5번'})
+[보조 키워드] ${input.subKeywords.map((k) => spacedKeyword(k)).join(', ') || '없음'}`;
+}
+
 export function articlePrompt(p: DojoProfile, input: ArticleInput, regionNote: string | null) {
-  return `[글 종류] ${kindLabel(input.kind)}
+  const story = isStory(input);
+  const brief = story ? input.brief : undefined;
+  const [lo, hi] = targetRangeForInput(input);
+  return `${todayLine()}
+[글 종류] ${kindLabel(input.kind)}
 [주요 독자] ${APP.ages} 유아 학부모
 [목표 지역] ${input.region}${regionNote ? `\n[주의] ${regionNote}` : ''}
 [주제] ${input.topic}
-[주요 키워드] ${input.mainKeyword} (본문에는 "${spacedKeyword(input.mainKeyword)}"처럼 자연스럽게, 3~5번)
-[보조 키워드] ${input.subKeywords.map((k) => spacedKeyword(k)).join(', ') || '없음'}
+${keywordLines(input)}
 [문체] ${input.tone}${input.tone === '따뜻한 설명형' ? ' — 친근한 해요체 ("~해요", "~드려요"). 딱딱한 "~합니다"는 쓰지 않는다' : ' — 차분한 존댓말, 너무 딱딱하지 않게'}${writerLine(input.writer)}
 [마무리] ${input.ending} — 마지막 섹션의 끝 문단으로 쓴다. 마무리 · 인사만 담은 섹션을 따로 만들지 않는다.
 [${APP.nameLabel}] "${p.name}" — 도입이나 마무리 문단에 글자 그대로 자연스럽게 1~2번 넣는다. 광고 문구처럼 되풀이하지 않는다.
-[분량] 본문(소제목+문단) 공백 제외 ${targetRangeFor(input.kind)[0]}~${targetRangeFor(input.kind)[1]}자 목표, 최소 ${minCharsFor(input.kind)}자. 분량을 위해 사실을 만들지 말고 교육적 설명 · 지도 방향 · 가정에서 도울 점으로 채우되, "아이에게 물어보세요" 같은 가정 대화 권유는 글 전체에서 한 번만.
-[구성] ${KIND_GUIDE[input.kind]}
-[섹션 id] s1, s2, s3 … 순서대로. 첫 섹션(도입)은 heading 빈 문자열 가능. 섹션 5~7개.
+[분량] 본문(소제목+문단) 공백 제외 ${lo}~${hi}자 목표${story ? `, 최소 ${minCharsForInput(input)}자. 분량은 주제 설명 글감으로 채우고, 같은 사실을 되풀이하거나 재료에 없는 일을 만들어 채우지 않는다.` : `, 최소 ${minCharsForInput(input)}자.`} ${story
+    ? (brief
+      ? '있었던 일과 주제 설명 글감으로만 쓴다. 짜임: 있었던 일 하나 → 그것을 이해시키는 설명 (예: "처음엔 반죽을 손끝으로만 콕콕 찔러 봤어요. 이 나이 아이들은 낯선 촉감을 손끝부터 조심스럽게 탐색하거든요."). 일반 육아 조언 · 입학 권유 · 주제와 상관없는 유치원 소개로 늘리지 않는다. 인사 · 감사 문장은 합쳐서 3문장 이하. 아이들을 "원아" · "원생"처럼 딱딱하게 부르지 않는다 ("우리 아이들", "○○반 친구들").'
+      : '재료가 담긴 만큼만 쓴다. 원장님 · 선생님 이야기 속 놀이 · 장면 · 아이들 모습 · 선생님이 도운 것을 구체적으로 풀어 쓰고, 재료에 없는 일반론(놀이 · 발달 일반 설명, 교육 효과, 가정 대화 권유)으로 늘리지 않는다.')
+    : '분량을 위해 사실을 만들지 말고 교육적 설명 · 지도 방향 · 가정에서 도울 점으로 채우되, "아이에게 물어보세요" 같은 가정 대화 권유는 글 전체에서 한 번만.'}
+[구성] ${brief ? PURPOSE_GUIDE[brief.purpose] : KIND_GUIDE[input.kind]}
+[섹션 id] s1, s2, s3 … 순서대로. 첫 섹션(도입)은 heading 빈 문자열 가능. ${story ? `섹션 ${brief ? '3~4' : '3~5'}개. 섹션 첫 문장에서 앞 섹션을 "그 ○○"처럼 받아 잇지 않는다. 글을 어떻게 읽으라는 해설("~라는 뜻이에요", "구분해서 보시면 돼요")을 쓰지 않는다.` : '섹션 5~7개.'}
 [사진 제안] photoSuggestions 는 실제 사진을 넣기 좋은 자리 2~3곳 (사진 설명이 있으면 그것 기준).
 
 [${APP.place} 정보 — 사실]
 ${profileBlock(p, input)}
 
-[이번 글 재료 — 사실]
-${factsBlock(input)}`;
+[이번 글 재료 — 사실${story ? '. 원장님 · 선생님이 쓴 이야기가 중심. "선생님이 도운 점" · "전달 가치" · "관찰 장면" 같은 항목 이름을 글에 쓰지 않는다' : ''}]
+${factsBlock(input)}${brief ? `
+[글 성격] ${brief.purpose} — ${brief.note}
+${briefBlock(brief)}` : ''}`;
 }
 
 export function expandPrompt(doc: ArticleDoc, current: number, min = MIN_CHARS) {
@@ -122,21 +172,84 @@ export function polishPrompt(doc: ArticleDoc, input: ArticleInput) {
   const kws = [input.mainKeyword, ...input.subKeywords].filter(Boolean).map((k) => `"${k}" → "${spacedKeyword(k)}"`).join(', ');
   return `아래 블로그 글을 학부모가 처음부터 끝까지 한 번에 읽는다고 생각하고 흐름을 다듬어라.
 고칠 것:
-1. 섹션과 문단이 앞 내용을 이어받게 연결한다. 섹션마다 처음부터 다시 소개하거나 같은 뜻을 되풀이하는 문장은 지우거나 합친다.
+1. ${isStory(input) ? '문단 안 문장은 앞 내용을 이어받게 연결하되, 섹션 첫 문장을 "그 ○○", "그렇게 ~" 처럼 앞 섹션을 받아 시작하지 않는다.' : '섹션과 문단이 앞 내용을 이어받게 연결한다.'} 섹션마다 처음부터 다시 소개하거나 같은 뜻을 되풀이하는 문장은 지우거나 합친다.
 2. 문장 사이 연결이 끊기는 곳(갑자기 주제가 바뀜, 접속이 어색함)을 자연스럽게 잇는다.
-3. 검색어를 그대로 끼워 넣은 듯한 표현을 띄어 쓴 자연스러운 말로 바꾼다 (${kws || '키워드 없음'}). 주요 키워드는 본문 전체 3~5번.
+3. 검색어를 그대로 끼워 넣은 듯한 표현을 띄어 쓴 자연스러운 말로 바꾼다 (${kws || '키워드 없음'}). 주요 키워드는 본문 전체 ${input.keywordPlan?.length || isStory(input) ? '2~3번 (억지로 넣은 문장은 키워드를 빼거나 문장을 지운다)' : '3~5번'}.
 4. 같은 어미 · 같은 시작어가 연달아 나오면 바꾼다.
 5. 효과를 보장하지 않는다는 해명 · 단서 문장("~라고 말할 수는 없어요", "~가 바로 달라지는 건 아니에요")과 글 주제와 상관없이 끼워 넣은 유치원 서비스 소개를 지운다. 글 자체를 설명하는 문장도 지운다 ("이것은 특정 아이 이야기가 아니라 일반적인 기준이에요", "이어서 ~를 나눠 볼게요", "오늘은 ~를 안내해 드려요" 같은 예고 · 해명).
 6. 연결은 내용으로 한다. 섹션 첫 문장에서 앞 섹션 내용을 억지로 다시 말하거나 키워드를 끼워 넣지 않는다 ("~를 생각했다면 ~도 볼까요?" 같은 이음말 반복 금지).${KINDER_POLISH(input.writer)}
 지킬 것: 사실(유치원 이름, 지역, 요일, 시간, 반 이름, 활동 내용, 경력)은 글자 그대로 둔다. 새 사실 · 사례 · 수치 · 일정을 더하지 않는다.
-섹션 id · 순서 · 소제목은 유지한다 (소제목은 어색할 때만 짧게 고친다). 이모지 수는 그대로. 분량은 공백 제외 ${minCharsFor(input.kind)}자 아래로 줄이지 않는다. 같은 권유("아이에게 물어보세요" 등)가 여러 번이면 하나만 남긴다. 인사만 담은 마지막 섹션이 따로 있으면 앞 섹션 끝에 합친다 (섹션 수가 하나 줄어도 됨).
+섹션 id · 순서 · 소제목은 유지한다 (소제목은 어색할 때만 짧게 고친다). 이모지 수는 그대로. 분량은 공백 제외 ${minCharsForInput(input)}자 아래로 줄이지 않는다. 같은 권유("아이에게 물어보세요" 등)가 여러 번이면 하나만 남긴다. 인사만 담은 마지막 섹션이 따로 있으면 앞 섹션 끝에 합친다 (섹션 수가 하나 줄어도 됨).
 titleCandidates · tags · photoSuggestions · reviewFlags 는 그대로 둔다. 같은 JSON 형식으로 전체를 출력하라.
 
 ${JSON.stringify(doc)}`;
 }
 
+// 자세히 쓰기 검색어 확인: 네이버 후보(검색량 포함)에서 이야기와 맞는 것을 고르고, 넣을 문장 예시를 만듦 (태권 글뚝딱 2026-10-28에서 옮김)
+export function keywordPlanPrompt(o: { region: string; kind: string; topic: string; story: string; candidates: { keyword: string; volume: number | null }[] }) {
+  return `아래 [이야기]로 유치원 네이버 블로그 글을 쓴다. 학부모가 실제로 검색할 주요 검색어 1개와 보조 검색어 0~2개를 골라라.
+- [네이버 검색어 후보]가 있으면 그중에서 이야기와 실제로 맞는 말만 고른다. 검색량이 커도 이야기와 상관없으면 고르지 않는다 (예: 이야기와 상관없는 "유치원가방" · "유치원선물").
+- 후보에 맞는 말이 없으면 이야기 속 말(놀이 · 행사 이름 등)을 그대로 쓴다. 이야기에 없는 말을 만들지 않는다.
+- "유치원" 한 낱말처럼 너무 넓은 말은 주요로 고르지 않는다. 이야기의 중심(놀이 · 행사 · 생활 주제)이 드러나는 말을 주요로 한다 (예: "유치원 소풍", "촉감놀이"). 넓은 말은 보조로만.
+- 다른 유치원 이름, 어린이집 · 영어유치원 · 놀이학교 · 학원, 다른 지역 이름, 원장 · 교사 채용이나 매매 같은 학부모가 찾지 않는 말은 고르지 않는다.
+- 검색어마다 sentence: 그 말이 자연스럽게 들어간 본문 문장 예시 1개. 이야기에 있는 사실만 쓴다 (띄어쓰기 · 조사 변형 가능). 해요체. 아이 이름은 쓰지 않는다 ("한 친구").
+- why: 원장님 · 선생님께 보여 줄 짧은 이유 (해요체, 25자 이내).
+- others: 원장님 · 선생님이 바꿀 때 보여 줄 다른 후보 3~5개 (같은 형식, 위에서 고른 것 제외).
+[글 종류] ${kindLabel(o.kind)}
+[유치원 지역] ${o.region}
+[주제] ${o.topic}
+[이야기] ${o.story}
+[네이버 검색어 후보] ${o.candidates.length ? o.candidates.map((c) => `${c.keyword}(${c.volume ?? '검색량 모름'})`).join(', ') : '없음 (이야기 속 말로 고른다)'}`;
+}
+
+// 자세히 쓰기 ① → ②: 재료를 읽고 글 성격 · 사실 · 확인 질문 · 주제 설명 글감을 한 번에 (태권 글뚝딱 2026-10-28 GPT 검토: 감정 · 성과를 고르게 하는 질문 금지)
+export function briefPrompt(o: { kind: string; topic: string; story: string }) {
+  return `${todayLine()}
+원장님 · 선생님이 고른 글 종류: ${kindLabel(o.kind)} (참고만. 주제와 재료가 다른 성격이면 실제 성격을 따른다)
+주제: ${o.topic}
+재료(원문): ${o.story}
+
+- purpose: 소식(지난 일 · 행사의 후기) / 안내(앞으로 할 일) / 교육(놀이 · 생활 습관 · 교육 방법) / 성장(아이 변화) / 모집(입학 · 원아 모집 안내) 중 하나.
+- note: 원장님 · 선생님께 보여 줄 한 문장, 해요체 (예: "운동회 이야기를 전하는 소식 글로 준비했어요").
+- facts: 재료를 장면 · 결과 단위로 나눈다. 숫자 · 인원 · 나이 · 반 이름은 붙은 항목과 한 덩어리로 둔다 ("햇살반 친구 5명이 이어달리기를 끝까지 달림"은 하나). quote 는 원문 일부 그대로, text 는 정리한 문장 (아이 이름은 "한 친구"로). 원문에 없는 것(감정, 아이의 말, 준비 과정, 합계)은 만들지 않는다. 숫자가 어느 항목에 붙는지 애매하면 unclear true.
+- check: unclear 인 것이 있으면 하나만 확인 질문 (quote 원문 인용, question 은 예/아니오로 답하는 해요체). 없으면 둘 다 빈 문자열. 감정 · 행동 · 성과를 새로 제안하는 질문 금지.
+- notes: 학부모가 "아, 그렇구나" 할 만한 주제 설명 5~7개, 각 1~2문장, 유치원 교사라면 누구나 동의할 정확한 내용만. 좋은 것: 그 놀이 · 활동이 어떤 것이고 아이들이 무엇을 해 보는지, 이 또래(만 3~5세 유아)에게 흔히 보이는 모습, 행사 · 나들이가 아이들에게 어떤 자리인지. 금지: 우리 아이들 · 우리 유치원에 대한 주장, 발달 · 건강 효과 보장, 아이 진단 · 평가, 육아 조언, 입학 권유, 기관마다 다른 규정 · 비용 단정, 낱말 뜻풀이("운동회는 운동하는 날이다").
+- exclude: 이 글에 넣으면 안 되는 흔한 군더더기 2~4개 (예: 입학 상담 안내, 일반 육아 조언). 주제 자체를 넣지 않을 것으로 두지 않는다.
+- topicGap: 주제에 이유 · 주장 · 설명할 거리가 있는데 재료에 그 내용이 없으면, 원장님 · 선생님께 그것을 한두 줄 적어 달라는 해요체 질문 한 문장 (예: 주제 "학습지 대신 놀이로 배우는 이유", 재료는 바깥놀이 장면뿐 → "학습지 대신 놀이로 배우게 하시는 이유를 한두 줄 적어 주시겠어요?"). 재료가 주제를 담고 있으면 빈 문자열.
+- asks: 재료에 장면 · 아이들이 한 말 · 선생님이 도운 내용이 적으면, 원장님 · 선생님이 한 줄로 답할 수 있는 물음 2~3개 (이 재료에 맞게 구체적으로, 해요체, 예: "이어달리기 때 아이들은 바통을 어떻게 건넸나요?"). 답을 정해 주는 물음 · 감정이나 성과를 넣어 묻는 물음 금지. 재료가 충분하면 빈 배열.`;
+}
+
+// 다듬은 글에서 지어낸 문장 · 틀린 숫자 · 해설 · 되풀이만 찾아 그 문장만 고침 (문단을 통째로 지우지 않음 — 적용은 코드: article.ts applyVerifyFixes)
+export function verifyPrompt(doc: ArticleDoc, p: DojoProfile, input: ArticleInput) {
+  const kws = [input.mainKeyword, ...input.subKeywords].filter(Boolean);
+  return `아래 [글]을 [사실]과 대조해 문제 문장을 찾아라.
+문제로 볼 것
+- 지어냄: 우리 아이들 · 유치원 · 행사에 대해 사실에 없는 내용 (감정, 아이의 말, 노력, 준비 과정, 인원, 발달 · 건강 효과, 일정, 금액)
+- 틀림: 숫자 · 나이 · 반 이름 · 날짜가 사실과 다름
+- 해설: 글을 어떻게 읽으라는 메타 문장 ("~라는 뜻이에요", "구분해서 보시면 돼요")
+- 되풀이: 앞 문장과 같은 내용 반복
+문제가 아닌 것: 인사 · 감사 표현, [주제 설명 글감]에 있는 일반 설명, ${APP.place} 정보에 있는 사실, 주제 · ${APP.place} 이름 · 검색어(${kws.join(', ') || '없음'}).
+sentence 는 글에 있는 문장 그대로 (한 문장). fix 는 고친 문장, 지울 거면 빈 문자열. 검색어가 든 문장은 지우지 말고 검색어를 남긴 채 고친다. 문제가 없으면 issues 빈 배열.
+
+[사실 — ${APP.place}]
+${profileBlock(p, input)}
+
+[사실 — 이번 글]
+${todayLine()}
+주제: ${input.topic}
+${factsBlock(input)}${input.brief ? `
+${briefBlock(input.brief)}` : ''}
+
+[글]
+${doc.sections.map((s) => `${s.heading ? `## ${s.heading}\n` : ''}${s.paragraphs.join('\n')}`).join('\n\n')}`;
+}
+
 // 흐름 2차 점검 (2026-10-27 사용자: 블로그에 올려 보니 흐름 · 낱말이 어울리지 않는 곳이 있음)
 // 다듬기가 전체를 다시 쓰는 것과 달리, 어색한 문장만 골라 그 문장만 바꿈 → 사실 · 분량이 덜 흔들림 (적용은 코드: article.ts applyFixes)
+// 이야기 글(자세히 쓰기)은 주제 설명 글감의 일반 설명을 단정문으로 바꾸지 않음
+// (2026-10-28 유치원판 시험: "~해 볼 수 있어요"를 "~해요"로 바꾸자 우리 아이들이 한 일처럼 읽혀, 다음 지어낸 문장 검사가 22곳을 지워 1,131자 → 623자)
+const STORY_PROOF_5 = '5. 같은 추측 · 일반론("~겠지요")이 여러 번 이어지는 곳만 줄인다. 주제 설명(놀이 · 활동이 어떤 것인지)을 우리 아이들이 실제로 한 일 · 느낀 것처럼 바꾸지 않는다 ("~해 볼 수 있어요"를 "~했어요" · "~해요"로 바꾸지 않음). 문장을 지우기보다 고친다.';
+
 export function proofreadPrompt(doc: ArticleDoc, input: ArticleInput) {
   return `아래 블로그 글을 학부모 입장에서 소리 내어 끝까지 읽고, 읽다가 걸리는 문장만 찾아 고쳐라. 괜찮은 문장은 건드리지 않는다.
 찾을 것:
@@ -144,7 +257,7 @@ export function proofreadPrompt(doc: ArticleDoc, input: ArticleInput) {
 2. 섹션 첫 문장에서 앞 섹션 말을 다시 꺼내 억지로 잇는 이음 문장 ("필요한 도움을 생각하다 보면 ~", "기다려주는 마음은 ~에도 이어질 수 있어요") → 지우거나 그 섹션 내용으로 바로 시작
 3. 해요체 사이에 섞인 "~합니다 · ~습니다 · ~겠습니다" → 해요체로 (글 끝 "○○ 드림" 줄은 그대로)
 4. 같은 낱말 · 같은 표현의 반복 (세 번 넘게 나오는 말, 연달아 같은 어미)
-5. "~겠지요", "~수 있어요" 같은 추측 · 일반론이 이어지는 곳 → 담백한 단정문으로 (없는 사실을 만들지는 않는다)
+${isStory(input) ? STORY_PROOF_5 : '5. "~겠지요", "~수 있어요" 같은 추측 · 일반론이 이어지는 곳 → 담백한 단정문으로 (없는 사실을 만들지는 않는다)'}
 6. 메모를 그대로 붙여 넣은 듯 어색한 문장 · 띄어쓰기 틀린 말 ("소풍갔어요" → "소풍을 갔어요")
 7. 유치원 글에 섞인 어린이집 말 (입소 · 보육료 · 보육교사 · 연장보육 · 영아 · "어린이집") → 유치원 말로
 지킬 것: 사실(${APP.place} 이름, 지역, 반 이름, 장소, 활동, 일정)은 글자 그대로 둔다. 새 사실 · 숫자 · 장면을 더하지 않는다. 이모지는 지우지 않는다.
@@ -168,11 +281,18 @@ export function reviewPrompt(doc: ArticleDoc, p: DojoProfile, input: ArticleInpu
 ${profileBlock(p, input)}
 
 [사실 — 이번 글]
-${reviewWriter(p, input.writer)}${factsBlock(input)}
+${todayLine()}
+주제: ${input.topic}
+${reviewWriter(p, input.writer)}${factsBlock(input)}${briefAnswers(input)}
 
 [글]
 ${doc.sections.map((s) => `(${s.id}) ${s.heading ?? ''}\n${s.paragraphs.join('\n')}`).join('\n\n')}`;
 }
+// ② 단계 물음 답 · 주제 설명도 사실 (2026-10-28 유치원판 시험: 물음에 적은 "한 친구는 왕관을 동생 반에 선물하고 싶다고 했어요"를 사실에 없다고 경고)
+const briefAnswers = (input: ArticleInput) => {
+  const b = isStory(input) ? input.brief : undefined;
+  return b ? `${askLines(b)}${b.topicAnswer ? `\n- 원장님 · 선생님 설명: ${b.topicAnswer}` : ''}` : '';
+};
 // 글쓴이도 사실 (2026-10-27 요요유치원 시험: "원장으로서" · "햇님반 담임으로서"를 사실에 없다고 경고 — 점검에 글쓴이를 넘기지 않았음)
 const reviewWriter = (p: DojoProfile, w?: Writer) =>
   !w ? '' : w.role === '원장' ? `글쓴이: ${p.name} 원장님${w.name.trim() ? ` (${w.name.trim()})` : ''}\n` : `글쓴이: ${writerLabel(w)} (담임)\n`;
@@ -219,6 +339,21 @@ const CARD_SUB_RULE = `sub 는 꼭 2문장, 60~110자:
 과장 · 보장 금지, 이모지 금지.`;
 // 답 없이 끝나는 카드 글 (있으면 한 번 더 만듦)
 export const VAGUE_SUB = /\?|궁금하(시)?지요|살펴(봐요|볼까요|보세요)|함께 볼까요|알아볼까요|생각해 볼까요/;
+// 자세히 쓰기 글의 카드 (태권 글뚝딱 2.2.9, 2026-10-28 사용자: 글은 좋은데 카드 문구 · 제목이 문제 — 큰 소식은 빠지고 일반 설명 카드가 우리 일처럼 읽힘)
+export type CardInput = { kind?: string; topic?: string; facts?: { story?: string }; brief?: ArticleBrief };
+export function cardBriefRule(b: ArticleBrief) {
+  const facts = b.facts.filter((f) => !(f.unclear && b.answer !== '맞아요')).map((f) => `- ${f.text}`);
+  return `[있었던 일 — 카드의 중심]
+${facts.join('\n')}${askLines(b)}${b.topicAnswer ? `
+- 원장님 · 선생님 설명: ${b.topicAnswer}` : ''}
+[이 글의 카드 규칙 — 위 규칙보다 먼저]
+- title 은 위 예시 같은 일반 설명이 아니라 [있었던 일]로 쓴다 (예: "햇살반이 이어달리기를 끝까지 달렸어요").
+- 있었던 일이 여러 개면 가장 큰 소식 · 아이들이 가장 많이 함께한 일을 먼저, 날짜 · 반 이름 · 인원은 글자 그대로 쓴다. 가장 큰 소식은 꼭 어느 카드 title 에 들어간다.
+- 카드마다 [있었던 일]을 하나 이상 담는다. 놀이 소개 · 발달 설명 같은 일반 설명은 한 문장까지만, 일반 설명만으로 카드 한 장을 채우지 않는다.
+- 같은 사실 · 같은 문장을 두 카드에 되풀이하지 않고, 한 카드 안에서 title 과 sub 가 같은 말을 되풀이하지 않는다. 있었던 일이 적으면 나눠 담고, 남는 자리는 글에 있는 그 일의 의미 · 장면으로 채운다.
+- 일반 설명을 우리 유치원이 그렇게 가르쳤다 · 아이들이 그렇게 했다처럼 쓰지 않는다 (예: 재료에 없는데 "블록 놀이로 수 개념을 익혀요").
+- sub 를 "~하는 놀이예요" · "~하는 활동이에요" 같은 정의 · 설명으로 끝내지 않는다.`;
+}
 const sectionsFull = (doc: ArticleDoc) => doc.sections.map((s) => `(${s.id}) ${s.heading ?? ''}: ${s.paragraphs.join(' ')}`).join('\n');
 
 // 카드 장면 규칙: 안전 · 개인정보 (기획안 v0.2 8장)
@@ -239,8 +374,9 @@ const MATCH_RULE = `제목과 답 맞추기 (꼭 지킬 것):
 // 재료가 주제 한 줄뿐이면 질문 제목 금지 (글에 답이 없음)
 const NO_QUESTION = '이 글은 재료가 적어 질문에 답할 구체 내용이 없다. 세 장 모두 title 을 물음표 없는 문장으로 쓴다 (카드1도).';
 
-export function cardCheckPrompt(doc: ArticleDoc, title: string, cards: { title: string; sub: string; scene: string; afterSectionId: string }[], kind?: string, writer?: Writer, noQuestion = false) {
-  const r = cardRoles(kind);
+export function cardCheckPrompt(doc: ArticleDoc, title: string, cards: { title: string; sub: string; scene: string; afterSectionId: string }[], input?: CardInput, writer?: Writer, noQuestion = false) {
+  const brief = storyBrief(input);
+  const r = cardRoles(input?.kind, brief?.purpose);
   return `아래 [카드] 3장을 [글]과 비교해 점검하고, 틀린 곳만 고쳐 같은 JSON 형식으로 3장 모두 출력하라. 맞는 카드는 글자 그대로 둔다.
 카드 역할: 카드1 = ${r[0].guide}, 카드2 = ${r[1].guide}, 카드3 = ${r[2].guide}.${cardWriter(writer)}${noQuestion ? `\n${NO_QUESTION}` : ''}
 점검할 것:
@@ -265,27 +401,32 @@ ${sectionsFull(doc)}`;
 const cardWriter = (w?: Writer) =>
   w ? `\n카드 문구 시점: ${w.role === '교사' ? `"${w.className?.trim() || '우리 반'} 친구들"처럼 반 시점` : '유치원 전체 시점'}.` : '';
 
-export function cardCopyPrompt(doc: ArticleDoc, title: string, kind?: string, writer?: Writer, noQuestion = false) {
-  const r = cardRoles(kind);
+export function cardCopyPrompt(doc: ArticleDoc, title: string, input?: CardInput, writer?: Writer, noQuestion = false) {
+  const brief = storyBrief(input);
+  const r = cardRoles(input?.kind, brief?.purpose);
   return `아래 블로그 글로 카드뉴스 3장 문구를 만들어라. 글에 있는 사실과 메시지만 쓴다.
 카드1 = ${r[0].guide}, 카드2 = ${r[1].guide}, 카드3 = ${r[2].guide}.
 세 장이 이 글 주제 하나로 이어지게 쓴다. 글 주제와 상관없는 유치원 정보(다른 서비스 · 활동)는 카드에 쓰지 않는다. 날짜 · 행사 이름은 글에 적힌 그대로.${cardWriter(writer)}
 ${CARD_TITLE_RULE}
-${CARD_SUB_RULE}\n${MATCH_RULE}${noQuestion ? `\n${NO_QUESTION}` : ''}
+${CARD_SUB_RULE}\n${MATCH_RULE}${noQuestion ? `\n${NO_QUESTION}` : ''}${brief ? `
+${cardBriefRule(brief)}` : ''}
 ${SCENE_RULES}
 afterSectionId 는 그 카드를 넣기 좋은 섹션 id (카드1은 도입 뒤, 카드2 · 카드3은 내용이 가장 가까운 섹션 뒤).
 
-[제목] ${title}
+[제목] ${title}${input?.topic ? `
+[주제] ${input.topic}` : ''}
 [섹션]
 ${sectionsFull(doc)}`;
 }
 
 // 카드 한 장 문구만 새로 (그림 · 장면은 그대로라 장면과 어울리게)
-export function cardOnePrompt(doc: ArticleDoc, title: string, index: number, current: { title: string; sub: string; scene: string }, others: string[], kind?: string, writer?: Writer, noQuestion = false) {
-  return `아래 블로그 글로 카드뉴스 ${index + 1}번 카드(${cardRoles(kind)[index]?.guide ?? '이 글의 메시지'})의 문구를 새로 만들어라. 글에 있는 사실과 메시지만 쓴다. 글 주제와 상관없는 ${APP.place} 정보는 쓰지 않는다.${cardWriter(writer)}
+export function cardOnePrompt(doc: ArticleDoc, title: string, index: number, current: { title: string; sub: string; scene: string }, others: string[], input?: CardInput, writer?: Writer, noQuestion = false) {
+  const brief = storyBrief(input);
+  return `아래 블로그 글로 카드뉴스 ${index + 1}번 카드(${cardRoles(input?.kind, brief?.purpose)[index]?.guide ?? '이 글의 메시지'})의 문구를 새로 만들어라. 글에 있는 사실과 메시지만 쓴다. 글 주제와 상관없는 ${APP.place} 정보는 쓰지 않는다.${cardWriter(writer)}
 지금 문구와 다른 표현으로 쓰고, 다른 카드 제목과 겹치지 않게. 이 카드는 카드${index + 1}이다. 아이 이름 · 금액 · 입학 약속 · 진단하는 말 금지.
 ${CARD_TITLE_RULE}
-${CARD_SUB_RULE}\n${MATCH_RULE}${noQuestion ? `\n${NO_QUESTION}` : ''}
+${CARD_SUB_RULE}\n${MATCH_RULE}${noQuestion ? `\n${NO_QUESTION}` : ''}${brief ? `
+${cardBriefRule(brief)}` : ''}
 그림은 바꾸지 않으므로 그림 장면과 어긋나지 않게 쓴다. 그림 장면: ${current.scene}
 
 [지금 문구] ${current.title} / ${current.sub}

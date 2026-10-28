@@ -3,13 +3,13 @@ import { useApp } from '../App';
 import { assetUrl, call, type Card, type CardSet } from '../api';
 import { Chips, Msg, useMsg } from './ui';
 import { FirstTip } from '../guide/voice';
-import { CARD_STYLES, type CardMode, type CardSize, type CardStyle } from '../../shared/types';
+import { CARD_STYLES, type BriefPurpose, type CardMode, type CardSize, type CardStyle } from '../../shared/types';
 
 export interface CardPref { style: CardStyle; size: CardSize; mode: CardMode }
 
 import { cardRoles } from '../../shared/cardRoles';
 
-function CardBox({ card, cs, articleId, busy, onChanged, kind }: { card: Card; cs: CardSet; articleId: string; busy: boolean; onChanged: () => void; kind?: string }) {
+function CardBox({ card, cs, articleId, busy, onChanged, kind, purpose }: { card: Card; cs: CardSet; articleId: string; busy: boolean; onChanged: () => void; kind?: string; purpose?: BriefPurpose }) {
   const { info } = useApp();
   const [title, setTitle] = useState(card.copy.title);
   const [sub, setSub] = useState(card.copy.sub);
@@ -38,7 +38,7 @@ function CardBox({ card, cs, articleId, busy, onChanged, kind }: { card: Card; c
       )}
       <div style={{ marginTop: 8 }}>
         {/* 2026-10-18 사용자: "설명이 부족하다" → 카드 역할 · 칸 이름 · 버튼마다 하는 일 */}
-        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>카드 {card.index + 1} · {cardRoles(kind)[card.index]?.label ?? ''}</div>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>카드 {card.index + 1} · {cardRoles(kind, purpose)[card.index]?.label ?? ''}</div>
         {card.overflow && <div className="note warn">글자가 카드 밖으로 넘쳐요. 아래 글을 조금 줄이고 [문구 적용]을 눌러 주세요.</div>}
         <div className="hint" style={{ fontWeight: 600 }}>큰 글씨 (카드 제목)</div>
         <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -61,7 +61,7 @@ function CardBox({ card, cs, articleId, busy, onChanged, kind }: { card: Card; c
   );
 }
 
-export function CardsPanel({ articleId, cs, pref, setPref, busy, onChanged, hasVersion, kind }: { articleId: string; cs: CardSet | null; pref: CardPref; setPref: (p: CardPref) => void; busy: boolean; onChanged: () => void; hasVersion: boolean; kind?: string }) {
+export function CardsPanel({ articleId, cs, pref, setPref, busy, onChanged, hasVersion, kind, purpose }: { articleId: string; cs: CardSet | null; pref: CardPref; setPref: (p: CardPref) => void; busy: boolean; onChanged: () => void; hasVersion: boolean; kind?: string; purpose?: BriefPurpose }) {
   const { info } = useApp();
   const msg = useMsg();
   const make = async () => {
@@ -105,7 +105,7 @@ export function CardsPanel({ articleId, cs, pref, setPref, busy, onChanged, hasV
         </div>
       )}
       <Msg m={msg.m} />
-      {cs && <div className="cards">{cs.cards.map((c) => <CardBox key={c.id} card={c} cs={cs} articleId={articleId} busy={busy} onChanged={onChanged} kind={kind} />)}</div>}
+      {cs && <div className="cards">{cs.cards.map((c) => <CardBox key={c.id} card={c} cs={cs} articleId={articleId} busy={busy} onChanged={onChanged} kind={kind} purpose={purpose} />)}</div>}
     </div>
   );
 }

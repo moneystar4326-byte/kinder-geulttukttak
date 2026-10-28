@@ -17,7 +17,7 @@ npm run build     # out/ 에 메인 · 화면 빌드
 npm start         # 앱 실행 (VS Code 터미널이면 아래 주의)
 npm test          # 단위 + 통합 시험
 npm run lint      # 타입 검사
-npm run dist      # Windows 설치파일 → release/Kinder-Geulttukttak-Setup-1.0.0.exe (GitHub 이 한글 파일 이름을 지워서 영어 이름)
+npm run dist      # Windows 설치파일 → release/Kinder-Geulttukttak-Setup-1.0.1.exe (GitHub 이 한글 파일 이름을 지워서 영어 이름)
 ```
 
 - **VS Code 안 터미널 주의**: VS Code 가 `ELECTRON_RUN_AS_NODE=1` 을 넣어 두어 `npm start` 가 멈춤. `env -u ELECTRON_RUN_AS_NODE npm start` (Git Bash) 또는 일반 터미널에서 실행. 설치본 사용자에게는 해당 없음. `npm ci` 뒤 electron 실행 파일이 없으면 `node node_modules/electron/install.js`.

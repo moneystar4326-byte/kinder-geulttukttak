@@ -1,6 +1,6 @@
 // 입력 검사 · 결과 점검 (AI 없이 코드로 하는 것)
 import type { ArticleDoc, ArticleInput, DojoProfile, ReviewFlag } from './types';
-import { bodyText, countDoc, minCharsFor } from './count';
+import { bodyText, countDoc, minCharsFor, minCharsForInput } from './count';
 import { uncheckedMentions } from './strengths';
 import { APP } from './kinder';
 
@@ -9,6 +9,8 @@ export function missingInputs(input: ArticleInput): string[] {
   const miss: string[] = [];
   const f = input.facts;
   if (!input.topic.trim()) miss.push('주제');
+  // 자세히 쓰기 "어떤 일이 있었나요?"에 이야기가 있으면 칸별 필수는 묻지 않음 (이야기에 있는 것만 씀)
+  if (f.story?.trim()) return input.subKeywords.length > 2 ? [...miss, '보조 키워드는 2개까지'] : miss;
   // 주요 키워드는 비워도 됨 (주제를 씀 — withKeywordFallback)
   if (input.subKeywords.length > 2) miss.push('보조 키워드는 2개까지');
   if (input.kind === '수업 후기' && !f.activities.trim()) miss.push('한 놀이 · 활동');
@@ -66,7 +68,7 @@ const KINDER_BANNED: [RegExp, string][] = [
 export function localFlags(doc: ArticleDoc, profile: DojoProfile, input?: ArticleInput): ReviewFlag[] {
   const flags: ReviewFlag[] = [];
   const counts = countDoc(doc);
-  const min = minCharsFor(input?.kind);
+  const min = input ? minCharsForInput(input) : minCharsFor();
   if (counts.withoutSpaces < min) flags.push({ code: 'too-short', message: `본문이 공백 제외 ${counts.withoutSpaces}자예요 (최소 ${min.toLocaleString()}자).` });
   const avoid = profile.avoidWords.split(',').map((s) => s.trim()).filter(Boolean);
   for (const s of doc.sections) {
@@ -112,7 +114,7 @@ export function spacedKeyword(kw: string) {
 // 원장님 · 선생님이 적은 재료(메모 · 칸)와 유치원 정보를 한 덩어리로 — 여기 있는 금액 · 이름만 사실로 봄
 export function factsText(input: ArticleInput, profile: DojoProfile) {
   const f = input.facts;
-  return [input.topic, f.activities, f.coachingPoints, f.scenes, f.values, f.extra, f.photoNotes,
+  return [input.topic, f.story ?? '', f.activities, f.coachingPoints, f.scenes, f.values, f.extra, f.photoNotes,
     ...Object.values(f.event ?? {}), ...Object.values(f.recruit ?? {}), ...Object.values(f.growth ?? {}),
     profile.otherFacts ?? '', profile.classFeatures, profile.hours ?? '', profile.classes ?? ''].join('\n');
 }
@@ -120,7 +122,7 @@ export function factsText(input: ArticleInput, profile: DojoProfile) {
 // 이번 글 재료(주제 · 메모 · 칸)만 — 아이 이름은 여기서만 찾음 (유치원 정보의 "자체 조리 급식이"까지 보지 않게)
 export function memoText(input: ArticleInput) {
   const f = input.facts;
-  return [input.topic, f.activities, f.coachingPoints, f.scenes, f.extra, f.photoNotes,
+  return [input.topic, f.story ?? '', f.activities, f.coachingPoints, f.scenes, f.extra, f.photoNotes,
     ...Object.values(f.event ?? {}), ...Object.values(f.recruit ?? {}), ...Object.values(f.growth ?? {})].join('\n');
 }
 
@@ -128,7 +130,7 @@ export function memoText(input: ArticleInput) {
 // 이러면 글에 "무엇을 했는지" 같은 구체 답이 없어 카드 제목을 질문으로 쓰지 않음 (2026-10-27 요요유치원 시험)
 export function thinFacts(input: ArticleInput) {
   const f = input.facts;
-  const own = [f.activities, f.coachingPoints, f.scenes, f.extra, ...Object.values(f.growth ?? {}), ...Object.values(f.event ?? {}), ...Object.values(f.recruit ?? {})].join(' ');
+  const own = [f.story ?? '', f.activities, f.coachingPoints, f.scenes, f.extra, ...Object.values(f.growth ?? {}), ...Object.values(f.event ?? {}), ...Object.values(f.recruit ?? {})].join(' ');
   const flat = (t: string) => t.replace(/[\s.,!?…]/g, '');
   return flat(own.split(input.topic.replace(/…$/, '')).join('')).length < 25;
 }

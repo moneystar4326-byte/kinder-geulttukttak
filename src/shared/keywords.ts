@@ -6,7 +6,9 @@ import { APP } from './kinder';
 // 유치원 글에 자주 나오는 주제 낱말 (메모에 있으면 조회 · 고르기에 씀)
 // 행사 낱말도 같이 (태권 글뚝딱 2026-10-18: 행사 낱말이 없어 행사 글에 엉뚱한 키워드가 붙던 문제)
 const EVENT_TERMS = ['생일잔치', '생일파티', '재롱잔치', '학예회', '운동회', '발표회', '공개수업', '부모참여수업', '참여수업', '견학', '소풍', '나들이', '현장학습', '현장체험학습', '체험학습', '졸업식', '졸업여행', '입학식', '입학설명회', '김장', '할로윈', '핼러윈', '크리스마스', '행사', '공연'];
-const TOPIC_TERMS = ['적응기간', '적응', '편식', '분리불안', '숲체험', '숲유치원', '바깥놀이', '오감놀이', '미술놀이', '물놀이', '누리과정', '방과후과정', '방과후', '특성화', '종일반', '처음학교로', '원아모집', '입학', '추첨', '등원', '하원', '통학버스', '급식', '간식', '한글', '수학', '영어', '감기', ...EVENT_TERMS];
+const TOPIC_TERMS = ['적응기간', '적응', '편식', '분리불안', '숲체험', '숲유치원', '바깥놀이', '오감놀이', '미술놀이', '물놀이', '누리과정', '방과후과정', '방과후', '특성화', '종일반', '처음학교로', '원아모집', '입학', '추첨', '등원', '하원', '통학버스', '급식', '간식', '한글', '수학', '영어', '감기',
+  // 놀이 · 생활 낱말 (태권 글뚝딱 2026-10-28: 이야기 속 동작 낱말이 없어 검색어 확인에 주제가 안 잡히던 문제를 유치원 말로)
+  '블록놀이', '모래놀이', '역할놀이', '신체놀이', '산책', '텃밭', '요리활동', '쿠킹', '그림책', '율동', ...EVENT_TERMS];
 const T = APP.term; // 유치원
 
 export function topicTerms(memo: string) {
@@ -34,6 +36,17 @@ export function hintWords(memo: string, region: string) {
 const num = (v?: string) => (v == null ? 0 : /^\d+$/.test(v) ? Number(v) : /<\s*10/.test(v) ? 5 : 0);
 export const volumeOf = (r: KeywordRow) => num(r.pc) + num(r.mobile);
 
+// 자세히 쓰기 검색어 확인에 AI에게 보낼 후보 (태권 글뚝딱 2026-10-28 실제 흐름 시험: 검색량순으로만 자르니 주제와 상관없는 넓은 말이 주제 키워드를 밀어냄)
+// 우리와 맞지 않는 것을 빼고, 재료의 주제 낱말이나 "유치원"이 든 것만, 검색량순
+export function planCandidates(rows: KeywordRow[], material: string, region: string, profile?: KeywordProfile | null, max = 25) {
+  const words = [...topicTerms(material), T];
+  return rows
+    .filter((r) => r.keyword && !foreignKeyword(r.keyword, region, profile) && words.some((w) => r.keyword.replace(/\s/g, '').includes(w)))
+    .map((r) => ({ keyword: r.keyword, volume: r.pc == null && r.mobile == null ? null : volumeOf(r) }))
+    .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
+    .slice(0, max);
+}
+
 // 유치원 유형 낱말 (유치원 정보의 유형 → "○○유치원" 앞에 와도 되는 낱말)
 // 2026-10-27 어린이집판 실제 조회: 다른 유형 키워드("가정어린이집")가 골라져 사실과 달라짐 → 유치원판은 단설 · 병설 · 사립 기준
 const TYPE_WORDS: Record<string, string[]> = {
@@ -48,7 +61,9 @@ const OTHER_PLACE = /어린이집|놀이학교|영어유치원|영유|어학원|
 const NOT_PARENT = /매매|매물|임대|컨설팅|개원|창업|인수|양도|권리금|구인|채용|교사모집|자격증|급여|원장/;
 
 // 우리 유치원과 맞지 않는 키워드인지: 어린이집 · 영어유치원 · 놀이학교 · 학원, 원장 · 창업자 쪽 말(매매 · 임대 · 채용), 다른 유형(병설유치원 — "유치원병설"처럼 뒤에 오는 건 보지 않음), "○○유치원"의 ○○이 우리 동네 · 주변 아파트 · 우리 유형 · 주제 낱말이 아님(다른 동네 · 다른 유치원 이름)
-export function foreignKeyword(keyword: string, region: string, profile?: Pick<DojoProfile, 'facilityType' | 'nearbyAreas'> | null) {
+type KeywordProfile = Pick<DojoProfile, 'facilityType' | 'nearbyAreas'> & { name?: string };
+
+export function foreignKeyword(keyword: string, region: string, profile?: KeywordProfile | null) {
   const k = keyword.replace(/\s/g, '');
   if (OTHER_PLACE.test(k) || NOT_PARENT.test(k)) return true;
   const own = TYPE_WORDS[profile?.facilityType ?? ''] ?? [];
@@ -59,12 +74,14 @@ export function foreignKeyword(keyword: string, region: string, profile?: Pick<D
   const known = [...regionWords(region), ...apts, ...own, ...TOPIC_TERMS].sort((a, b) => b.length - a.length);
   let rest = k.slice(0, at);
   for (const w of known) rest = rest.split(w).join('');
-  return rest.length > 0;
+  // 우리 유치원 이름의 일부도 우리 이름 ("신대방요요유치원"의 "요요유치원" — 태권 글뚝딱 2026-10-27 실제 도장 이름에서 옮겨 옴)
+  const ownName = (profile?.name ?? '').replace(/\s/g, '').replace(new RegExp(`${T}$`), '');
+  return rest.length > 0 && !(rest.length >= 2 && ownName.includes(rest));
 }
 
 // 고르기: 우리와 맞지 않는 키워드(foreignKeyword)를 먼저 빼고, 주제 낱말(없으면 "유치원")이 들어간 키워드만 → 주요 = 주제 낱말이 든 것 중 검색량 최대,
 // 보조 = 지역 · 주변 아파트 이름이 든 것 1개 + 다른 키워드 1개. 관련 없는 건 낱말 조건에서 빠짐
-export function pickKeywords(rows: KeywordRow[], memo: string, region: string, profile?: Pick<DojoProfile, 'facilityType' | 'nearbyAreas'> | null) {
+export function pickKeywords(rows: KeywordRow[], memo: string, region: string, profile?: KeywordProfile | null) {
   if (!rows.length) return { main: '', subs: [] as string[] }; // 조회 실패 → 화면에서 주제로 대신
   const terms = topicTerms(memo);
   const apts = (profile?.nearbyAreas ?? []).flatMap((a) => [a.name, a.name.replace(/아파트$/, '')]).map((n) => n.replace(/\s/g, '')).filter((n) => n.length >= 2);

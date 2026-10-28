@@ -1,6 +1,6 @@
 // 카드뉴스 3장의 역할을 글 종류에 맞게 (태권 글뚝딱 2026-10-18: 행사 글에서 수업 장면을 찾다 다른 수업 이야기를 끌어오던 문제)
 // 2026-10-27 사용자: 카드 아래 글이 "궁금하지요 · 살펴봐요"로 끝나 부실 → 고민만이 아니라 답까지, 수업은 무엇을 어떻게 했는지까지
-import type { ArticleKind } from './types';
+import type { ArticleBrief, ArticleKind, BriefPurpose } from './types';
 
 export interface CardRole { label: string; guide: string }
 
@@ -33,4 +33,34 @@ export const CARD_ROLES: Record<ArticleKind, [CardRole, CardRole, CardRole]> = {
   ],
 };
 
-export const cardRoles = (kind?: ArticleKind | string) => CARD_ROLES[(kind as ArticleKind) in CARD_ROLES ? (kind as ArticleKind) : '수업 후기'];
+// 자세히 쓰기 글은 고른 종류 대신 글 성격으로 (태권 글뚝딱 2.2.9, 2026-10-28 사용자: 결과 글인데 카드2가 재료에 없는 일반 설명
+// — 재료에 없는 "지도 과정" 칸을 일반 설명으로 채우고, 가장 큰 결과는 카드에 없었음). 유치원판은 놀이 · 생활 말로
+export const BRIEF_CARD_ROLES: Record<BriefPurpose, [CardRole, CardRole, CardRole]> = {
+  '소식': [
+    { label: '가장 큰 소식', guide: '있었던 일 중 가장 큰 소식 (날짜 · 행사 이름 · 반 이름은 글자 그대로)' },
+    { label: '그 밖의 결과 · 장면', guide: '있었던 일 중 나머지 결과 · 장면' },
+    { label: '의미', guide: '이 일이 아이들에게 어떤 자리였는지 — 있었던 일에 기대어' },
+  ],
+  '안내': [
+    { label: '언제 · 무엇', guide: '있었던 일에 적힌 날짜 · 행사 이름 그대로, 무엇을 하는지' },
+    { label: '하는 일', guide: '있었던 일에 적힌 활동 · 준비물' },
+    { label: '참여 안내', guide: '있었던 일에 적힌 참여 방법 · 안내만' },
+  ],
+  '교육': [
+    { label: '배운 것', guide: '있었던 일에 적힌 놀이 · 배운 내용' },
+    { label: '실제 장면', guide: '있었던 일에 적힌 실제 놀이 · 활동 장면 — 무엇을 어떻게 했는지' },
+    { label: '알아 두면 좋은 점', guide: '그 놀이 · 내용을 학부모가 이해하도록 돕는 설명 하나와 있었던 일' },
+  ],
+  '성장': [
+    { label: '이전 모습', guide: '있었던 일에 적힌 이전 모습' },
+    { label: '그사이 · 결과', guide: '있었던 일에 적힌 선생님이 도운 과정이나 결과 (도운 과정이 재료에 없으면 결과 · 장면으로, 지어내지 않는다)' },
+    { label: '지금 모습', guide: '있었던 일에 적힌 지금 모습과 메시지' },
+  ],
+  '모집': CARD_ROLES['모집 안내'],
+};
+
+// 글 성격은 이야기를 적은 글(자세히 쓰기)에서만 씀 — 글 쓰기(articlePrompt)와 같은 기준
+export const storyBrief = (input?: { facts?: { story?: string }; brief?: ArticleBrief }) => (input?.facts?.story?.trim() ? input.brief : undefined);
+
+export const cardRoles = (kind?: ArticleKind | string, purpose?: BriefPurpose) =>
+  purpose ? BRIEF_CARD_ROLES[purpose] : CARD_ROLES[(kind as ArticleKind) in CARD_ROLES ? (kind as ArticleKind) : '수업 후기'];
