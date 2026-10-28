@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
+import path from 'node:path';
 import type { Cipher } from '../credentials';
 import { ApiError } from '../services/errors';
 import { checkAccess, LICENSE_PUBLIC_KEY, verifyLicense, type Access, type LicenseClaims } from './token';
@@ -43,7 +44,11 @@ const WHY: Record<string, string> = {
 export const NEED_CONNECT = '새 글 만들기는 계정 연결 뒤에 쓸 수 있어요. 왼쪽 아래 [계정 연결]을 눌러 주세요 (14일 무료).';
 
 // PC 식별값: Windows MachineGuid · 맥 IOPlatformUUID 의 해시 (원래 값은 서버로 보내지 않음). 못 읽으면 자료 폴더에 만든 임의 값
-export function readDeviceHash(fallbackFile: string): string {
+// prefix 는 앱마다 다르게: 같은 PC에서 태권 글뚝딱과 같은 번호를 쓰면 서버가 같은 연결로 보고 갱신 비밀값을 바꿔
+// 한쪽 앱 연결이 풀리고, 체험 PC 기록도 겹침 (2026-10-28 사용자: 태권도판과 부딪히면 안 됨)
+export const LEGACY_DEVICE_PREFIX = 'geulttukttak2-device';
+export const DEVICE_PREFIX = 'geulttukttak-kinder-device';
+export function readDeviceHash(fallbackFile: string, prefix = DEVICE_PREFIX): string {
   let raw = '';
   if (process.platform === 'win32') {
     try {
@@ -60,7 +65,20 @@ export function readDeviceHash(fallbackFile: string): string {
     try { raw = fs.readFileSync(fallbackFile, 'utf8').trim(); } catch { /* 처음 */ }
     if (!raw) { raw = randomBytes(16).toString('hex'); fs.writeFileSync(fallbackFile, raw); }
   }
-  return createHash('sha256').update(`geulttukttak2-device:${raw.toLowerCase()}`).digest('base64url');
+  return createHash('sha256').update(`${prefix}:${raw.toLowerCase()}`).digest('base64url');
+}
+
+// 이 PC가 쓸 기기 번호 종류를 처음 한 번 정해 device-kind.txt 에 남김.
+// 1.0.1 전에 이미 계정을 연결한 PC(license.bin 있음)는 예전 번호 그대로: 바꾸면 '다른 PC 이용권'으로 잠기고, 체험은 PC 1대라 다시 연결도 막힘
+export function pickDeviceHash(dataDir: string, read = readDeviceHash): string {
+  const kindFile = path.join(dataDir, 'device-kind.txt');
+  let kind = '';
+  try { kind = fs.readFileSync(kindFile, 'utf8').trim(); } catch { /* 처음 */ }
+  if (kind !== 'legacy' && kind !== 'kinder') {
+    kind = fs.existsSync(path.join(dataDir, 'license.bin')) ? 'legacy' : 'kinder';
+    fs.writeFileSync(kindFile, kind);
+  }
+  return read(path.join(dataDir, 'device-id.txt'), kind === 'legacy' ? LEGACY_DEVICE_PREFIX : DEVICE_PREFIX);
 }
 
 const b64u = (b: Buffer) => b.toString('base64url');

@@ -13,7 +13,7 @@ import { createBrowserDraft } from './services/browser-draft';
 import { loadSettings } from './settings';
 import { restoreBackup } from './backup';
 import { initLog, log } from './log';
-import { createLicense, readDeviceHash } from './license';
+import { createLicense, pickDeviceHash } from './license';
 import { APP } from '../shared/kinder';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'gtd-asset', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
@@ -102,7 +102,7 @@ app.whenReady().then(() => {
   // 이용권 (계정 연결 · 체험 · 구독 기간). 시험 때 GTD_SERVER 로 시험 홈페이지를 가리킬 수 있음 (서명 키가 같아야 통과)
   const cipher = { available: () => safeStorage.isEncryptionAvailable(), encrypt: (s: string) => safeStorage.encryptString(s), decrypt: (b: Buffer) => safeStorage.decryptString(b) };
   const license = createLicense({
-    file: path.join(dataDir, 'license.bin'), cipher, device: readDeviceHash(path.join(dataDir, 'device-id.txt')),
+    file: path.join(dataDir, 'license.bin'), cipher, device: pickDeviceHash(dataDir),
     openExternal: (url) => shell.openExternal(url),
     focus: () => { if (win) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); } },
     log,
