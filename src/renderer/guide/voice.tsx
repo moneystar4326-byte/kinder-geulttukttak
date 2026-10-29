@@ -9,7 +9,8 @@ export type Line = { id: string; file?: string; say: string; buttons?: string[] 
 const LINES = new Map<string, Line>(script.groups.flatMap((g) => g.items as Line[]).map((i) => [i.id, i]));
 export const line = (id: string): Line => LINES.get(id) ?? { id, say: '' };
 
-export const KAKAO_CHAT = 'https://pf.kakao.com/_xiHmJX/chat';
+// 유치원 전용 카카오톡 채널 '유치원 글뚝딱' (2026-10-29 · 태권 글뚝딱 채널 _xiHmJX 와 따로)
+export const KAKAO_CHAT = 'https://pf.kakao.com/_UexnWX/chat';
 export const open = (url: string) => call('shell:open', url).catch(() => {});
 
 // 앱 전체에서 소리는 한 번에 하나만: 같은 화면에서 동시에 뜬 안내는 차례로, 그 뒤에 뜬 안내 · [다시 듣기]는 앞 소리를 끊고 재생
