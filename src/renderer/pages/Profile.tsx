@@ -128,7 +128,7 @@ export function ProfilePage() {
                   <button className="btn small primary" disabled={!area.trim()} onClick={() => { set({ nearbyAreas: areas.map((a, j) => (j === editAt ? { ...a, name: area.trim() } : a)) }); setArea(''); setEditAt(null); }}>고치기</button>
                   <button className="btn small" onClick={() => { setArea(''); setEditAt(null); }}>그만두기</button>
                 </>
-              : <button className="btn small" disabled={!area.trim()} onClick={() => { set({ nearbyAreas: [...areas, { name: area.trim(), kind: /초$/.test(area.trim()) ? '학교' : '직접 입력', source: 'manual' }] }); setArea(''); }}>추가</button>}
+              : <button className="btn small" disabled={!area.trim() || areas.some((a) => a.name.trim() === area.trim())} title={areas.some((a) => a.name.trim() === area.trim()) ? '이미 있는 이름이에요' : undefined} onClick={() => { set({ nearbyAreas: [...areas, { name: area.trim(), kind: /초$/.test(area.trim()) ? '학교' : '직접 입력', source: 'manual' }] }); setArea(''); }}>추가</button>}
           </div>
           {<p className="hint">이름을 누르면 위 칸에서 고쳐 쓸 수 있어요 (종류 · 거리는 그대로). 카카오 아파트 이름에는 제목 · 태그에서 "아파트"가 자동으로 붙어요 ("롯데낙천대" → [롯데낙천대아파트 유치원]).</p>}
           <div className="chips">
