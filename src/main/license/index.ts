@@ -31,8 +31,8 @@ export type LicenseStatus =
 const productParam: Record<string, string> = { product: PRODUCT };
 
 const WHY: Record<string, string> = {
-  'trial-ended': '무료 체험이 끝났어요. 구독하시면 바로 이어서 쓸 수 있어요.',
-  'paid-ended': '구독 기간이 끝났어요. 입금하시면 확인 뒤 바로 풀려요.',
+  'trial-ended': '무료 체험이 끝났어요. VIP 회원이 되시면 바로 이어서 쓸 수 있어요.',
+  'paid-ended': '이용 기간이 끝났어요. 입금하시면 확인 뒤 바로 풀려요.',
   revoked: '이용이 멈춰 있어요. 카카오톡으로 문의해 주세요.',
   'recheck-needed': '14일 동안 이용권을 확인하지 못했어요. 인터넷에 연결한 뒤 [다시 확인]을 눌러 주세요.',
   'clock-back': '컴퓨터 시계가 맞지 않아요. Windows 날짜 · 시간을 확인해 주세요.',

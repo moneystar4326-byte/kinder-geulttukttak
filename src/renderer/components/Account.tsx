@@ -21,7 +21,7 @@ export function planLine(l: LicenseStatus) {
   if (l.state === 'locked') return '새 글 만들기 잠김';
   if (l.inGrace) return '입금 확인 기다리는 중';
   if (l.plan === 'paid' && l.until && new Date(l.until).getUTCFullYear() >= 2090) return 'VIP 회원 · 기간 제한 없음'; // 홈페이지 admin_grant_vip (기한 2099-12-31)
-  return `${l.plan === 'paid' ? '구독 중' : '무료 체험'} · ${l.daysLeft}일 남음`;
+  return `${l.plan === 'paid' ? '이용 중' : '무료 체험'} · ${l.daysLeft}일 남음`;
 }
 
 function useConnect() {
@@ -65,8 +65,8 @@ export function LockBanner() {
   const { busy, msg, connect, refresh } = useConnect();
   if (!license) return null;
   if (license.state === 'ok') {
-    if (license.inGrace) return <div className="note warn">구독 기간이 지났어요. 입금 확인을 기다리는 동안 며칠은 그대로 쓸 수 있어요.</div>;
-    if (license.plan === 'trial' && license.daysLeft <= 3) return <div className="note warn">무료 체험이 {license.daysLeft}일 남았어요. <button className="btn link" onClick={() => open(`${SITE}/price`)}>구독 안내 보기</button></div>;
+    if (license.inGrace) return <div className="note warn">이용 기간이 지났어요. 입금 확인을 기다리는 동안 며칠은 그대로 쓸 수 있어요.</div>;
+    if (license.plan === 'trial' && license.daysLeft <= 3) return <div className="note warn">무료 체험이 {license.daysLeft}일 남았어요. <button className="btn link" onClick={() => open(`${SITE}/price`)}>VIP 안내 보기</button></div>;
     return null;
   }
   return (
@@ -78,7 +78,7 @@ export function LockBanner() {
         {license.state === 'none' || ['other-device', 'other-dojang', 'broken', 'other-product'].includes((license as { why: string }).why)
           ? <button className="btn primary" disabled={!!busy} onClick={connect}>{busy === 'connect' ? '연결 기다리는 중…' : '계정 연결'}</button>
           : <button className="btn primary" disabled={!!busy} onClick={refresh}>{busy === 'refresh' ? '확인 중…' : '다시 확인'}</button>}
-        {license.state === 'locked' && ['trial-ended', 'paid-ended'].includes(license.why) && <button className="btn" onClick={() => open(`${SITE}/my`)}>구독 신청 (마이페이지)</button>}
+        {license.state === 'locked' && ['trial-ended', 'paid-ended'].includes(license.why) && <button className="btn" onClick={() => open(`${SITE}/my`)}>VIP 신청 (마이페이지)</button>}
       </div>
       {msg && <div className={`note ${msg.kind}`}>{msg.text}</div>}
     </div>
@@ -111,7 +111,7 @@ export function AccountPanel() {
           ? <button className="btn primary" disabled={!!busy} onClick={connect}>{busy === 'connect' ? '연결 기다리는 중…' : '계정 연결'}</button>
           : <button className="btn" disabled={!!busy} onClick={refresh}>{busy === 'refresh' ? '확인 중…' : '다시 확인'}</button>}
         {license.state !== 'none' && <button className="btn" disabled={!!busy} onClick={connect}>다른 계정으로 다시 연결</button>}
-        <button className="btn link" onClick={() => open(`${SITE}/my`)}>마이페이지 (구독 · 입금)</button>
+        <button className="btn link" onClick={() => open(`${SITE}/my`)}>마이페이지 (VIP · 입금)</button>
       </div>
       {msg && <div className={`note ${msg.kind}`} style={{ marginTop: 10 }}>{msg.text}</div>}
       {license.state !== 'none' && (

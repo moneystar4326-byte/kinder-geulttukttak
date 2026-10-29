@@ -513,6 +513,11 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
                 {prefixes.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
             </Field>
+            {(profile?.greeting?.trim() || profile?.closing?.trim()) && (
+              <Field label="첫인사 · 끝인사" hint={`${APP.place} 정보에 적은 문장을 글 맨 앞 · 맨 끝에 그대로 붙여요`}>
+                <label className="row"><input type="checkbox" checked={input.greetings !== false} onChange={(e) => set({ greetings: e.target.checked })} /> 이 글에 넣기</label>
+              </Field>
+            )}
             <p className="hint">{input.facts.story?.trim() ? '분량: 본문 공백 제외 약 900~1,200자 (② 단계 물음에 답하면 1,200~1,500자). 모자란 분량은 주제 설명으로 채우고, 지어내지 않아요.' : `분량: 본문 공백 제외 최소 1,500자, 목표 1,800~2,200자 (행사 · ${kindLabel('모집 안내')}는 최소 1,000자). 모자라면 사실을 더하지 않고 최대 2번 보완해요.`}</p>
           </div>
           <div className="panel">

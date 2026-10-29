@@ -122,6 +122,18 @@ ${plan.map((k) => `- ${k.role} "${k.keyword}" 예: ${k.sentence}`).join('\n')}`;
 [보조 키워드] ${input.subKeywords.map((k) => spacedKeyword(k)).join(', ') || '없음'}`;
 }
 
+// 유치원 정보의 첫인사 · 끝인사는 코드가 붙이므로 AI는 인사 문장을 쓰지 않음 (두 번 들어가지 않게 — 2026-10-29)
+const greetLine = (p: DojoProfile, input: ArticleInput) => {
+  if (input.greetings === false) return '';
+  const g = p.greeting?.trim();
+  const c = p.closing?.trim();
+  const lines = [
+    g ? `\n[첫인사] 프로그램이 글 맨 앞에 "${g}"를 붙인다. 첫 문단은 "안녕하세요" 같은 인사 · 자기소개 없이 바로 본론으로 시작한다.` : '',
+    c ? `\n[끝인사] 프로그램이 글 맨 끝에 "${c}"를 붙인다. 마지막 문단에 감사 · 작별 인사("감사합니다", "다음에 또 찾아올게요")를 따로 쓰지 않는다.` : '',
+  ];
+  return lines.join('');
+};
+
 export function articlePrompt(p: DojoProfile, input: ArticleInput, regionNote: string | null) {
   const story = isStory(input);
   const brief = story ? input.brief : undefined;
@@ -133,7 +145,7 @@ export function articlePrompt(p: DojoProfile, input: ArticleInput, regionNote: s
 [주제] ${input.topic}
 ${keywordLines(input)}
 [문체] ${input.tone}${input.tone === '따뜻한 설명형' ? ' — 친근한 해요체 ("~해요", "~드려요"). 딱딱한 "~합니다"는 쓰지 않는다' : ' — 차분한 존댓말, 너무 딱딱하지 않게'}${writerLine(input.writer)}
-[마무리] ${input.ending} — 마지막 섹션의 끝 문단으로 쓴다. 마무리 · 인사만 담은 섹션을 따로 만들지 않는다.
+[마무리] ${input.ending} — 마지막 섹션의 끝 문단으로 쓴다. 마무리 · 인사만 담은 섹션을 따로 만들지 않는다.${greetLine(p, input)}
 [${APP.nameLabel}] "${p.name}" — 도입이나 마무리 문단에 글자 그대로 자연스럽게 1~2번 넣는다. 광고 문구처럼 되풀이하지 않는다.
 [분량] 본문(소제목+문단) 공백 제외 ${lo}~${hi}자 목표${story ? `, 최소 ${minCharsForInput(input)}자. 분량은 주제 설명 글감으로 채우고, 같은 사실을 되풀이하거나 재료에 없는 일을 만들어 채우지 않는다.` : `, 최소 ${minCharsForInput(input)}자.`} ${story
     ? (brief

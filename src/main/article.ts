@@ -25,11 +25,11 @@ export function withLocation(doc: ArticleDoc, profile: DojoProfile): ArticleDoc 
   return appendLine(doc, line);
 }
 
-// 본문에 유치원 이름이 한 번도 없으면 마지막 섹션 끝에 한 줄 (2026-10-22 파일럿: 글에 상호명이 안 나옴)
-export function withDojoName(doc: ArticleDoc, profile: DojoProfile): ArticleDoc {
+// 본문(+ 첫인사 · 끝인사)에 유치원 이름이 한 번도 없으면 마지막 섹션 끝에 한 줄 (2026-10-22 파일럿: 글에 상호명이 안 나옴)
+export function withDojoName(doc: ArticleDoc, profile: DojoProfile, extra = ''): ArticleDoc {
   const name = profile.name.trim();
   const flat = (t: string) => t.replace(/\s+/g, '');
-  if (!name || !doc.sections.length || flat(bodyText(doc)).includes(flat(name))) return doc;
+  if (!name || !doc.sections.length || flat(bodyText(doc) + extra).includes(flat(name))) return doc;
   const last = name.charCodeAt(name.length - 1) - 0xac00;
   const josa = last >= 0 && last < 11172 && last % 28 ? '은' : '는';
   const where = dongOf(profile.region) || profile.region.trim();
@@ -44,10 +44,46 @@ export function writerSignLine(input: ArticleInput, profile: DojoProfile) {
   if (w.role === '원장') return `${profile.name.trim()} 원장${name ? ` ${name}` : ''} 드림`;
   return `${w.className?.trim() ? `${w.className.trim()} ` : ''}담임${name ? ` ${name}` : ''} 선생님 드림`;
 }
+// 맨 끝 문단이 글쓴이 줄이면 떼어 냄: 다시 다듬을 때 끝인사를 찾고, 끝인사 → 글쓴이 줄 순서를 지키려고
+export function stripWriterSign(doc: ArticleDoc, input: ArticleInput, profile: DojoProfile): ArticleDoc {
+  const line = writerSignLine(input, profile);
+  const end = doc.sections[doc.sections.length - 1];
+  if (!line || !end || end.paragraphs[end.paragraphs.length - 1]?.trim() !== line) return doc;
+  return { ...doc, sections: [...doc.sections.slice(0, -1), { ...end, paragraphs: end.paragraphs.slice(0, -1) }] };
+}
 export function withWriterSign(doc: ArticleDoc, input: ArticleInput, profile: DojoProfile): ArticleDoc {
   const line = writerSignLine(input, profile);
   if (!line || !doc.sections.length || bodyText(doc).includes(line)) return doc;
   return appendLine(doc, line);
+}
+
+// 첫인사 · 끝인사 (태권 글뚝딱 2.2.11에서 옮김): 유치원 정보에 적은 그대로 첫 문단 앞 · 마지막 문단 뒤에 코드가 붙임
+// 이미 붙어 있으면 떼고 다시 붙여서 두 번 들어가지 않음 (다시 다듬기 등)
+export function greetingsOf(profile: DojoProfile, input: Pick<ArticleInput, 'greetings'>) {
+  if (input.greetings === false) return { greeting: '', closing: '' };
+  return { greeting: profile.greeting?.trim() ?? '', closing: profile.closing?.trim() ?? '' };
+}
+export function stripGreetings(doc: ArticleDoc, profile: DojoProfile): ArticleDoc {
+  const g = profile.greeting?.trim();
+  const c = profile.closing?.trim();
+  const sections = doc.sections.map((s, i) => {
+    let ps = s.paragraphs;
+    if (g && i === 0 && ps[0]?.trim() === g) ps = ps.slice(1);
+    if (c && i === doc.sections.length - 1 && ps[ps.length - 1]?.trim() === c) ps = ps.slice(0, -1);
+    return ps === s.paragraphs ? s : { ...s, paragraphs: ps };
+  });
+  return { ...doc, sections };
+}
+export function withGreetings(doc: ArticleDoc, profile: DojoProfile, input: Pick<ArticleInput, 'greetings'>): ArticleDoc {
+  const { greeting, closing } = greetingsOf(profile, input);
+  const base = stripGreetings(doc, profile);
+  if (!base.sections.length || (!greeting && !closing)) return base;
+  const n = base.sections.length;
+  const sections = base.sections.map((s, i) => ({
+    ...s,
+    paragraphs: [...(greeting && i === 0 ? [greeting] : []), ...s.paragraphs, ...(closing && i === n - 1 ? [closing] : [])],
+  }));
+  return { ...base, sections };
 }
 
 export function titleWithPrefix(title: string, prefix?: string) {
@@ -98,7 +134,9 @@ export async function generateArticle(deps: { db: Db; ai: TextAI; profile: DojoP
     ctx.signal.throwIfAborted();
     // 지역 태그는 코드가 붙임 (동네 · 가까운 아파트 + 유치원)
     const tags = [...new Set([...areaTags(profile.region, profile.nearbyAreas ?? []), ...doc.tags])].slice(0, 15);
-    doc = decorateHeadings(withWriterSign(withDojoName(withLocation({ ...doc, tags }, profile), profile), input, profile)); // 소제목 이모지는 코드가 같은 모양으로
+    const gr = greetingsOf(profile, input);
+    // 순서: 위치 · 유치원 이름 → 첫인사 · 끝인사 → 글쓴이 줄 (끝인사 다음에 "○○ 드림")
+    doc = decorateHeadings(withWriterSign(withGreetings(withDojoName(withLocation({ ...doc, tags }, profile), profile, gr.greeting + gr.closing), profile, input), input, profile)); // 소제목 이모지는 코드가 같은 모양으로
     doc = { ...doc, reviewFlags: mergeFlags(doc, profile, input, aiFlags) };
     const counts = countDoc(doc);
     const short = counts.withoutSpaces < min;
@@ -231,7 +269,12 @@ export async function reviseArticle(deps: { db: Db; ai: TextAI; profile: DojoPro
   } else {
     ctx.step('글 다듬는 중');
     const label = { warmer: '더 따뜻하게', professional: '더 전문적으로', 'less-promo': '홍보 줄이기' }[req.kind];
-    doc = decorateHeadings(await ai.revise(req.kind, base.doc, o, minCharsForInput(art.input)));
+    // 원래 글에 지금 인사 문장이 있을 때만 다시 붙임 (인사를 바꾼 뒤 옛 글을 다듬어도 두 번 들어가지 않게)
+    // 유치원: 글쓴이 줄을 먼저 떼야 끝인사가 마지막 문단으로 보임 (글쓴이 줄은 아래에서 다시 붙임)
+    const noSign = stripWriterSign(base.doc, art.input, profile);
+    const bare = stripGreetings(noSign, profile);
+    const revised = decorateHeadings(await ai.revise(req.kind, bare, o, minCharsForInput(art.input)));
+    doc = bodyText(bare) !== bodyText(noSign) ? withGreetings(revised, profile, art.input) : revised;
     doc = { ...doc, titleCandidates: base.doc.titleCandidates };
     note = label;
   }

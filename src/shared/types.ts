@@ -28,6 +28,8 @@ export interface DojoProfile {
   credentials?: string; // 확인 가능한 내용만
   contact?: string;
   consultLink?: string;
+  greeting?: string; // 글 맨 앞 첫인사 — 코드가 그대로 붙임 (2026-10-29 보람태권도 요청)
+  closing?: string; // 글 맨 끝 끝인사
   blogUrl?: string;
   mapName?: string; // 네이버 지도에서 검색할 유치원 이름 (비우면 유치원 이름) // https://blog.naver.com/아이디 (네이버 초안 입력에 필요)
   logoPath?: string; // 앱 폴더 assets 안으로 복사한 경로
@@ -84,6 +86,7 @@ export interface ArticleInput {
   includeProfile: { philosophy: boolean; classFeatures: boolean; credentials: boolean; contact: boolean; address: boolean };
   withCards: boolean;
   keywordPlan?: KeywordPlanItem[]; // 자세히 쓰기 검색어 확인: 고른 검색어와 넣을 문장 예시 (있으면 이대로 씀)
+  greetings?: boolean; // false 면 이 글에는 첫인사 · 끝인사를 붙이지 않음 (없으면 붙임)
   titlePrefix?: string; // 예: [롯데낙천대아파트 유치원] — 코드가 제목 앞에 붙임 (AI에 동네 이름을 맡기지 않음)
   writer?: Writer; // 이 글을 쓰는 사람. 고른 때의 이름 · 반을 그대로 담음
   writerSign?: boolean; // 글 끝에 글쓴이 한 줄 (코드가 붙임)

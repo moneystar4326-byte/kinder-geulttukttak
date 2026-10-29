@@ -77,6 +77,12 @@ export function ProfilePage() {
           <h2>연락 · 브랜드</h2>
           <Field label="연락처" hint="글마다 넣을지 골라요"><input type="text" value={p.contact ?? ''} onChange={(e) => set({ contact: e.target.value })} /></Field>
           <Field label="상담 링크"><input type="url" value={p.consultLink ?? ''} onChange={(e) => set({ consultLink: e.target.value })} /></Field>
+          <Field label="첫인사" hint="모든 글 맨 앞에 적은 그대로 붙여요 (AI가 바꾸지 않음). 비우면 AI가 알아서 시작해요">
+            <textarea rows={2} value={p.greeting ?? ''} placeholder={`예: 안녕하세요, ${p.name || '○○유치원'}입니다 😊`} onChange={(e) => set({ greeting: e.target.value })} />
+          </Field>
+          <Field label="끝인사" hint="모든 글 맨 끝에 적은 그대로 붙여요. 글마다 [만들기 설정]에서 뺄 수 있어요">
+            <textarea rows={2} value={p.closing ?? ''} placeholder={`예: 오늘도 ${p.name || '○○유치원'}을 아껴 주셔서 감사합니다. 궁금한 점은 언제든 편하게 연락 주세요!`} onChange={(e) => set({ closing: e.target.value })} />
+          </Field>
           <Field label="로고" hint="PNG · JPG (투명 PNG 권장). 카드에 따로 얹어요 (AI가 다시 그리지 않음)">
             <div className="row">
               {p.logoPath ? <img src={assetUrl(info.dataDir, p.logoPath)} alt="로고" style={{ height: 48, border: '1px solid var(--line)', borderRadius: 6, padding: 4, background: '#fff' }} /> : <span className="muted">없음</span>}
