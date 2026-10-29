@@ -36,6 +36,23 @@ export function withDojoName(doc: ArticleDoc, profile: DojoProfile, extra = ''):
   return appendLine(doc, `${name}${josa} ${where ? `${where}에서 ` : ''}아이들과 함께하고 있어요.`);
 }
 
+// 연락처를 넣기로 한 글(모집 · 행사 한 줄 쓰기, 자세히 쓰기에서 고른 글)인데 본문에 연락처가 없으면 마지막 섹션 끝에 한 줄
+// (2026-10-29 유치원 정보 점검: 연락처를 넘겨도 AI가 "유치원으로 문의해 주세요"만 쓰고 번호를 빼먹음)
+export function contactLine(input: ArticleInput, profile: DojoProfile) {
+  if (!input.includeProfile.contact) return '';
+  const items = [profile.contact?.trim(), profile.consultLink?.trim()].filter(Boolean) as string[];
+  return items.length ? `상담 문의: ${items.join(' · ')}` : '';
+}
+export function withContact(doc: ArticleDoc, input: ArticleInput, profile: DojoProfile, extra = ''): ArticleDoc {
+  const line = contactLine(input, profile);
+  if (!line || !doc.sections.length) return doc;
+  const flat = (t: string) => t.replace(/[\s-]/g, '');
+  const text = flat(bodyText(doc) + extra);
+  const items = [profile.contact?.trim(), profile.consultLink?.trim()].filter(Boolean) as string[];
+  if (items.every((x) => text.includes(flat(x)))) return doc;
+  return appendLine(doc, line);
+}
+
 // 유치원: 글 끝 글쓴이 한 줄 (고른 경우만, 적어 준 이름 · 반 그대로 — 기획안 v0.2 4장)
 export function writerSignLine(input: ArticleInput, profile: DojoProfile) {
   const w = input.writer;
@@ -136,7 +153,7 @@ export async function generateArticle(deps: { db: Db; ai: TextAI; profile: DojoP
     const tags = [...new Set([...areaTags(profile.region, profile.nearbyAreas ?? []), ...doc.tags])].slice(0, 15);
     const gr = greetingsOf(profile, input);
     // 순서: 위치 · 유치원 이름 → 첫인사 · 끝인사 → 글쓴이 줄 (끝인사 다음에 "○○ 드림")
-    doc = decorateHeadings(withWriterSign(withGreetings(withDojoName(withLocation({ ...doc, tags }, profile), profile, gr.greeting + gr.closing), profile, input), input, profile)); // 소제목 이모지는 코드가 같은 모양으로
+    doc = decorateHeadings(withWriterSign(withGreetings(withContact(withDojoName(withLocation({ ...doc, tags }, profile), profile, gr.greeting + gr.closing), input, profile, gr.greeting + gr.closing), profile, input), input, profile)); // 소제목 이모지는 코드가 같은 모양으로
     doc = { ...doc, reviewFlags: mergeFlags(doc, profile, input, aiFlags) };
     const counts = countDoc(doc);
     const short = counts.withoutSpaces < min;
@@ -274,7 +291,9 @@ export async function reviseArticle(deps: { db: Db; ai: TextAI; profile: DojoPro
     const noSign = stripWriterSign(base.doc, art.input, profile);
     const bare = stripGreetings(noSign, profile);
     const revised = decorateHeadings(await ai.revise(req.kind, bare, o, minCharsForInput(art.input)));
-    doc = bodyText(bare) !== bodyText(noSign) ? withGreetings(revised, profile, art.input) : revised;
+    // AI가 다시 쓰면 연락처 줄이 빠질 수 있어 다시 확인 (끝인사보다 앞에)
+    const withC = withContact(revised, art.input, profile);
+    doc = bodyText(bare) !== bodyText(noSign) ? withGreetings(withC, profile, art.input) : withC;
     doc = { ...doc, titleCandidates: base.doc.titleCandidates };
     note = label;
   }

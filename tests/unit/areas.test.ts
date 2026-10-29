@@ -47,3 +47,9 @@ test('본문에 주변 이름이 없을 때만 위치 한 줄을 붙임 (받침 
   assert.equal(mentionsNearby('신대방동 유치원', areas), false);
   assert.equal(locationLine('유치원', '서울', []), '');
 });
+
+// 2026-10-29 유치원 정보 점검: 직접 적은 "보라매초"(종류 '학교')도 제목 앞 이름에 들어감
+test('직접 적은 학교 이름도 돌아가며 붙음', () => {
+  const r = prefixRotation('서울 동작구 신대방동', [{ name: '보라매초', kind: '학교', source: 'manual' }]);
+  assert.deepEqual(r, ['[신대방동 유치원]', '[보라매초 근처 유치원]']);
+});

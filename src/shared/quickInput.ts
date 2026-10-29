@@ -28,7 +28,8 @@ export function buildQuickInput(o: { memo: string; profile: DojoProfile | null; 
     kind, topic, audience: AUDIENCES[0], mainKeyword: o.main || fallbackKeyword(base.region, topic), subKeywords: o.subs ?? [], ending: quickEnding(kind, o.writer?.role === '교사'),
     ...(o.writer ? { writer: o.writer, writerSign: !!o.writerSign } : {}),
     facts: { ...base.facts, activities: memo, event: { ...base.facts.event!, when: kind === '행사 안내' ? quickWhen(memo) : '' } },
-    includeProfile: { philosophy: true, classFeatures: true, credentials: true, contact: false, address: false },
+    // 모집 · 행사 글은 "상담 안내로 마무리"인데 연락처를 안 넘기면 AI가 막연한 문의 문장만 씀 (2026-10-29 유치원 정보 점검) → 적어 둔 연락처 · 상담 링크를 넘김
+    includeProfile: { philosophy: true, classFeatures: true, credentials: true, contact: kind === '모집 안내' || kind === '행사 안내', address: false },
     withCards: o.withCards,
     titlePrefix: o.titlePrefix,
   };

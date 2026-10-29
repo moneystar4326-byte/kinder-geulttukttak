@@ -14,6 +14,7 @@ import { childNames, hideChildNames, memoText, plainBody, thinFacts, withKeyword
 import { planCandidates } from '../../shared/keywords';
 import type { ArticleDoc, ArticleInput, CardSet, KeywordRow } from '../../shared/types';
 import { APP } from '../../shared/kinder';
+import { issueMessage } from './messages';
 import { CARD_STYLES } from '../../shared/types';
 import { loadSettings, saveSettings, type AppSettings } from '../settings';
 import { composeClassFeatures } from '../../shared/strengths';
@@ -53,7 +54,7 @@ const Id = z.string().min(1).max(64);
 function handle<A extends z.ZodTypeAny>(channel: string, schema: A, fn: (arg: z.infer<A>) => unknown) {
   ipcMain.handle(channel, async (_e, raw) => {
     const parsed = schema.safeParse(raw);
-    if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? '입력이 올바르지 않아요' };
+    if (!parsed.success) return { ok: false, error: issueMessage(parsed.error.issues[0]) };
     try { return { ok: true, data: await fn(parsed.data) }; } catch (e) {
       const err = e instanceof ApiError ? e : null;
       log(`ipc-${channel}`, e instanceof Error ? e.message : String(e));

@@ -1,7 +1,7 @@
 // 태권 글뚝딱 2.2.11에서 옮김: 유치원 정보의 첫인사 · 끝인사를 글 맨 앞 · 맨 끝에 그대로 (+ 유치원 글쓴이 줄과의 순서)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { stripGreetings, stripWriterSign, withDojoName, withGreetings, withWriterSign, writerSignLine } from '../../src/main/article';
+import { stripGreetings, stripWriterSign, withContact, withDojoName, withGreetings, withWriterSign, writerSignLine } from '../../src/main/article';
 import { articlePrompt } from '../../src/main/services/openai/prompts';
 import { DEMO_INPUT, DEMO_PROFILE } from '../../src/main/services/openai/demo';
 import type { ArticleDoc, ArticleInput, DojoProfile } from '../../src/shared/types';
@@ -64,4 +64,16 @@ test('유치원: 다시 다듬을 때 글쓴이 줄을 떼면 끝인사가 보�
   const again = withWriterSign(withGreetings(stripGreetings(noSign, prof()), prof(), signed), signed, prof());
   assert.deepEqual(again, full);
   assert.deepEqual(stripWriterSign(doc(), signed, prof()), doc());
+});
+
+// 2026-10-29 유치원 정보 점검: 연락처를 넣기로 한 글인데 AI가 번호를 빼먹으면 프로그램이 한 줄 붙임
+test('연락처: 본문에 없으면 끝인사 · 글쓴이 줄보다 앞에 한 줄, 있으면 그대로, 끄면 안 붙임', () => {
+  const p = prof({ contact: '02-000-0000', consultLink: 'https://pf.kakao.com/_x' });
+  const on = { ...signed, includeProfile: { ...signed.includeProfile, contact: true } } as ArticleInput;
+  const full = withWriterSign(withGreetings(withContact(doc(), on, p), p, on), on, p);
+  assert.deepEqual(full.sections[1].paragraphs.slice(-3), ['상담 문의: 02-000-0000 · https://pf.kakao.com/_x', C, writerSignLine(on, p)]);
+  const has = { ...doc(), sections: [doc().sections[0], { id: 's2', heading: '마무리', paragraphs: ['상담은 02 000 0000, https://pf.kakao.com/_x 로 주세요.'] }] } as ArticleDoc;
+  assert.deepEqual(withContact(has, on, p), has);
+  assert.deepEqual(withContact(doc(), { ...on, includeProfile: { ...on.includeProfile, contact: false } } as ArticleInput, p), doc());
+  assert.deepEqual(withContact(doc(), on, prof({ contact: '', consultLink: '' })), doc());
 });

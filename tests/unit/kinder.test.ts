@@ -320,3 +320,12 @@ test('실제 시험 (2026-10-27 요요유치원 글 3편): 사실 점검이 글�
   // 방과후과정 글에 "유치원 바깥놀이"가 주요 키워드가 되던 문제 — 목록 순서가 아니라 메모에 나온 순서
   assert.deepEqual(K.topicTerms('방과후과정 소개해요. 날씨 좋은 날은 바깥놀이터에서 놀아요'), ['방과후과정', '바깥놀이']);
 });
+
+// 2026-10-29 유치원 정보 점검: 한 줄 쓰기 모집 · 행사 글은 적어 둔 연락처를 넘김 (다른 글은 그대로 안 넘김)
+test('한 줄 쓰기: 모집 · 행사 글에만 연락처를 넣음', async () => {
+  const { buildQuickInput } = await import('../../src/shared/quickInput');
+  const q = (memo: string) => buildQuickInput({ memo, profile: null, withCards: false, titlePrefix: '' });
+  assert.equal(q('2027학년도 신입 원아 모집합니다').includeProfile.contact, q('2027학년도 신입 원아 모집합니다').kind === '모집 안내');
+  assert.equal(q('2027학년도 신입 원아 모집합니다').kind, '모집 안내');
+  assert.equal(q('오늘 햇님반 친구들이 낙엽 놀이를 했어요').includeProfile.contact, false);
+});

@@ -17,10 +17,10 @@ export const kinderPrefix = (name: string, kakaoApt: boolean) =>
 
 // 제목 머리말 후보 (돌아가며 씀): 가까운 아파트 4곳 · 직접 적은 이름을 번갈아, 소재 동 이름은 세 편에 한 번 꼭
 // (태권 글뚝딱 2026-10-18: [신대방동 태권도]로 블로그 1번째 · 플레이스 2위 → 이름을 늘리되 소재 동은 세 편에 한 번)
-const KAKAO_KINDS = ['학교', '지하철역', '아파트', '유치원'];
 export function prefixRotation(region: string, areas: NearbyArea[]) {
   const dong = dongOf(region);
-  const manual = areas.filter((a) => a.source === 'manual' && !KAKAO_KINDS.includes(a.kind) && a.name.trim() && a.name.trim() !== dong);
+  // 직접 적은 이름은 종류와 상관없이 씀 (2026-10-29 점검: "보라매초"처럼 초로 끝나 '학교'로 저장된 이름이 말없이 빠졌음)
+  const manual = areas.filter((a) => a.source === 'manual' && a.name.trim() && a.name.trim() !== dong);
   const rest = [...new Set([
     ...near(areas, '아파트').slice(0, 4).map((a) => kinderPrefix(a.name, true)),
     ...manual.map((a) => kinderPrefix(a.name.trim(), false)),
