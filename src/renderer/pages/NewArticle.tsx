@@ -239,6 +239,8 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
   const [quick, setQuick] = useState(local.get('quick-memo', ''));
   const [quickCards, setQuickCards] = useState(true);
   const [quickPrefix, setQuickPrefixState] = useState(local.get('quick-prefix', true));
+  // 태권 글뚝딱 2.2.11에서 옮김: 주변 장소가 비면 [동 유치원] 하나만 계속 붙는데 "돌아가며"로 안내돼 헷갈림
+  const quickNames = prefixNames(profile?.region ?? '', profile?.nearbyAreas ?? []);
   const setQuickPrefix = (v: boolean) => { setQuickPrefixState(v); local.set('quick-prefix', v); };
   const [detail, setDetail] = useState(false); // 항상 한 줄로 쓰기부터 (자세히 쓰기 입력은 그대로 보관)
   useEffect(() => { local.set('quick-memo', quick); }, [quick]);
@@ -294,7 +296,8 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
         {thinMemo(quick) && <p className="hint">💡 {TX.thinMemo}</p>}
         <div className="row" style={{ marginTop: 8 }}><MicButton disabled={!info.secrets.openai || !!busy} onText={(t) => setQuick((q) => appendSpoken(q, t))} /></div>
         <div className="row" style={{ marginTop: 10 }}>
-          <label className="row"><input type="checkbox" checked={quickPrefix} onChange={(e) => setQuickPrefix(e.target.checked)} /> 제목 앞에 동네 이름 붙이기 <span className="hint">({prefixNames(profile?.region ?? '', profile?.nearbyAreas ?? []).join(' · ') || `${APP.place} 정보에 지역 · 주변 장소가 없어요`} 중 돌아가며{dongOf(profile?.region ?? '') ? `, [${dongOf(profile?.region ?? '')} ${APP.term}]는 세 편에 한 번` : ''})</span></label>
+          <label className="row"><input type="checkbox" checked={quickPrefix} onChange={(e) => setQuickPrefix(e.target.checked)} /> 제목 앞에 동네 이름 붙이기 <span className="hint">{quickNames.length > 1 ? `(${quickNames.join(' · ')} 중 돌아가며${dongOf(profile?.region ?? '') ? `, [${dongOf(profile?.region ?? '')} ${APP.term}]은 세 편에 한 번` : ''})` : quickNames.length ? `(주변 장소가 없어 ${quickNames[0]}만 붙어요)` : `(${APP.place} 정보에 지역 · 주변 장소가 없어요)`}</span></label>
+          {quickPrefix && quickNames.length <= 1 && <span className="hint" style={{ flexBasis: "100%", order: 1 }}>가까운 아파트 · 초등학교 · 역 이름을 {APP.place} 정보 → 주변 장소에 적으면 제목 앞 이름이 돌아가며 붙어요. <button className="btn link" onClick={() => go({ page: 'profile' })}>주변 장소 적으러 가기</button></span>}
           <label className="row"><input type="checkbox" checked={quickCards} onChange={(e) => setQuickCards(e.target.checked)} /> 카드뉴스 3장도 만들기 {quickCards && card.mode === 'ai' && <span className="hint">(AI 그림 3장 비용 발생)</span>}</label>
         </div>
         <div className="row" style={{ marginTop: 10 }}>
@@ -504,7 +507,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
                 ))}
               </div>
             </Field>
-            <Field label="제목 앞 동네 이름 (선택)" hint={`고른 그대로 제목 앞에 붙여요 (AI가 만들지 않음). 후보는 ${APP.place} 정보의 주변 장소에서 와요`}>
+            <Field label="제목 앞 동네 이름 (선택)" hint={prefixes.length > 1 ? `고른 그대로 제목 앞에 붙여요 (AI가 만들지 않음). 후보는 ${APP.place} 정보의 주변 장소에서 와요` : `고른 그대로 제목 앞에 붙여요. ${APP.place} 정보 → 주변 장소에 가까운 아파트 · 초등학교 · 역 이름을 적으면 후보가 늘어요`}>
               <select value={input.titlePrefix ?? ''} onChange={(e) => set({ titlePrefix: e.target.value })}>
                 <option value="">붙이지 않음</option>
                 {prefixes.map((p) => <option key={p} value={p}>{p}</option>)}
