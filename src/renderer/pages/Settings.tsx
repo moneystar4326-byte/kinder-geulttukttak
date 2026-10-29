@@ -77,7 +77,7 @@ export function SettingsPage() {
         <SecretRow name="openai" label="OpenAI API 키" hint={`OpenAI 사이트에서 만든 키 (sk- 로 시작). 글 · 그림 사용료는 ${APP.owner} OpenAI 계정에서 쓴 만큼 나가요.`} />
         <div className="row" style={{ marginBottom: 10 }}>
           <button className="btn primary" onClick={() => setGuideAt('A03')}>🔊 비서와 같이 키 만들기</button>
-          <button className="btn link" onClick={() => open('https://growmoment.co.kr/guide')}>캡처로 보는 안내 (홈페이지)</button>
+          <button className="btn link" onClick={() => open('https://kinder.growmoment.co.kr/guide')}>캡처로 보는 안내 (홈페이지)</button>
         </div>
         <details className="expert"><summary>전문가 설정 · 그대로 두셔도 돼요</summary>
         <div className="grid2">

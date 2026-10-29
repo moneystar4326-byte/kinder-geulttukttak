@@ -80,5 +80,7 @@ export function checkAccess(c: LicenseClaims, ctx: { device: string; dojang: str
 // 한국 시각 자정 기준 만료 시각. 가입일을 1일째로 세서 days일째가 끝나는 밤 12시
 // 예: 10/21 가입 · 14일 → 11/3까지 쓰고 11/4 0시(KST)에 끝
 
-// 홈페이지 서버 서명 키의 공개키 (홈페이지 lib/license/public-key.ts 와 같음)
-export const LICENSE_PUBLIC_KEY = "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEALsV2FYpd8PkN75ZpGZUZUTxNcANos8Rd0SybooyUmeY=\n-----END PUBLIC KEY-----\n";
+// 유치원 홈페이지(kinder.growmoment.co.kr) 서명 키의 공개키 (D:\유치원홈페이지 lib/license/public-key.ts 와 같음 · 1.0.2부터)
+export const LICENSE_PUBLIC_KEY = "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAtTTDhAf9DAgRXGCYiluXwqOYG763Tc1ggZgUFC+uFYE=\n-----END PUBLIC KEY-----\n";
+// 1.0.1까지 쓰던 growmoment.co.kr(태권 글뚝딱과 같은 서버)의 공개키. 예전 이용권을 알아보고 "다시 연결" 안내만 함 (이걸로 열어 주지 않음)
+export const OLD_SERVER_PUBLIC_KEY = "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEALsV2FYpd8PkN75ZpGZUZUTxNcANos8Rd0SybooyUmeY=\n-----END PUBLIC KEY-----\n";

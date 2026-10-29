@@ -11,7 +11,7 @@ export type LicenseStatus =
 
 export type Latest = { latest: string; must: boolean; notes: string[]; download: string } | null;
 
-const SITE = 'https://growmoment.co.kr';
+const SITE = 'https://kinder.growmoment.co.kr';
 const open = (url: string) => call('shell:open', url).catch(() => {});
 // 기한은 한국 시각 자정에 끝남 → 그 전날까지로 보여 줌
 const lastDay = (iso: string) => new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'long', day: 'numeric' }).format(new Date(new Date(iso).getTime() - 1));

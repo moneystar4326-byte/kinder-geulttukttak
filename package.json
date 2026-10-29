@@ -1,7 +1,7 @@
 {
   "name": "geulttukttak-kinder",
   "productName": "유치원 글뚝딱",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "유치원 글뚝딱 — 유치원 블로그 작가 (설치형)",
   "main": "out/main/index.js",

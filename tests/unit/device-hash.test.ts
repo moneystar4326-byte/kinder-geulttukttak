@@ -22,10 +22,10 @@ test('처음 쓰는 PC는 유치원 번호, 한 번 정하면 연결한 뒤에�
   assert.equal(pickDeviceHash(dir, fake), `hash:${DEVICE_PREFIX}`);
 });
 
-test('1.0.0 때 이미 연결한 PC는 예전 번호 그대로 (잠기지 않게), 연결을 풀어도 그대로', () => {
+test('1.0.2: 1.0.0 때 연결한 PC(legacy)도 유치원 번호 · device-kind.txt 는 건드리지 않음 (1.0.1로 되돌릴 때 예전 서버 계정이 이어지게)', () => {
   const dir = tmp();
   fs.writeFileSync(path.join(dir, 'license.bin'), 'x');
-  assert.equal(pickDeviceHash(dir, fake), `hash:${LEGACY_DEVICE_PREFIX}`);
-  fs.rmSync(path.join(dir, 'license.bin'));
-  assert.equal(pickDeviceHash(dir, fake), `hash:${LEGACY_DEVICE_PREFIX}`);
+  fs.writeFileSync(path.join(dir, 'device-kind.txt'), 'legacy');
+  assert.equal(pickDeviceHash(dir, fake), `hash:${DEVICE_PREFIX}`);
+  assert.equal(fs.readFileSync(path.join(dir, 'device-kind.txt'), 'utf8'), 'legacy');
 });

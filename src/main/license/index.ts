@@ -1,5 +1,5 @@
 // 이용권 (앱 2.1 · 2026-10-22): 홈페이지 카카오 계정에 이 PC를 연결하고, 서버가 서명한 이용권으로 체험 · 구독 기간을 확인
-// [계정 연결] → 브라우저 growmoment.co.kr/app/connect → (카카오 로그인) → [이 PC 연결하기]
+// [계정 연결] → 브라우저 kinder.growmoment.co.kr/app/connect (1.0.2부터 유치원 전용 서버 · 태권 글뚝딱과 DB도 따로) → (카카오 로그인) → [이 PC 연결하기]
 // → 브라우저가 127.0.0.1:임시포트/callback 으로 1회용 코드를 넘김 → 앱이 코드 + verifier(PKCE)로 이용권을 받음
 // 이용권은 공개키로 인터넷 없이 확인. 켤 때 · 6시간마다 새로 받아 입금 확인 · 중지가 반영됨 (14일 못 받으면 잠김)
 // 잠겨도 막는 건 AI로 새로 만드는 일뿐: 지난 글 보기 · 복사 · 내보내기 · 네이버 초안은 그대로
@@ -11,10 +11,10 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Cipher } from '../credentials';
 import { ApiError } from '../services/errors';
-import { checkAccess, LICENSE_PUBLIC_KEY, verifyLicense, type Access, type LicenseClaims } from './token';
+import { checkAccess, LICENSE_PUBLIC_KEY, OLD_SERVER_PUBLIC_KEY, verifyLicense, type Access, type LicenseClaims } from './token';
 import { APP, PRODUCT } from '../../shared/kinder';
 
-export const SERVER = (process.env.GTD_SERVER || 'https://growmoment.co.kr').replace(/\/$/, '');
+export const SERVER = (process.env.GTD_SERVER || 'https://kinder.growmoment.co.kr').replace(/\/$/, '');
 const REFRESH_EVERY = 6 * 3600_000;
 const CONNECT_WAIT = 10 * 60_000;
 
@@ -23,7 +23,7 @@ type Stored = { token: string; refresh: string; activationId: string; lastSeen?:
 export type LicenseStatus =
   | { state: 'none' } // 아직 연결 안 함
   | { state: 'ok'; plan: 'trial' | 'paid'; daysLeft: number; inGrace: boolean; until: string | null; dojang: string; checkedAt: string | null }
-  | { state: 'locked'; why: Exclude<Access, { canCreate: true }>['why'] | 'broken' | 'other-product'; message: string; dojang: string | null; checkedAt: string | null };
+  | { state: 'locked'; why: Exclude<Access, { canCreate: true }>['why'] | 'broken' | 'other-product' | 'moved'; message: string; dojang: string | null; checkedAt: string | null };
 
 // 상품 구분 (2026-10-27): 홈페이지 서버가 이용권에 product 를 넣어 주면 다른 상품(태권 글뚝딱) 이용권은 잠금.
 // 아직 product 가 없는 이용권(지금 서버)은 막지 않음 — 서버에서 구분을 넣기 전까지는 같은 계정이 두 앱을 다 쓸 수 있음
@@ -40,6 +40,7 @@ const WHY: Record<string, string> = {
   'other-dojang': '이용권 정보가 맞지 않아요. [계정 연결]을 다시 해 주세요.',
   broken: '이용권을 읽지 못했어요. [계정 연결]을 다시 해 주세요.',
   'other-product': `${APP.appName}용 이용권이 아니에요. ${APP.appName} 계정으로 [계정 연결]을 다시 해 주세요.`,
+  moved: `${APP.appName} 계정 서버가 새 주소로 옮겨졌어요. 왼쪽 아래 [계정 연결]을 한 번 더 눌러 주세요. 만든 글 · 설정은 그대로예요.`,
 };
 export const NEED_CONNECT = '새 글 만들기는 계정 연결 뒤에 쓸 수 있어요. 왼쪽 아래 [계정 연결]을 눌러 주세요 (14일 무료).';
 
@@ -68,17 +69,10 @@ export function readDeviceHash(fallbackFile: string, prefix = DEVICE_PREFIX): st
   return createHash('sha256').update(`${prefix}:${raw.toLowerCase()}`).digest('base64url');
 }
 
-// 이 PC가 쓸 기기 번호 종류를 처음 한 번 정해 device-kind.txt 에 남김.
-// 1.0.1 전에 이미 계정을 연결한 PC(license.bin 있음)는 예전 번호 그대로: 바꾸면 '다른 PC 이용권'으로 잠기고, 체험은 PC 1대라 다시 연결도 막힘
+// 1.0.2부터 모든 PC가 유치원 번호. 새 서버에는 예전 기록이 없어 1.0.0 때 연결한 PC(device-kind.txt=legacy)도 옛 번호를 지킬 이유가 없음.
+// device-kind.txt 는 읽지도 고치지도 않음: 1.0.1로 되돌려 설치하면 예전 서버 계정이 예전 번호로 그대로 이어지게
 export function pickDeviceHash(dataDir: string, read = readDeviceHash): string {
-  const kindFile = path.join(dataDir, 'device-kind.txt');
-  let kind = '';
-  try { kind = fs.readFileSync(kindFile, 'utf8').trim(); } catch { /* 처음 */ }
-  if (kind !== 'legacy' && kind !== 'kinder') {
-    kind = fs.existsSync(path.join(dataDir, 'license.bin')) ? 'legacy' : 'kinder';
-    fs.writeFileSync(kindFile, kind);
-  }
-  return read(path.join(dataDir, 'device-id.txt'), kind === 'legacy' ? LEGACY_DEVICE_PREFIX : DEVICE_PREFIX);
+  return read(path.join(dataDir, 'device-id.txt'), DEVICE_PREFIX);
 }
 
 const b64u = (b: Buffer) => b.toString('base64url');
@@ -94,6 +88,8 @@ export interface LicenseDeps {
   log?: (ev: string, msg?: string) => void;
   now?: () => Date;
   fetch?: typeof fetch;
+  /** 시험용: 확인 키 바꿔 끼우기 (기본 = 유치원 서버 키 · 예전 서버 키) */
+  keys?: { current: string; old: string };
 }
 
 export function createLicense(d: LicenseDeps) {
@@ -101,6 +97,11 @@ export function createLicense(d: LicenseDeps) {
   const f = d.fetch ?? fetch;
   let stored: Stored | null | undefined;
   let pending: { server: http.Server; reject: (e: Error) => void } | null = null;
+
+  // 1.0.1까지 growmoment.co.kr 에서 받은 이용권인지
+  const KEY = d.keys?.current ?? LICENSE_PUBLIC_KEY;
+  const OLD_KEY = d.keys?.old ?? OLD_SERVER_PUBLIC_KEY;
+  const fromOldServer = (s: Stored) => !verifyLicense(s.token, KEY).ok && verifyLicense(s.token, OLD_KEY).ok;
 
   function load(): Stored | null {
     if (stored !== undefined) return stored;
@@ -117,8 +118,11 @@ export function createLicense(d: LicenseDeps) {
   function status(): LicenseStatus {
     const s = load();
     if (!s) return { state: 'none' };
-    const v = verifyLicense(s.token, LICENSE_PUBLIC_KEY);
-    if (!v.ok) return { state: 'locked', why: 'broken', message: WHY.broken, dojang: null, checkedAt: s.checkedAt ?? null };
+    const v = verifyLicense(s.token, KEY);
+    if (!v.ok) {
+      if (fromOldServer(s)) return { state: 'locked', why: 'moved', message: WHY.moved, dojang: null, checkedAt: s.checkedAt ?? null };
+      return { state: 'locked', why: 'broken', message: WHY.broken, dojang: null, checkedAt: s.checkedAt ?? null };
+    }
     const c = v.claims;
     const product = (c as LicenseClaims & { product?: string }).product;
     if (product && product !== PRODUCT) return { state: 'locked', why: 'other-product', message: WHY['other-product'], dojang: c.dojang, checkedAt: s.checkedAt ?? null };
@@ -145,7 +149,7 @@ export function createLicense(d: LicenseDeps) {
   }
 
   function accept(token: string) {
-    const v = verifyLicense(token, LICENSE_PUBLIC_KEY);
+    const v = verifyLicense(token, KEY);
     if (!v.ok || v.claims.device !== d.device) throw new Error('받은 이용권이 맞지 않아요. 잠시 뒤 다시 해 주세요.');
     // 다른 업종 이용권은 저장하지 않음: 연결은 실패로 알리고, 새로 받기면 쓰던 이용권을 그대로 둠 (2026-10-27 버그 점검)
     const product = (v.claims as LicenseClaims & { product?: string }).product;
@@ -157,6 +161,8 @@ export function createLicense(d: LicenseDeps) {
   async function refresh(): Promise<LicenseStatus> {
     const s = load();
     if (!s) return status();
+    // 예전 서버 이용권의 갱신 비밀값은 새 서버로 보내지 않음 (새 서버에는 없는 연결이기도 함) → [계정 연결] 안내만
+    if (fromOldServer(s)) { const st = status(); d.onChange?.(st); return st; }
     try {
       const r = await post<{ token: string }>('/api/app/refresh', { activationId: s.activationId, refresh: s.refresh, device: d.device, ...productParam });
       if (r.status === 200 && r.j.token) { accept(r.j.token); save({ ...s, token: r.j.token, checkedAt: now().toISOString() }); }
