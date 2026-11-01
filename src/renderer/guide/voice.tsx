@@ -117,12 +117,15 @@ export function HelpBox({ where, onClose }: { where: string; onClose?: () => voi
   );
 }
 
-// 설정 칸마다 [🔊 설명 듣기]: 누르면 그 칸 대본이 말풍선으로 펼쳐지고 첫 문장을 읽어 줌
-export function Speak({ ids, label = '설명 듣기' }: { ids: string[]; label?: string }) {
+// 음성 파일이 없는 동안은 소리를 약속하는 말(🔊 · 듣기 · AI 목소리)을 보여 주지 않음 (2026-11-02). public/voice/ 에 파일을 넣을 때 true 로
+export const VOICE_READY = false;
+
+// 설정 칸마다 [설명 보기]: 누르면 그 칸 대본이 말풍선으로 펼쳐짐 (음성이 있으면 첫 문장을 읽어 줌)
+export function Speak({ ids, label = VOICE_READY ? '설명 듣기' : '설명 보기' }: { ids: string[]; label?: string }) {
   const [openState, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className="btn small speak" onClick={() => setOpen(!openState)} aria-expanded={openState}>🔊 {openState ? '설명 닫기' : label}</button>
+      <button type="button" className="btn small speak" onClick={() => setOpen(!openState)} aria-expanded={openState}>{VOICE_READY ? '🔊 ' : ''}{openState ? '설명 닫기' : label}</button>
       {openState && (
         <div className="speak-box">
           {ids.map((id, i) => <Bubble key={id} id={id} auto={i === 0} />)}

@@ -218,6 +218,10 @@ export function createLicense(d: LicenseDeps) {
       const st = status();
       d.onChange?.(st);
       return st;
+    } catch (e) {
+      // 연결 실패도 기록에 남김: 고객 화면을 받아 보지 않아도 이유를 알 수 있게 (2026-11-02)
+      d.log?.('license-connect', e instanceof Error ? e.message : String(e));
+      throw e;
     } finally {
       clearTimeout(timer);
       if (pending?.server === server) pending = null;

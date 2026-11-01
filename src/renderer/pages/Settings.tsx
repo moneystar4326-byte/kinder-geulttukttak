@@ -76,7 +76,7 @@ export function SettingsPage() {
         <h2 className="h2-row">OpenAI (글 · 카드 그림) <Speak ids={['P02', 'P03']} /></h2>
         <SecretRow name="openai" label="OpenAI API 키" hint={`OpenAI 사이트에서 만든 키 (sk- 로 시작). 글 · 그림 사용료는 ${APP.owner} OpenAI 계정에서 쓴 만큼 나가요.`} />
         <div className="row" style={{ marginBottom: 10 }}>
-          <button className="btn primary" onClick={() => setGuideAt('A03')}>🔊 비서와 같이 키 만들기</button>
+          <button className="btn primary" onClick={() => setGuideAt('A03')}>비서와 같이 키 만들기</button>
           <button className="btn link" onClick={() => open('https://kinder.growmoment.co.kr/guide')}>캡처로 보는 안내 (홈페이지)</button>
         </div>
         <details className="expert"><summary>전문가 설정 · 그대로 두셔도 돼요</summary>
@@ -98,7 +98,7 @@ export function SettingsPage() {
       <div className="panel">
         <h2 className="h2-row">네이버 검색광고 (키워드 검색량, 선택) <Speak ids={['P04', 'P05a', 'P05b', 'P05c', 'P05d', 'P06']} /></h2>
         <p className="hint">없어도 키워드를 직접 적어 글을 만들 수 있어요. 네이버 광고주센터 왼쪽 [도구] → [SA API 사용 관리]에서 발급해요.</p>
-        <div className="row" style={{ marginBottom: 10 }}><button className="btn primary" onClick={() => setKeyGuide('naver')}>🔊 비서와 같이 연결하기</button></div>
+        <div className="row" style={{ marginBottom: 10 }}><button className="btn primary" onClick={() => setKeyGuide('naver')}>비서와 같이 연결하기</button></div>
         <SecretRow name="naverApiKey" label="API Key (액세스 라이선스)" hint="SA API 사용 관리의 '엑세스라이선스' 줄 [복사] (옆 [재발급]은 누르지 마세요)" />
         <SecretRow name="naverSecret" label="Secret Key (비밀 키)" hint="'비밀키' 줄 [복사]. 저장하면 화면 · 로그에 다시 보이지 않아요" />
         <SecretRow name="naverCustomer" label="Customer ID" hint="SA API 사용 관리 화면 위 'CUSTOMER_ID =' 옆 숫자" />
@@ -113,7 +113,7 @@ export function SettingsPage() {
       <div className="panel">
         <h2 className="h2-row">카카오 로컬 (주변 학교 · 아파트 이름, 선택) <Speak ids={['P07', 'P08']} /></h2>
         <p className="hint">제목 앞 "{'[○○아파트 유치원]'}" 같은 동네 이름 후보를 모을 때만 써요. 없으면 {APP.place} 정보에서 직접 적으면 돼요.</p>
-        <div className="row" style={{ marginBottom: 10 }}><button className="btn primary" onClick={() => setKeyGuide('kakao')}>🔊 비서와 같이 연결하기</button></div>
+        <div className="row" style={{ marginBottom: 10 }}><button className="btn primary" onClick={() => setKeyGuide('kakao')}>비서와 같이 연결하기</button></div>
         <SecretRow name="kakao" label="카카오 REST API 키" hint="카카오 개발자 → 앱 → [플랫폼 키] → REST API 키. 앱의 [제품 설정 → 카카오맵] 사용 설정도 켜야 해요" />
         <div className="row">
           <button className="btn" disabled={!info.secrets.kakao || testing !== null} onClick={() => runTest('kakao')}>{testing === 'kakao' ? '확인 중…' : '연결 확인'}</button>
@@ -194,11 +194,11 @@ function SecretaryPanel({ onGuide }: { onGuide: (stepId: string) => void }) {
             <span className="grow">{i.label}</span>
             {i.done ? <span className="badge ok">끝</span> : i.step === 'A10'
               ? <button className="btn small primary" onClick={() => go({ page: 'new' })}>새 글 쓰러 가기</button>
-              : <button className="btn small primary" onClick={() => onGuide(i.step)}>🔊 비서와 같이 하기</button>}
+              : <button className="btn small primary" onClick={() => onGuide(i.step)}>비서와 같이 하기</button>}
           </li>
         ))}
       </ul>
-      <p className="hint">각 칸 제목 옆 [🔊 설명 듣기]를 누르면 그 칸을 설명해 드려요 (안내 음성은 AI 목소리예요). 처음부터 다시 하려면 <button className="btn link" onClick={() => onGuide('A00')}>설치 도우미 처음부터</button></p>
+      <p className="hint">각 칸 제목 옆 [설명 보기]를 누르면 그 칸을 설명해 드려요. 처음부터 다시 하려면 <button className="btn link" onClick={() => onGuide('A00')}>설치 도우미 처음부터</button></p>
     </div>
   );
 }

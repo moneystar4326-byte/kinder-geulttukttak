@@ -6,7 +6,7 @@ import { useApp } from '../App';
 import { call, local, type DojoProfile } from '../api';
 import { Chips } from '../components/ui';
 import type { LicenseStatus } from '../components/Account';
-import { Bubble, HelpBox, line, open } from './voice';
+import { Bubble, HelpBox, line, open, VOICE_READY } from './voice';
 import { APP } from '../../shared/kinder';
 
 const OPENAI = 'https://platform.openai.com';
@@ -120,7 +120,7 @@ export function SetupGuide({ start, onClose, firstRun }: { start?: string; onClo
           </div>
           {shotBox}
         </div>
-        <p className="hint ai-voice">안내 음성은 AI로 만든 목소리예요.</p>
+        {VOICE_READY && <p className="hint ai-voice">안내 음성은 AI로 만든 목소리예요.</p>}
       </div>
     </div>
   );

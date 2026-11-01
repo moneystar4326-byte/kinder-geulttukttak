@@ -285,7 +285,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
       <div className="head"><h1>새 글 작성</h1></div>
       <LockBanner />
       {guideAt && <SetupGuide start={guideAt} onClose={() => setGuideAt(null)} />}
-      {!info.secrets.openai && <div className="note warn">AI 연결(OpenAI 키)이 아직 안 됐어요. 연결해야 글을 만들 수 있어요. <button className="btn link" onClick={() => setGuideAt('A03')}>🔊 비서와 같이 연결하기</button></div>}
+      {!info.secrets.openai && <div className="note warn">AI 연결(OpenAI 키)이 아직 안 됐어요. 연결해야 글을 만들 수 있어요. <button className="btn link" onClick={() => setGuideAt('A03')}>비서와 같이 연결하기</button></div>}
       {!profile && <div className="note warn">{APP.place} 정보를 먼저 저장해 주세요. <button className="btn link" onClick={() => go({ page: 'profile' })}>{APP.place} 정보로 가기</button></div>}
       <div className="panel">
         <h2>주제 한 줄로 바로 쓰기</h2>

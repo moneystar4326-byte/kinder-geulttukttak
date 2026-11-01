@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../App';
 import { call } from '../api';
-import { Bubble, HelpBox, line, open } from './voice';
+import { Bubble, HelpBox, line, open, VOICE_READY } from './voice';
 import { KeyImport } from './SetupGuide';
 import { APP } from '../../shared/kinder';
 
@@ -98,7 +98,7 @@ export function KeyGuide({ flow, onClose }: { flow: 'naver' | 'kakao'; onClose: 
             </div>
           )}
         </div>
-        <p className="hint ai-voice">안내 음성은 AI로 만든 목소리예요.</p>
+        {VOICE_READY && <p className="hint ai-voice">안내 음성은 AI로 만든 목소리예요.</p>}
       </div>
     </div>
   );
