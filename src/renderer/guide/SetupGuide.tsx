@@ -18,7 +18,7 @@ export const STEPS: Step[] = [
   { id: 'A03', title: 'AI 소개' },
   { id: 'A03b', title: '개인정보' },
   { id: 'A04', title: 'OpenAI 가입', shot: 'oa-1-home.jpg', url: `${OPENAI}/` },
-  { id: 'A05', title: '카드 등록', shot: 'oa-2-billing.jpg', url: `${OPENAI}/settings/organization/billing/overview` },
+  { id: 'A05', title: '카드 등록', shot: 'oa-5-settings.jpg', url: `${OPENAI}/settings/organization/billing/overview` },
   { id: 'A06', title: '5달러 충전', shot: 'oa-2-billing.jpg', url: `${OPENAI}/settings/organization/billing/overview` },
   { id: 'A07', title: '월 한도', shot: 'oa-3-limits.jpg', url: `${OPENAI}/settings/organization/limits` },
   { id: 'A08', title: '키 만들기', shot: 'oa-4-keys.jpg', url: `${OPENAI}/api-keys` },
@@ -58,7 +58,7 @@ export function SetupGuide({ start, onClose, firstRun }: { start?: string; onClo
 
   const shotBox = step.shot && (
     <div className="guide-shot">
-      <img src={`./guide/${step.shot}`} alt={`${step.title} 화면 예시 (OpenAI 실제 화면, 2026-10-22)`} />
+      <img src={`./guide/${step.shot}`} alt={`${step.title} 화면 예시 (OpenAI 실제 화면, 2026-11-02)`} />
       <span className="hint">OpenAI 실제 화면 (2026-10-22). 화면이 다르면 짐작해서 누르지 말고 "화면이 달라요"를 눌러 주세요.</span>
       {step.url && <button type="button" className="btn" onClick={() => open(step.url!)}>OpenAI 화면 열기</button>}
     </div>
