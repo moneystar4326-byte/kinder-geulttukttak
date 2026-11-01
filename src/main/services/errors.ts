@@ -5,13 +5,17 @@ export class ApiError extends Error {
   constructor(public code: ApiErrorCode, message: string, public provider: string, public retryable = false) { super(message); }
 }
 
+// OpenAI 문구는 할 일까지 말해 줌. 이미지도 원장님께는 같은 OpenAI 계정 (2026-11-02)
+const isOpenAI = (p: string) => p.startsWith('OpenAI');
+const KEPT = '쓰던 글은 그대로 있어요.';
+
 const MSG: Record<ApiErrorCode, (p: string) => string> = {
-  auth: (p) => `${p} 키가 맞지 않아요. 설정에서 키를 다시 확인해 주세요.`,
-  permission: (p) => `${p} 계정에 이 기능(모델) 권한이 없어요. 설정에서 모델을 바꾸거나 ${p} 계정의 사용 권한을 확인해 주세요.`,
-  quota: (p) => `${p} 사용 한도나 크레딧이 부족해요. ${p} 결제 · 사용량 화면을 확인해 주세요.`,
+  auth: (p) => isOpenAI(p) ? `OpenAI 키가 맞지 않아요. 키를 새로 만들어 넣으면 돼요. ${KEPT}` : `${p} 키가 맞지 않아요. 설정에서 키를 다시 확인해 주세요.`,
+  permission: (p) => isOpenAI(p) ? 'OpenAI 계정에서 이 기능을 쓸 수 없어요. 이 화면을 사진으로 찍어 카톡으로 보내 주세요.' : `${p} 계정에 이 기능(모델) 권한이 없어요. 설정에서 모델을 바꾸거나 ${p} 계정의 사용 권한을 확인해 주세요.`,
+  quota: (p) => isOpenAI(p) ? `OpenAI 크레딧이나 사용 한도가 부족해요. 충전하거나 한도를 올린 뒤, 몇 분 뒤에 다시 만들어 주세요. ${KEPT}` : `${p} 사용 한도나 크레딧이 부족해요. ${p} 결제 · 사용량 화면을 확인해 주세요.`,
   rate: (p) => `${p} 요청이 잠깐 많아요. 1분쯤 뒤에 다시 시도해 주세요.`,
-  network: () => '인터넷 연결을 확인해 주세요.',
-  server: (p) => `${p} 서버가 잠시 응답하지 않아요. 잠시 뒤 다시 시도해 주세요.`,
+  network: () => '인터넷이 끊긴 것 같아요. 연결을 확인하고 다시 시도해 주세요.',
+  server: (p) => isOpenAI(p) ? `내 PC 문제가 아니에요. OpenAI 서버가 잠시 응답하지 않아요. 잠시 뒤 다시 만들어 주세요. ${KEPT}` : `${p} 서버가 잠시 응답하지 않아요. 잠시 뒤 다시 시도해 주세요.`,
   schema: () => 'AI 응답 형식이 맞지 않았어요. 다시 시도해 주세요.',
   cancelled: () => '멈췄어요.',
   'bad-request': (p) => `${p}가 요청을 받지 않았어요. 설정의 모델 이름을 확인해 주세요.`,

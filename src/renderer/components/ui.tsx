@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { call, type Job } from '../api';
+import { KAKAO_CHAT, open } from '../guide/voice';
+import { failActions, isAiJob, OPENAI_BILLING, OPENAI_KEYS } from '../../shared/failHelp';
 
 export function Field({ label, req, hint, children }: { label: string; req?: boolean; hint?: ReactNode; children: ReactNode }) {
   return <label className="field"><span>{label}{req && <em>*</em>}</span>{children}{hint && <small>{hint}</small>}</label>;
@@ -19,7 +21,7 @@ export function Chips<T extends string>({ options, value, onChange, multi, label
 }
 
 // 진행 상태: 알 수 없는 진행률 대신 단계 + 경과 시간
-export function JobBar({ job, onDone }: { job: Job | null; onDone?: () => void }) {
+export function JobBar({ job, onDone, onRetry, onSettings }: { job: Job | null; onDone?: () => void; onRetry?: () => void; onSettings?: () => void }) {
   const [now, setNow] = useState(Date.now());
   const running = job && (job.state === 'running' || job.state === 'queued');
   useEffect(() => { if (!running) return; const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, [running]);
@@ -35,10 +37,30 @@ export function JobBar({ job, onDone }: { job: Job | null; onDone?: () => void }
       <button className="btn small" onClick={() => call('job:cancel', job.id).catch(() => {})}>멈추기</button>
     </div>
   );
-  if (job.state === 'failed') return <div className="note err"><b>실패:</b> {job.message}</div>;
+  if (job.state === 'failed') return <FailNote job={job} onRetry={onRetry} onSettings={onSettings} />;
   if (job.state === 'cancelled') return <div className="note warn">{job.message ?? '멈췄어요.'}</div>;
   if (job.state === 'interrupted') return <div className="note warn">{job.message ?? '프로그램이 꺼져서 멈췄어요. 다시 시도할 수 있어요.'}</div>;
   return null;
+}
+
+// 실패 안내: 이유 + 이유별 버튼 + 그래도 안 되면 카톡 (2026-11-02)
+function FailNote({ job, onRetry, onSettings }: { job: Job; onRetry?: () => void; onSettings?: () => void }) {
+  const acts = failActions(job.type, job.errorCode);
+  return (
+    <div className="note err">
+      <b>실패:</b> {job.message}
+      {acts.length > 0 && (
+        <div className="row" style={{ marginTop: 8 }}>
+          {acts.includes('billing') && <button className="btn small" onClick={() => open(OPENAI_BILLING)}>충전 화면 열기</button>}
+          {acts.includes('keys') && <button className="btn small" onClick={() => open(OPENAI_KEYS)}>키 화면 열기</button>}
+          {acts.includes('settings') && onSettings && <button className="btn small" onClick={onSettings}>설정으로 가기</button>}
+          {acts.includes('retry') && onRetry && <button className="btn small" onClick={onRetry}>다시 만들기</button>}
+          {acts.includes('kakao') && <button className="btn small" onClick={() => open(KAKAO_CHAT)}>카톡으로 묻기</button>}
+        </div>
+      )}
+      {isAiJob(job.type) && <div className="hint" style={{ marginTop: 8 }}>{job.errorCode === 'permission' ? '' : '해결되지 않으면 이 화면을 사진으로 찍어 카톡으로 보내 주세요. '}키, 카드번호, 비밀번호는 보내지 마세요.</div>}
+    </div>
+  );
 }
 
 export function Msg({ m }: { m: { kind: 'ok' | 'err' | 'info' | 'warn'; text: string } | null }) {

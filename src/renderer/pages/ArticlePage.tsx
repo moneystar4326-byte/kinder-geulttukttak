@@ -14,7 +14,7 @@ import { APP } from '../../shared/kinder';
 const same = (a: Draft | null, b: Draft | null) => JSON.stringify(a) === JSON.stringify(b);
 
 export function ArticlePage({ id }: { id: string }) {
-  const { info } = useApp();
+  const { info, go } = useApp();
   const [b, setB] = useState<ArticleBundle | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saved, setSaved] = useState<Draft | null>(null); // 마지막으로 저장된 내용
@@ -173,7 +173,7 @@ export function ArticlePage({ id }: { id: string }) {
         <span className="sp" />
         <span className="hint">{dirty ? '저장 안 됨 (곧 자동 저장)' : saved ? '저장됨' : ''}</span>
       </div>
-      <JobBar job={job} />
+      <JobBar job={job} onRetry={job?.type === 'article' ? regenerate : undefined} onSettings={() => go({ page: 'settings' })} />
       {aiAside && <div className="note warn">AI 결과("{aiAside.note}")가 이력에 따로 저장됐어요. 그동안 고친 글이 있어서 바꾸지 않았어요. <button className="btn link" onClick={async () => { try { if (dirty) await save(); await call('article:setCurrent', { id, versionId: aiAside.id }); await load(true); } catch (e) { msg.err(e); } }}>AI 결과로 바꾸기</button> <button className="btn link" onClick={() => setDismissed(aiAside.id)}>닫기</button></div>}
       {!draft && !busy && <div className="note info">아직 글이 없어요. <button className="btn link" onClick={regenerate}>글 만들기</button></div>}
       {draft && <FirstTip id="A11" />}
