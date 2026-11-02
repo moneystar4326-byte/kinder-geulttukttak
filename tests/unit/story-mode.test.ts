@@ -34,12 +34,18 @@ test('이야기 글: 검색어 계획대로 2~3번, 일반론으로 늘리지 �
 });
 
 test('한 줄로 쓰기 · 예전 칸 입력은 그대로 (3~5번, 섹션 5~7개, 최소 분량)', () => {
-  const old: ArticleInput = { ...base, topic: '촉감놀이', mainKeyword: '유치원 촉감놀이', facts: { ...base.facts, activities: '밀가루 반죽 촉감놀이' } };
+  const old: ArticleInput = { ...base, topic: '촉감놀이', mainKeyword: '유치원 촉감놀이', facts: { ...base.facts, activities: '밀가루 반죽 촉감놀이'.repeat(30) } };
   const p = articlePrompt(DEMO_PROFILE, old, null);
   assert.match(p, /3~5번/);
   assert.match(p, /섹션 5~7개/);
   assert.equal(minCharsForInput(old), 1500);
   assert.equal(minCharsForInput(withStory), STORY_MIN);
+  // 재료가 적으면 짧게 (2026-11-02): 키워드 2~3번 · 섹션 3~5개 · 최소 800자
+  const thin: ArticleInput = { ...old, facts: { ...base.facts, activities: '밀가루 반죽 촉감놀이' } };
+  const t = articlePrompt(DEMO_PROFILE, thin, null);
+  assert.match(t, /섹션 3~5개/);
+  assert.match(t, /2~3번/);
+  assert.equal(minCharsForInput(thin), 800);
 });
 
 test('이야기가 있으면 칸별 필수는 묻지 않음, 입력 형식도 통과', () => {

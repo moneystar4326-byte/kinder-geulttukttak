@@ -47,8 +47,17 @@ export const minCharsFor = (kind?: string) => (kind && SHORT_KINDS.includes(kind
 export const STORY_MIN = 800;
 type CountInput = { kind?: string; facts?: { story?: string }; brief?: { asks?: { answer?: string }[] } };
 const hasStory = (input?: CountInput) => !!input?.facts?.story?.trim();
+// 2026-11-02 사용자: 짧은 메모를 1,500자로 늘리면 어느 글에나 맞는 태도 문장으로 차서 어색함 → 재료가 적으면 글도 짧게
+// 교육 정보는 일반 설명이 곧 내용이라 그대로. 800자 아래로는 내리지 않음 (2026-10-28 사용자: 600자는 짧다)
+const textIn = (v: unknown): string => (typeof v === 'string' ? v : v && typeof v === 'object' ? Object.values(v).map(textIn).join('') : '');
+export const materialChars = (input?: CountInput) => textIn(input?.facts).replace(/\s/g, '').length;
+const THIN_CHARS = 100;
+const SMALL_CHARS = 250;
+const THIN_KIND = (input?: CountInput) => !hasStory(input) && input?.kind !== '교육 정보' && materialChars(input) > 0;
+export const thinMaterial = (input?: CountInput) => THIN_KIND(input) && materialChars(input) < THIN_CHARS;
+const smallMaterial = (input?: CountInput) => THIN_KIND(input) && materialChars(input) < SMALL_CHARS;
 export const storyAnswers = (input?: CountInput) => (input?.brief?.asks ?? []).filter((a) => a.answer?.trim()).length;
-export const minCharsForInput = (input: CountInput) => (hasStory(input) ? STORY_MIN : minCharsFor(input.kind));
+export const minCharsForInput = (input: CountInput) => (hasStory(input) || thinMaterial(input) ? STORY_MIN : smallMaterial(input) ? 1000 : minCharsFor(input.kind));
 export const targetRangeForInput = (input: CountInput): readonly [number, number] =>
-  hasStory(input) ? (storyAnswers(input) ? [1200, 1500] : [900, 1200]) : targetRangeFor(input.kind);
+  hasStory(input) ? (storyAnswers(input) ? [1200, 1500] : [900, 1200]) : thinMaterial(input) ? [900, 1200] : smallMaterial(input) ? [1200, 1600] : targetRangeFor(input.kind);
 export const targetRangeFor = (kind?: string): readonly [number, number] => (kind && SHORT_KINDS.includes(kind) ? [1200, 1600] : TARGET_RANGE);

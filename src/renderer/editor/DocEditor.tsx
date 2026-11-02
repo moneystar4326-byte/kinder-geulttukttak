@@ -5,8 +5,8 @@ import { countChars, countDoc, minCharsFor, STORY_MIN } from '../../shared/count
 export interface Draft { title: string; doc: ArticleDoc }
 export interface ParaSel { sectionId: string; index: number }
 
-export function DocEditor({ draft, onChange, sel, onSelect, prefix, readOnly, kind, story }: { draft: Draft; onChange: (d: Draft) => void; sel: ParaSel | null; onSelect: (s: ParaSel | null) => void; prefix?: string; readOnly?: boolean; kind?: string; story?: boolean }) {
-  const MIN = story ? STORY_MIN : minCharsFor(kind);
+export function DocEditor({ draft, onChange, sel, onSelect, prefix, readOnly, kind, story, min }: { draft: Draft; onChange: (d: Draft) => void; sel: ParaSel | null; onSelect: (s: ParaSel | null) => void; prefix?: string; readOnly?: boolean; kind?: string; story?: boolean; min?: number }) {
+  const MIN = min ?? (story ? STORY_MIN : minCharsFor(kind));
   const { doc } = draft;
   const counts = countDoc(doc);
   const setDoc = (d: Partial<ArticleDoc>) => onChange({ ...draft, doc: { ...doc, ...d } });

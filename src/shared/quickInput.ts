@@ -4,6 +4,12 @@ import { fallbackKeyword } from './validation';
 import { quickEnding, quickKind, quickWhen } from './quick';
 import type { Writer } from './kinder';
 
+// 메모만으로는 활동을 구체적으로 쓰기 어려운지 → 만들기 전에 물음 (2026-11-02). 교육 정보 글은 묻지 않음
+export const needsMoreMemo = (memo: string) => {
+  const m = memo.trim();
+  return !!m && quickKind(m) !== '교육 정보' && m.replace(/\s/g, '').length < 100;
+};
+
 export const emptyInput = (p?: DojoProfile | null): ArticleInput => ({
   kind: '수업 후기', audience: AUDIENCES[0], region: p?.region ?? '', topic: '',
   facts: { activities: '', coachingPoints: '', scenes: '', values: '', extra: '', photoNotes: '', event: { when: '', where: '', who: '', bring: '', apply: '' }, recruit: { who: '', trial: '' }, growth: { before: '', now: '', process: '' } },

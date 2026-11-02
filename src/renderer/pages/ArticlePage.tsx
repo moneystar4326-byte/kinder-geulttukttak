@@ -7,6 +7,7 @@ import { TypingStage } from '../editor/TypingStage';
 import { CardsPanel, type CardPref } from '../components/CardsPanel';
 import { FirstTip } from '../guide/voice';
 import { localFlags } from '../../shared/validation';
+import { minCharsForInput } from '../../shared/count';
 import { storyBrief } from '../../shared/cardRoles';
 import type { DojoProfile, RevisionKind } from '../../shared/types';
 import { APP } from '../../shared/kinder';
@@ -196,7 +197,7 @@ export function ArticlePage({ id }: { id: string }) {
               <button className="btn small" disabled={busy || !sel} onClick={() => revise('paragraph')}>선택 문단 수정</button>
             </div>
             {busy && <p className="note info">AI가 고치는 중이라 잠시 편집을 막아 둘게요. 끝나면 바로 고칠 수 있어요.</p>}
-            <DocEditor draft={draft} onChange={setDraft} sel={sel} onSelect={setSel} prefix={b.article.input.titlePrefix} readOnly={busy} kind={b.article.input.kind} story={!!b.article.input.facts.story?.trim()} />
+            <DocEditor draft={draft} onChange={setDraft} sel={sel} onSelect={setSel} prefix={b.article.input.titlePrefix} readOnly={busy} kind={b.article.input.kind} story={!!b.article.input.facts.story?.trim()} min={minCharsForInput(b.article.input)} />
           </div>
 
           <div>

@@ -8,7 +8,8 @@ import { ARTICLE_KINDS, AUDIENCES, CARD_STYLES, ENDINGS, TONES, type ArticleBrie
 import { fallbackKeyword, missingInputs } from '../../shared/validation';
 import { foreignKeyword, hintWords, pickKeywords, planCandidates } from '../../shared/keywords';
 import { autoPrefix, dongOf, prefixNames } from '../../shared/areas';
-import { buildQuickInput, emptyInput, thinMemo } from '../../shared/quickInput';
+import { buildQuickInput, emptyInput, needsMoreMemo, quickTopic, thinMemo } from '../../shared/quickInput';
+import { quickKind } from '../../shared/quick';
 import { MicButton } from '../components/MicButton';
 import { APP, kindLabel, writerLabel, type Writer } from '../../shared/kinder';
 
@@ -19,7 +20,7 @@ const appendSpoken = (prev: string, text: string) => (prev.trim() ? `${prev.trim
 const TX = {
   thinMemo: '아이들이 가장 좋아한 것이나 기억에 남는 장면을 한 줄만 더 적으면 글이 훨씬 구체적으로 나와요. (예: 분수대 앞에서 비눗방울을 불었어요)',
   quickPh: ['예: 햇님반 친구들이랑 가을 낙엽 밟기 놀이를 했어요', '예: 7세반 아이 초등학교 입학 준비는 어떻게 하나요?', '예: 10월 30일 할로윈 파티 안내'],
-  quickHint: '주제나 오늘 있었던 일을 한 줄 적으면, 유치원 정보(지역 · 교육과정 특징 · 교육 철학)와 함께 1,500자 이상 글을 만들어요 (행사 · 입학 · 원아 모집 안내는 1,000자 이상). 적지 않은 장면 · 대화 · 아이 이름 · 금액은 만들지 않으니, 실제 있었던 일을 적을수록 글이 풍성해져요.',
+  quickHint: '주제나 오늘 있었던 일을 한 줄 적으면, 유치원 정보(지역 · 교육과정 특징 · 교육 철학)와 함께 글을 만들어요. 메모가 짧으면 만들기 전에 두세 가지를 묻고, 억지로 늘리지 않아 900~1,200자쯤으로 나와요. 적지 않은 장면 · 대화 · 아이 이름 · 금액은 만들지 않으니, 실제 있었던 일을 적을수록 글이 길고 풍성해져요.',
   topicHint: '예: 낙엽 밟기 바깥놀이',
   values: ['호기심', '배려', '나눔', '자신감', '도전', '협동', '즐거움', '자립', '감사'],
   // 자세히 쓰기 "어떤 일이 있었나요?" (글 종류별 예시 — 태권 글뚝딱 2026-10-28 흐름을 유치원 말로)
@@ -237,6 +238,9 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
 
   // 빠른 작성: 주제(또는 메모) 한 줄 → 유치원 정보 + 일반 교육 설명으로 바로 글 + 카드
   const [quick, setQuick] = useState(local.get('quick-memo', ''));
+  // 재료가 적으면 만들기 전에 물음 2~3개 (2026-11-02). 메모를 고치면 물음은 사라짐
+  const [quickAsks, setQuickAsks] = useState<{ memo: string; items: { question: string; answer: string }[] } | null>(null);
+  const asksNow = quickAsks && quickAsks.memo === quick.trim() ? quickAsks : null;
   const [quickCards, setQuickCards] = useState(true);
   const [quickPrefix, setQuickPrefixState] = useState(local.get('quick-prefix', true));
   // 태권 글뚝딱 2.2.11에서 옮김: 주변 장소가 비면 [동 유치원] 하나만 계속 붙는데 "돌아가며"로 안내돼 헷갈림
@@ -249,6 +253,14 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
     if (!memo) return;
     setBusy('quick'); msg.clear();
     try {
+      // 재료가 적으면 만들기 전에 물어봄. 물음을 못 받아도 글은 만듦 (음성 비서로 시작한 글은 묻지 않음)
+      if (!text && !asksNow && needsMoreMemo(memo)) {
+        setBusy('quick-ask');
+        const b = await call<{ asks?: { question: string }[] }>('article:brief', { kind: quickKind(memo), topic: quickTopic(memo), story: memo }).catch(() => null);
+        const items = (b?.asks ?? []).map((a) => ({ question: a.question, answer: '' }));
+        if (items.length) { setQuickAsks({ memo, items }); setBusy(''); return; }
+        setBusy('quick');
+      }
       // 네이버 검색광고 키가 있으면 실제 검색량으로 키워드 자동 고르기 (실패하면 주제를 키워드로 — buildQuickInput)
       let main = '', subs: string[] = [], chosen: KeywordRow[] = [];
       if (naverReady) {
@@ -263,7 +275,9 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
       // 제목 앞 동네 이름: 글마다 돌아가며 ([신대방동 유치원] → [롯데낙천대아파트 유치원] → …)
       const titlePrefix = quickPrefix ? autoPrefix(profile?.region ?? '', profile?.nearbyAreas ?? [], (await call<unknown[]>('article:list').catch(() => [])).length) : '';
       const q = buildQuickInput({ memo, profile, main, subs, withCards: quickCards, titlePrefix, writer, writerSign });
-      const art = await call<{ id: string }>('article:create', { input: q, keywords: chosen });
+      const answered = (asksNow?.items ?? []).filter((a) => a.answer.trim()).map((a) => `${a.question} ${a.answer.trim()}`).join('\n');
+      const input = answered ? { ...q, facts: { ...q.facts, scenes: answered } } : q;
+      const art = await call<{ id: string }>('article:create', { input, keywords: chosen });
       local.set(`card-pref-${art.id}`, card);
       // 시작부터 실패하면(키 없음 · 잠김 등) 빈 글로 넘어가지 않고 이 화면에 이유를 보여 줌 (처음 사용자 시험 불편 12)
       try { await call('article:generate', art.id); } catch (e) { await call('article:delete', art.id).catch(() => {}); throw e; }
@@ -300,8 +314,19 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
           {quickPrefix && quickNames.length <= 1 && <span className="hint" style={{ flexBasis: "100%", order: 1 }}>가까운 아파트 · 초등학교 · 역 이름을 {APP.place} 정보 → 주변 장소에 적으면 제목 앞 이름이 돌아가며 붙어요. <button className="btn link" onClick={() => go({ page: 'profile' })}>주변 장소 적으러 가기</button></span>}
           <label className="row"><input type="checkbox" checked={quickCards} onChange={(e) => setQuickCards(e.target.checked)} /> 카드뉴스 3장도 만들기 {quickCards && card.mode === 'ai' && <span className="hint">(AI 그림 3장 비용 발생)</span>}</label>
         </div>
+        {asksNow && !busy && (
+          <div className="note info" style={{ marginTop: 10 }}>
+            <b>재료를 조금만 더 알려 주세요. 글이 훨씬 구체적으로 나와요.</b>
+            {asksNow.items.map((a, i) => (
+              <Field key={i} label={a.question}>
+                <input value={a.answer} maxLength={500} placeholder="한 줄이면 돼요 (비워 둬도 돼요)" onChange={(e) => setQuickAsks({ ...asksNow, items: asksNow.items.map((x, j) => (j === i ? { ...x, answer: e.target.value } : x)) })} />
+              </Field>
+            ))}
+            <p className="hint">있었던 일만 적어 주세요. 답이 없으면 지금 메모로 짧게 만들어요.</p>
+          </div>
+        )}
         <div className="row" style={{ marginTop: 10 }}>
-          <button className="btn primary" disabled={!quick.trim() || !!busy || !profile} onClick={() => quickStart()}>{busy === 'quick-kw' ? '키워드 고르는 중…' : busy === 'quick' ? '시작하는 중…' : '바로 글 만들기'}</button>
+          <button className="btn primary" disabled={!quick.trim() || !!busy || !profile} onClick={() => quickStart()}>{busy === 'quick-ask' ? '재료 살펴보는 중…' : busy === 'quick-kw' ? '키워드 고르는 중…' : busy === 'quick' ? '시작하는 중…' : asksNow ? '이대로 글 만들기' : '바로 글 만들기'}</button>
           <span className="hint">지역: {profile?.region ?? '-'} · 문체: {profile?.tone ?? '-'} · 키워드: {naverReady ? '네이버 검색량으로 자동 선택' : `${fallbackKeyword(profile?.region ?? '', '주제')} (설정에 검색광고 키가 없음)`}</span>
         </div>
         <Msg m={msg.m} />

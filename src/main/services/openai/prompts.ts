@@ -1,6 +1,7 @@
 // 글 · 카드 문구 지시문 (기획서 6.1 생성 규칙)
 import type { ArticleBrief, ArticleDoc, ArticleInput, DojoProfile, RevisionKind } from '../../../shared/types';
-import { bodyText, MIN_CHARS, minCharsForInput, TARGET_RANGE, targetRangeForInput } from '../../../shared/count';
+import { bodyText, MIN_CHARS, minCharsForInput, TARGET_RANGE, targetRangeForInput, thinMaterial } from '../../../shared/count';
+import { overusedLine } from '../../../shared/overused';
 import { nearbyLine } from '../../../shared/areas';
 import { spacedKeyword } from '../../../shared/validation';
 import { cardRoles, storyBrief } from '../../../shared/cardRoles';
@@ -29,6 +30,7 @@ export const SYSTEM_RULES = `너는 유치원 원장님 · 선생님의 블로�
 - 섹션은 앞 섹션의 마지막 내용을 이어받아 시작한다. 섹션마다 처음부터 다시 소개하지 않고, 앞에서 한 말을 다른 섹션에서 되풀이하지 않는다.
 - '유치원 주변'이 있으면 마무리 쪽 문단에 한 번, 학부모가 위치를 떠올릴 수 있게 "○○아파트 · ○○초 근처에 있는"처럼 주변 아파트나 학교 이름 1~2개를 꼭 쓴다 (본문 전체에서 최대 두 번). 거리 숫자 · 걸어서 몇 분은 쓰지 않는다.
 - 다른 글을 베끼거나 틀에 유치원 이름만 바꿔 넣은 듯한 글을 쓰지 않는다.
+- 어느 글에나 들어갈 수 있는 어른의 태도 · 다짐 문장("살펴봐요", "지켜봐요", "비교하지 않아요", "소중히 여겨요", "저마다 달라요", "~보다 ~하려 해요")은 글 전체에서 합쳐 두 번까지만 쓴다. 대신 이 글의 활동에만 맞는 구체적인 문장을 쓴다.
 - 소제목은 15자 안팎으로 짧고 궁금하게. 소제목에는 이모지 · 기호를 넣지 않는다 (프로그램이 붙임).
 - 제목 후보는 정확히 3개, 각 20~40자, 과장 없이.
 - 태그는 8~12개, # 없이, 학부모가 검색할 짧은 말 (주제 · 연령 · 유치원 · 육아 관련).
@@ -114,11 +116,13 @@ ${b.notes.map((x) => `- ${x}`).join('\n')}${b.exclude.length ? `
 
 // 자세히 쓰기 "이야기" 글 (태권 글뚝딱 2026-10-28): 칸별 항목표 · 일반론 채우기 · 키워드 3~5번 때문에 문장이 어색하던 것을 고침
 const isStory = (input: ArticleInput) => !!input.facts.story?.trim();
+// 재료가 적어 글이 짧으면 키워드도 이야기 글만큼만 (짧은 글에 3~5번이면 억지로 끼운 문장이 됨)
+const lightKeyword = (input: ArticleInput) => isStory(input) || thinMaterial(input);
 function keywordLines(input: ArticleInput) {
   const plan = input.keywordPlan ?? [];
   if (plan.length) return `[검색어 계획] 아래 문장 예시처럼 자연스러운 자리에만 넣는다. 주요는 2~3번, 보조는 1번씩. 횟수를 채우려고 문장을 만들지 않는다. 띄어쓰기 · 조사 변형은 괜찮다 ("유치원소풍" → "유치원 소풍").
 ${plan.map((k) => `- ${k.role} "${k.keyword}" 예: ${k.sentence}`).join('\n')}`;
-  return `[주요 키워드] ${input.mainKeyword} (본문에는 "${spacedKeyword(input.mainKeyword)}"처럼 자연스럽게, ${isStory(input) ? '2~3번. 횟수를 채우려고 문장을 만들지 않는다' : '3~5번'})
+  return `[주요 키워드] ${input.mainKeyword} (본문에는 "${spacedKeyword(input.mainKeyword)}"처럼 자연스럽게, ${lightKeyword(input) ? '2~3번. 횟수를 채우려고 문장을 만들지 않는다' : '3~5번'})
 [보조 키워드] ${input.subKeywords.map((k) => spacedKeyword(k)).join(', ') || '없음'}`;
 }
 
@@ -151,9 +155,9 @@ ${keywordLines(input)}
     ? (brief
       ? '있었던 일과 주제 설명 글감으로만 쓴다. 짜임: 있었던 일 하나 → 그것을 이해시키는 설명 (예: "처음엔 반죽을 손끝으로만 콕콕 찔러 봤어요. 이 나이 아이들은 낯선 촉감을 손끝부터 조심스럽게 탐색하거든요."). 일반 육아 조언 · 입학 권유 · 주제와 상관없는 유치원 소개로 늘리지 않는다. 인사 · 감사 문장은 합쳐서 3문장 이하. 아이들을 "원아" · "원생"처럼 딱딱하게 부르지 않는다 ("우리 아이들", "○○반 친구들").'
       : '재료가 담긴 만큼만 쓴다. 원장님 · 선생님 이야기 속 놀이 · 장면 · 아이들 모습 · 선생님이 도운 것을 구체적으로 풀어 쓰고, 재료에 없는 일반론(놀이 · 발달 일반 설명, 교육 효과, 가정 대화 권유)으로 늘리지 않는다.')
-    : '분량을 위해 사실을 만들지 말고 교육적 설명 · 지도 방향 · 가정에서 도울 점으로 채우되, "아이에게 물어보세요" 같은 가정 대화 권유는 글 전체에서 한 번만.'}
+    : '분량을 위해 사실을 만들지 말고, 재료에 적힌 활동 · 행사가 어떤 것인지 구체적으로 풀어 쓴다 (예: "한복은 저고리와 치마를 겹쳐 입는 옷이라 옷고름을 매는 동안 손이 바빠져요."). 재료에 없는 놀이 · 동작 이름과 장면은 쓰지 않고, 일반 설명을 우리 아이들이 실제로 한 일처럼 쓰지 않는다. 쓸 말이 떨어지면 태도 · 다짐 문장으로 늘리지 말고 목표보다 짧게 끝낸다. "아이에게 물어보세요" 같은 가정 대화 권유는 글 전체에서 한 번만.'}
 [구성] ${brief ? PURPOSE_GUIDE[brief.purpose] : KIND_GUIDE[input.kind]}
-[섹션 id] s1, s2, s3 … 순서대로. 첫 섹션(도입)은 heading 빈 문자열 가능. ${story ? `섹션 ${brief ? '3~4' : '3~5'}개. 섹션 첫 문장에서 앞 섹션을 "그 ○○"처럼 받아 잇지 않는다. 글을 어떻게 읽으라는 해설("~라는 뜻이에요", "구분해서 보시면 돼요")을 쓰지 않는다.` : '섹션 5~7개.'}
+[섹션 id] s1, s2, s3 … 순서대로. 첫 섹션(도입)은 heading 빈 문자열 가능. ${story ? `섹션 ${brief ? '3~4' : '3~5'}개. 섹션 첫 문장에서 앞 섹션을 "그 ○○"처럼 받아 잇지 않는다. 글을 어떻게 읽으라는 해설("~라는 뜻이에요", "구분해서 보시면 돼요")을 쓰지 않는다.` : thinMaterial(input) ? '섹션 3~5개.' : '섹션 5~7개.'}
 [사진 제안] photoSuggestions 는 실제 사진을 넣기 좋은 자리 2~3곳 (사진 설명이 있으면 그것 기준).
 
 [${APP.place} 정보 — 사실]
@@ -167,7 +171,7 @@ ${briefBlock(brief)}` : ''}`;
 
 export function expandPrompt(doc: ArticleDoc, current: number, min = MIN_CHARS) {
   return `아래 글의 본문이 공백 제외 ${current}자라 최소 ${min}자에 모자란다. 목표 ${min === MIN_CHARS ? TARGET_RANGE[0] : min + 200}자 이상. 같은 권유("아이에게 물어보세요" 등)를 되풀이해서 늘리지 마라.
-새 사실을 만들지 말고(활동 · 사례 · 수치 · 일정 추가 금지), 이미 있는 사실의 교육적 의미, 지도 방향, 가정에서 도울 점을 더 자세히 풀어 써서 늘려라.
+새 사실을 만들지 말고(활동 · 사례 · 수치 · 일정 추가 금지), 이미 있는 활동 · 행사가 어떤 것인지 구체적으로 더 풀어 써서 늘려라. 일반 설명을 우리 아이들이 실제로 한 일처럼 쓰지 않는다. "살펴봐요", "지켜봐요", "비교하지 않아요" 같은 태도 · 다짐 문장으로 늘리지 마라.
 섹션 id 와 순서는 유지하고, 같은 문장 반복으로 늘리지 마라. 같은 JSON 형식으로 전체를 다시 출력하라.
 
 ${JSON.stringify(doc)}`;
@@ -186,13 +190,13 @@ export function polishPrompt(doc: ArticleDoc, input: ArticleInput) {
 고칠 것:
 1. ${isStory(input) ? '문단 안 문장은 앞 내용을 이어받게 연결하되, 섹션 첫 문장을 "그 ○○", "그렇게 ~" 처럼 앞 섹션을 받아 시작하지 않는다.' : '섹션과 문단이 앞 내용을 이어받게 연결한다.'} 섹션마다 처음부터 다시 소개하거나 같은 뜻을 되풀이하는 문장은 지우거나 합친다.
 2. 문장 사이 연결이 끊기는 곳(갑자기 주제가 바뀜, 접속이 어색함)을 자연스럽게 잇는다.
-3. 검색어를 그대로 끼워 넣은 듯한 표현을 띄어 쓴 자연스러운 말로 바꾼다 (${kws || '키워드 없음'}). 주요 키워드는 본문 전체 ${input.keywordPlan?.length || isStory(input) ? '2~3번 (억지로 넣은 문장은 키워드를 빼거나 문장을 지운다)' : '3~5번'}.
+3. 검색어를 그대로 끼워 넣은 듯한 표현을 띄어 쓴 자연스러운 말로 바꾼다 (${kws || '키워드 없음'}). 주요 키워드는 본문 전체 ${input.keywordPlan?.length || lightKeyword(input) ? '2~3번 (억지로 넣은 문장은 키워드를 빼거나 문장을 지운다)' : '3~5번'}.
 4. 같은 어미 · 같은 시작어가 연달아 나오면 바꾼다.
 5. 효과를 보장하지 않는다는 해명 · 단서 문장("~라고 말할 수는 없어요", "~가 바로 달라지는 건 아니에요")과 글 주제와 상관없이 끼워 넣은 유치원 서비스 소개를 지운다. 글 자체를 설명하는 문장도 지운다 ("이것은 특정 아이 이야기가 아니라 일반적인 기준이에요", "이어서 ~를 나눠 볼게요", "오늘은 ~를 안내해 드려요" 같은 예고 · 해명).
 6. 연결은 내용으로 한다. 섹션 첫 문장에서 앞 섹션 내용을 억지로 다시 말하거나 키워드를 끼워 넣지 않는다 ("~를 생각했다면 ~도 볼까요?" 같은 이음말 반복 금지).${KINDER_POLISH(input.writer)}
 지킬 것: 사실(유치원 이름, 지역, 요일, 시간, 반 이름, 활동 내용, 경력)은 글자 그대로 둔다. 새 사실 · 사례 · 수치 · 일정을 더하지 않는다.
 섹션 id · 순서 · 소제목은 유지한다 (소제목은 어색할 때만 짧게 고친다). 이모지 수는 그대로. 분량은 공백 제외 ${minCharsForInput(input)}자 아래로 줄이지 않는다. 같은 권유("아이에게 물어보세요" 등)가 여러 번이면 하나만 남긴다. 인사만 담은 마지막 섹션이 따로 있으면 앞 섹션 끝에 합친다 (섹션 수가 하나 줄어도 됨).
-titleCandidates · tags · photoSuggestions · reviewFlags 는 그대로 둔다. 같은 JSON 형식으로 전체를 출력하라.
+titleCandidates · tags · photoSuggestions · reviewFlags 는 그대로 둔다. 같은 JSON 형식으로 전체를 출력하라.${overusedLine(doc)}
 
 ${JSON.stringify(doc)}`;
 }
@@ -273,7 +277,7 @@ ${isStory(input) ? STORY_PROOF_5 : '5. "~겠지요", "~수 있어요" 같은 추
 6. 메모를 그대로 붙여 넣은 듯 어색한 문장 · 띄어쓰기 틀린 말 ("소풍갔어요" → "소풍을 갔어요")
 7. 유치원 글에 섞인 어린이집 말 (입소 · 보육료 · 보육교사 · 연장보육 · 영아 · "어린이집") → 유치원 말로
 지킬 것: 사실(${APP.place} 이름, 지역, 반 이름, 장소, 활동, 일정)은 글자 그대로 둔다. 새 사실 · 숫자 · 장면을 더하지 않는다. 이모지는 지우지 않는다.
-before 는 글에 있는 문장을 한 글자도 바꾸지 말고 그대로 옮긴다 (문장 하나 단위). after 는 고친 문장, 지울 문장이면 빈 문자열. 고칠 곳이 없으면 fixes 빈 배열. 많아야 15곳.
+before 는 글에 있는 문장을 한 글자도 바꾸지 말고 그대로 옮긴다 (문장 하나 단위). after 는 고친 문장, 지울 문장이면 빈 문자열. 고칠 곳이 없으면 fixes 빈 배열. 많아야 15곳.${overusedLine(doc)}
 
 [글 정보] 종류: ${kindLabel(input.kind)} · 주제: ${input.topic}${input.writer ? ` · 글쓴이: ${writerLabel(input.writer)}` : ''}
 

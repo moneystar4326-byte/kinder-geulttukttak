@@ -1,6 +1,7 @@
 // 입력 검사 · 결과 점검 (AI 없이 코드로 하는 것)
 import type { ArticleDoc, ArticleInput, DojoProfile, ReviewFlag } from './types';
 import { bodyText, countDoc, minCharsFor, minCharsForInput } from './count';
+import { overusedWords } from './overused';
 import { uncheckedMentions } from './strengths';
 import { APP } from './kinder';
 
@@ -82,6 +83,7 @@ export function localFlags(doc: ArticleDoc, profile: DojoProfile, input?: Articl
     for (const a of unknownAmounts(body, factsText(input, profile))) flags.push({ code: 'fee', message: `사실 칸에 없는 금액 "${a}"이 글에 있어요. 교육비 · 원비는 적어 준 그대로만 써요.` });
     for (const n of childNames(memoText(input))) if (body.includes(n)) flags.push({ code: 'child-name', message: `메모에 있던 이름 "${n}"이 글에 있어요. 아이 이름이면 "한 친구"로 바꿔 주세요.` });
   }
+  for (const x of overusedWords(doc)) flags.push({ code: 'overused', message: `"${x.word}"가 ${x.count}번 나와요. 이 글의 활동을 말하는 문장으로 바꾸면 더 자연스러워요.` });
   // 같은 문장 반복
   const sentences = bodyText(doc).split(/(?<=[.!?。])\s+/).map((x) => x.trim()).filter((x) => x.length > 15);
   const seen = new Set<string>();
