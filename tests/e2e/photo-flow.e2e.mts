@@ -155,11 +155,55 @@ try {
   await page.waitForFunction(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent === '네이버에 초안 입력') as HTMLButtonElement; return b && !b.disabled; }, undefined, { timeout: 10000 });
   await page.screenshot({ path: path.join(outDir, '4-confirmed.png'), fullPage: true });
 
+  // GIF (태권 글뚝딱 2.7.0에서 옮김): 만들기 → 프레임 수 확인 → 사진을 고치면 옛 GIF 지움 → 다시 확인하고 다시 만듦
+  await page.click('button:has-text("GIF 만들기")');
+  await page.waitForSelector('img[alt="움직이는 사진 미리보기"]', { timeout: 60000 });
+  st = await call<PhotoState>('photos:state', id);
+  assert.ok(st.gif, 'GIF 저장됨');
+  const gifB64 = fs.readFileSync(st.gif!.file).toString('base64');
+  const decoded = await page.evaluate(async (b64) => {
+    const data = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const d = new (window as any).ImageDecoder({ data, type: 'image/gif' });
+    await d.tracks.ready;
+    const f = await d.decode({ frameIndex: 0 });
+    const out = { frames: d.tracks.selectedTrack.frameCount, w: f.image.displayWidth, h: f.image.displayHeight };
+    f.image.close();
+    return out;
+  }, gifB64);
+  console.log('GIF', decoded, st.gif!.bytes);
+  assert.equal(decoded.frames, st.items.length, '브라우저가 프레임을 모두 읽음');
+  assert.equal(decoded.w, st.gif!.w);
+  await page.screenshot({ path: path.join(outDir, '4b-gif.png'), fullPage: true });
+  const gifPath = st.gif!.file;
+  const edit = page.locator('img[data-bg]');
+  await edit.scrollIntoViewIfNeeded();
+  const eb = (await edit.boundingBox())!;
+  await page.mouse.move(eb.x + 20, eb.y + 20); await page.mouse.down(); await page.mouse.move(eb.x + 50, eb.y + 50, { steps: 3 }); await page.mouse.up();
+  for (let i = 0; i < 50; i++) { await page.waitForTimeout(300); st = await call<PhotoState>('photos:state', id); if (!st.gif) break; }
+  assert.equal(st.gif, null, '사진을 고치면 GIF가 빠짐 (가리기 전 얼굴이 남지 않게)');
+  assert.equal(st.gifGone, true);
+  assert.equal(fs.existsSync(gifPath), false, '옛 GIF 파일이 지워짐');
+  await page.waitForSelector('text=전에 만든 GIF를 지웠어요');
+  for (let i = 0; i < st.items.length; i++) {
+    const btn = page.locator('button:has-text("확인하고 다음"), button:has-text("얼굴 없는 사진이 맞아요")').first();
+    if (!(await btn.count())) break;
+    await btn.click(); await page.waitForTimeout(400);
+  }
+  await page.click('button:has-text("GIF 만들기")');
+  await page.waitForSelector('img[alt="움직이는 사진 미리보기"]', { timeout: 60000 });
+  await page.click('button:has-text("글 맨 위")');
+  await page.waitForTimeout(300);
+  st = await call<PhotoState>('photos:state', id);
+  assert.equal(st.gif?.at, 'top', '넣을 자리 바꿈');
+  assert.deepEqual(st.blockers, []);
+
   // 붙여넣기 도우미: 사진이 장면 글 사이 그림 단계로 들어가고, 끝까지 하면 '사용한 사진'으로 기록
   const plan = await call<any>('paste:plan', { articleId: id, map: false });
   const media = plan.steps.filter((s: any) => s.kind === 'media');
-  assert.equal(media.reduce((n: number, s: any) => n + s.items.length, 0), 3, '사진 3장이 그림 단계로');
-  assert.ok(media.every((s: any) => s.items.every((it: any) => it.image)), '처리본은 그림으로 복사');
+  const items = media.flatMap((s: any) => s.items);
+  assert.equal(items.filter((it: any) => it.image).length, 3, '사진 3장이 그림 단계로 (그림으로 복사)');
+  assert.deepEqual(items.filter((it: any) => !it.image).map((it: any) => it.label), ['움직이는 사진'], 'GIF는 파일로 올림');
+  assert.equal(plan.steps.findIndex((s: any) => s.kind === 'media' && s.items.some((it: any) => !it.image)), 2, 'GIF는 글 맨 위 (제목 · 서식 다음)');
   assert.equal((await call<any[]>('photos:scan')).filter((p) => p.used).length, 0);
   await call('paste:finish', { articleId: id, map: false, stamp: plan.stamp });
   assert.equal((await call<any[]>('photos:scan')).filter((p) => p.used).length, 3, '끝까지 하면 사용한 사진으로 기록');

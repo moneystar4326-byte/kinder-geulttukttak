@@ -7,6 +7,7 @@ import { TypingStage } from '../editor/TypingStage';
 import { CardsPanel, type CardPref } from '../components/CardsPanel';
 import { MobilePreview } from '../components/MobilePreview';
 import { PhotoCheckPanel } from '../components/PhotoCheckPanel';
+import { PhotoGifPanel } from '../components/PhotoGifPanel';
 import { PasteHelper } from '../components/PasteHelper';
 import { naverAutoOn } from '../../shared/naverAuto';
 import { FirstTip } from '../guide/voice';
@@ -195,6 +196,7 @@ export function ArticlePage({ id }: { id: string }) {
       {!draft && !busy && <div className="note info">아직 글이 없어요. <button className="btn link" onClick={regenerate}>글 만들기</button></div>}
       {draft && <FirstTip id="A11" />}
       {photoMode && <PhotoCheckPanel articleId={id} doc={draft?.doc} refresh={`${JSON.stringify(saved?.doc)}|${naverJob?.state}|${naverJob?.updatedAt}`} onState={setPhotoSt} />}
+      {photoMode && <PhotoGifPanel articleId={id} st={photoSt} onState={setPhotoSt} />}
 
       {draft && (
         <div className="split">
@@ -251,7 +253,7 @@ export function ArticlePage({ id }: { id: string }) {
             {/* 붙여넣기 도우미 (태권 글뚝딱 2.8.0에서 옮김): 기본 방법. 지도 칸은 '네이버에 초안 입력'과 같은 값을 씀 */}
             <PasteHelper articleId={id} opts={{ map: naverMap }} beforeStart={async () => { if (dirty) await save(); }}
               blocked={!b.version ? '글을 먼저 만들어 주세요' : photoBlocked ? '사진 얼굴 가림 확인이 끝나야 쓸 수 있어요 (위 사진 확인 칸)' : undefined}
-              refreshKey={`${b.cardSet?.id ?? ''}|${photoSt?.items.map((x) => `${x.id}${x.confirmed ? 1 : 0}${x.excluded ? 1 : 0}${x.processedHash ?? ''}`).join(',') ?? ''}`}>
+              refreshKey={`${b.cardSet?.id ?? ''}|${photoSt?.items.map((x) => `${x.id}${x.confirmed ? 1 : 0}${x.excluded ? 1 : 0}${x.processedHash ?? ''}`).join(',') ?? ''}|${photoSt?.gif ? `${photoSt.gif.hash}${photoSt.gif.at}` : ''}`}>
               {mapBox}
             </PasteHelper>
 

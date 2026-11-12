@@ -241,4 +241,5 @@ export interface PhotoItem {
   excluded: boolean;
   error?: string;
 }
-export interface PhotoState { items: PhotoItem[]; blockers: string[]; workDir: string; resumable: boolean }
+export interface PhotoGif { file: string; hash: string; at: 'bottom' | 'top'; delay: number; frames: number; w: number; h: number; bytes: number }
+export interface PhotoState { items: PhotoItem[]; blockers: string[]; workDir: string; resumable: boolean; gif: PhotoGif | null; gifGone: boolean; gifPlan: { ready: boolean; total: number; ids: string[]; sig: string } }

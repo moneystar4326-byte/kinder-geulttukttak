@@ -10,6 +10,7 @@ import { chromium, type Browser, type Page } from 'playwright-core';
 import { findBrowser } from '../../src/main/services/browser-draft/browser';
 import * as E from '../../src/main/services/browser-draft/editor';
 import { buildBlocks } from '../../src/main/services/browser-draft';
+import { GifWriter } from '../../src/shared/gif';
 
 const MOCK = pathToFileURL(path.resolve('tests/fixtures/mock-editor.html')).href;
 const exe = findBrowser();
@@ -201,4 +202,17 @@ test('사진 글: 장면 글 바로 아래 순서대로 들어가고, 끊겨도 
   assert.deepEqual(await page.$$eval('#body .se-image', (els) => els.map((e) => (e as HTMLElement).dataset.name)), ['gtd-card-1.png', 'gtd-card-2.png', 'gtd-card-3.png']);
   // 다 들어간 뒤에는 이어 넣을 것이 없음
   assert.equal(E.resumePlan(await texts(), 3, shots).ok, false);
+});
+
+test('사진 글 GIF: 글 끝 자리에 올라가고 자리 글자가 지워짐 (태권 글뚝딱 2.7.0에서 옮김)', { skip: !exe && '크롬 · 엣지 없음' }, async () => {
+  const { page } = await open();
+  const f = (await E.findEditor(page, 5000))!;
+  const gif = path.join(os.tmpdir(), `gtd-gif-${process.pid}.gif`);
+  const w = new GifWriter(2, 2, 60); w.addFrame(new Uint8Array(16).fill(200)); fs.writeFileSync(gif, w.finish());
+  await page.evaluate((t) => (window as any).__paste(t), E.blocksToText(buildBlocks([{ id: 's', paragraphs: ['본문'] }], [], [], undefined, 'bottom')));
+  const before = await page.locator('.se-component.se-image').count();
+  assert.deepEqual(await E.insertCardsAtMarks(page, f, [{ index: E.GIF_CARD, file: gif }]), [true]);
+  assert.equal(await page.locator('.se-component.se-image').count(), before + 1);
+  assert.deepEqual((await E.verify(f, '', [E.GIF_CARD])).leftMarks, []);
+  fs.rmSync(gif, { force: true });
 });

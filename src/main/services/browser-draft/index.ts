@@ -173,7 +173,7 @@ export type BrowserDraft = ReturnType<typeof createBrowserDraft>;
 
 // 초안 블록 만들기: 권장 배치 = 도입 → 카드1 → … (카드의 afterSectionId 기준, 없으면 도입 뒤 · 가운데 · 마무리 앞)
 // 문단은 휴대폰에서 읽기 좋게 짧은 줄로 끊고, 맨 끝에 #태그 한 줄 (그 뒤에 지도)
-export function buildBlocks(sections: { id: string; heading?: string; paragraphs: string[] }[], cards: { title: string; afterSectionId?: string; index?: number }[], tags: string[] = [], photos?: { sectionId: string; index: number; title: string }[]): E.DraftBlock[] {
+export function buildBlocks(sections: { id: string; heading?: string; paragraphs: string[] }[], cards: { title: string; afterSectionId?: string; index?: number }[], tags: string[] = [], photos?: { sectionId: string; index: number; title: string }[], gif?: 'bottom' | 'top'): E.DraftBlock[] {
   const ids = sections.map((s) => s.id);
   const n = ids.length;
   const fallback = [0, Math.floor((n - 1) / 2), Math.max(n - 2, 0)]; // 도입 뒤 · 가운데 · 마무리 앞
@@ -184,12 +184,16 @@ export function buildBlocks(sections: { id: string; heading?: string; paragraphs
     after.set(at, [...(after.get(at) ?? []), i]);
   });
   const out: E.DraftBlock[] = [];
+  // 사진 글 움직이는 GIF: 맨 위면 첫 문단 앞, 끝이면 마무리 글(글쓴이 줄) 뒤 · 태그 앞
+  const gifBlock: E.DraftBlock = { kind: 'card', text: E.cardMark(E.GIF_CARD, '움직이는 사진'), cardIndex: E.GIF_CARD };
+  if (gif === 'top') out.push(gifBlock);
   for (const s of sections) {
     if (s.heading) out.push({ kind: 'heading', text: headingLines(s.heading).join('\n') });
     for (const para of s.paragraphs) for (const chunk of mobileParagraphs(para)) out.push({ kind: 'paragraph', text: chunk });
     for (const ph of photos ?? []) if (ph.sectionId === s.id) out.push({ kind: 'card', text: E.cardMark(ph.index, ph.title), cardIndex: ph.index }); // 사진 글: 그 장면 글 바로 아래
     for (const i of after.get(s.id) ?? []) { const n = cards[i].index ?? i; out.push({ kind: 'card', text: E.cardMark(n, cards[i].title), cardIndex: n }); }
   }
+  if (gif === 'bottom') out.push(gifBlock);
   if (tags.length) out.push({ kind: 'paragraph', text: tagLine(tags) });
   return out;
 }

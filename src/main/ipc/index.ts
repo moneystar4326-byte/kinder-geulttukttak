@@ -27,7 +27,7 @@ import { collectNearby, lookupAddress, prefixOptions } from '../services/nearby'
 import type { PlaceResult } from '../services/browser-draft/editor';
 import { createCardService, type Shooter } from '../services/card-renderer';
 import { blogIdOf, buildBlocks, STEP_LABEL, type BrowserDraft } from '../services/browser-draft';
-import { PHOTO_BASE } from '../services/browser-draft/editor';
+import { GIF_CARD, PHOTO_BASE } from '../services/browser-draft/editor';
 import { pasteSteps } from '../services/paste-helper';
 import { PASTE_STALE } from '../../shared/paste';
 import { NAVER_AUTO_OFF_MSG, NAVER_AUTO_TERMS_VERSION, naverAutoOn } from '../../shared/naverAuto';
@@ -476,8 +476,8 @@ export function registerIpc(ctx: AppCtx) {
     const missing = (cs?.cards ?? []).filter((c) => !(c.status === 'done' && c.outputPath)).map((c) => cardNo(slots, c.index));
     const cardNote = photo ? '' : !cs ? '카드를 아직 만들지 않아 사진 없이 넣었어요 (카드를 만든 뒤 넣으면 사진도 같이 들어가요)' : missing.length ? `카드 ${missing.join(', ')}번은 만들어지지 않아 빠졌어요 (카드 화면에서 다시 만들기)` : '';
     // 글쓴이 줄("○○반 담임 선생님 드림")은 본문 끝 문단에 이미 들어 있어서 따로 넣지 않음
-    const blocks = buildBlocks(v.doc.sections, cards.map((c) => ({ title: c.copy.title, afterSectionId: c.afterSectionId, index: c.index })), v.doc.tags, photo?.marks);
-    const cardFiles = [...(photo?.files ?? []), ...cards.map((c) => ({ index: c.index, file: c.outputPath! }))];
+    const blocks = buildBlocks(v.doc.sections, cards.map((c) => ({ title: c.copy.title, afterSectionId: c.afterSectionId, index: c.index })), v.doc.tags, photo?.marks, photo?.gif?.at);
+    const cardFiles = [...(photo?.files ?? []), ...cards.map((c) => ({ index: c.index, file: c.outputPath! })), ...(photo?.gif ? [{ index: GIF_CARD, file: photo.gif.file }] : [])]; // GIF는 맨 나중에 (못 올라가도 다른 사진은 멈추지 않게)
     return { v, p, photo, slots, cardNote, blocks, cardFiles, noCards: !photo && !cs, missingCards: photo ? [] : missing };
   }
   handle('naver:fill', z.object({ articleId: Id, onExisting: z.enum(['stop', 'new']), typing: z.boolean().optional(), map: z.boolean().optional() }), ({ articleId, onExisting, typing, map }) => {
@@ -495,8 +495,9 @@ export function registerIpc(ctx: AppCtx) {
       if (r.state === 'not-owner') throw new Error(`글쓰기 화면을 열지 못했어요. 로그인한 네이버 아이디가 blog.naver.com/${r.blogId} 의 주인인지 확인해 주세요.`);
       const c = r.check;
       const photoNote = photo ? photo.finish(c.leftMarks, r.order) : ''; // 사진을 다 못 넣었으면 여기서 멈춤 (이어 넣기)
-      const leftCards = c.leftMarks.filter((n) => n <= PHOTO_BASE).map((n) => cardNo(slots, n - 1));
-      const msg = [`제목 ${c.titleOk ? '확인' : '다름 — 직접 확인 필요'}`, `이미지 ${c.images}장`, photoNote, cardNote, r.map ? placeNote(r.map) : '', leftCards.length ? `카드 ${leftCards.join(', ')}번은 올리지 못해 자리 글자가 남아 있어요 (네이버 창에서 그 자리에 직접 올려 주세요 · 저장 폴더에 카드 파일이 있어요)` : '', '발행 · 저장은 직접 눌러 주세요'].filter(Boolean).join(' · ');
+      const leftCards = c.leftMarks.filter((n) => n !== GIF_CARD + 1 && n <= PHOTO_BASE).map((n) => cardNo(slots, n - 1));
+      const gifNote = photo?.gifGone ? '사진이 바뀌어 GIF는 빠졌어요 (넣으려면 다시 만들어 주세요)' : photo?.gif ? (c.leftMarks.includes(GIF_CARD + 1) ? 'GIF를 올리지 못해 자리 글자가 남아 있어요 (처리본 폴더의 animated.gif를 그 자리에 직접 올려 주세요)' : 'GIF 넣음 (네이버 창에서 움직이는지 확인해 주세요)') : '';
+      const msg = [`제목 ${c.titleOk ? '확인' : '다름 — 직접 확인 필요'}`, `이미지 ${c.images}장`, photoNote, cardNote, gifNote, r.map ? placeNote(r.map) : '', leftCards.length ? `카드 ${leftCards.join(', ')}번은 올리지 못해 자리 글자가 남아 있어요 (네이버 창에서 그 자리에 직접 올려 주세요 · 저장 폴더에 카드 파일이 있어요)` : '', '발행 · 저장은 직접 눌러 주세요'].filter(Boolean).join(' · ');
       return `입력 끝: ${msg}`;
     }).job;
   });
@@ -523,6 +524,7 @@ export function registerIpc(ctx: AppCtx) {
     const notes = [
       d.noCards ? '카드를 아직 만들지 않아 그림 단계가 없어요. 카드를 만든 뒤 [다시 준비]를 눌러 주세요.' : '',
       d.missingCards.length ? `카드 ${d.missingCards.join(', ')}번은 만들어지지 않아 빠져요 (카드 화면에서 다시 만들기)` : '',
+      d.photo?.gifGone ? '사진이 바뀌어 GIF는 빠졌어요 (넣으려면 다시 만들어 주세요)' : '',
     ].filter(Boolean);
     return { steps, stamp, notes, canOpen: !!d.p.blogUrl && !!blogIdOf(d.p.blogUrl) };
   });

@@ -20,6 +20,7 @@ export const SEL = {
 export interface DraftBlock { kind: 'heading' | 'paragraph' | 'card'; text: string; cardIndex?: number }
 // 사진 글의 사진 자리는 따로 표시 (카드 0~2 와 겹치지 않게 — 태권 글뚝딱 2.5.0에서 옮김)
 export const PHOTO_BASE = 100;
+export const GIF_CARD = 7; // 사진 글 움직이는 GIF 자리 번호 (카드 번호와 겹치지 않게 — 태권 글뚝딱 2.7.0에서 옮김)
 const markName = (i: number) => (i >= PHOTO_BASE ? `사진 ${i - PHOTO_BASE + 1}` : `카드 ${i + 1}`);
 export const cardMark = (i: number, title: string) => `[${markName(i)} · ${title.replace(/[\[\]]/g, '')}]`;
 export const isCardMark = (t: string, i: number) => new RegExp(`^\\[${markName(i).replace(' ', '\\s*')}\\s*·`).test(t.replace(/[​﻿]/g, '').trim());

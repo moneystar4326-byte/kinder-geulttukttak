@@ -160,7 +160,7 @@ export function PasteHelper({ articleId, opts, beforeStart, blocked, refreshKey,
                   <div style={{ margin: '4px 0 0 22px' }}>
                     {s.items.map((it, j) => (
                       <div className="row" key={j}>
-                        <span className="grow hint">{it.label}{!it.image ? ' (그림으로 복사할 수 없어 파일로 올려요)' : ''}</span>
+                        <span className="grow hint">{it.label}{!it.image ? (/움직이는/.test(it.label) ? ' (움직이는 그림이라 파일로 올려요)' : ' (그림으로 복사할 수 없어 파일로 올려요)') : ''}</span>
                         {it.image && <button className="btn small" disabled={busy} onClick={act((p) => copyImage(p, i, j, it.label))}>그림 복사</button>}
                         <button className="btn small" disabled={busy} onClick={act((p) => show(p, i, j, it.label))}>파일 위치</button>
                       </div>

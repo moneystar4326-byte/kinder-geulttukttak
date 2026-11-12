@@ -12,13 +12,14 @@ import { withKeywordFallback } from '../../shared/validation';
 import { bodyText } from '../../shared/count';
 import { shortLines } from '../../shared/format';
 import { cleanRegions, isJpeg, jpegHasMetadata, MAX_PHOTOS, namesInBody, PHOTO_EXT, photoLinkErrors, photoStory, scenesNamesInBody } from '../../shared/photos';
+import { GIF_MAX_BYTES, isGif, pickFrames } from '../../shared/gif';
 import { loadSettings } from '../settings';
 import { APP } from '../../shared/kinder';
 import { NAVER_AUTO_OFF_MSG, naverAutoOn } from '../../shared/naverAuto';
-import type { ArticleDoc, KeywordRow, PhotoItem, PhotoState } from '../../shared/types';
+import type { ArticleDoc, KeywordRow, PhotoGif, PhotoItem, PhotoState } from '../../shared/types';
 import { hashOf, photoFileProblems, scanFolder } from '../services/photo-folder';
 import { STEP_LABEL } from '../services/browser-draft';
-import { PHOTO_BASE } from '../services/browser-draft/editor';
+import { GIF_CARD, PHOTO_BASE } from '../services/browser-draft/editor';
 
 const Id = z.string().min(1).max(64);
 const PhotoId = z.string().regex(/^p\d{2}$/);
@@ -34,6 +35,31 @@ const liveDoc = (doc: Pick<ArticleDoc, 'sections'>, all: PhotoItem[]) => {
   const out = new Set(all.filter((x) => x.excluded).map((x) => x.id));
   return { sections: doc.sections.map((s) => (s.photoId && out.has(s.photoId) ? { ...s, photoId: undefined } : s)) };
 };
+
+// 움직이는 GIF (태권 글뚝딱 2.7.0에서 옮김): 처리본으로만 만듦. 만들 때의 사진(순서 · 처리본 해시)을 기억해, 사진이 바뀌면 바로 지움 (가리기 전 얼굴이 GIF에 남지 않게)
+const gifFile = (ctx: AppCtx, articleId: string) => path.join(workDir(ctx, articleId), 'animated.gif');
+const gifMeta = (ctx: AppCtx, articleId: string) => path.join(workDir(ctx, articleId), 'animated.json');
+function gifPlan(ctx: AppCtx, articleId: string, doc: ArticleDoc | null) {
+  const all = items(ctx, articleId);
+  const byId = new Map(all.filter((x) => !x.excluded).map((x) => [x.id, x]));
+  const linked = (doc?.sections ?? []).filter((s) => s.photoId && byId.has(s.photoId)).map((s) => byId.get(s.photoId!)!);
+  const ready = !photoFileProblems(all).length && linked.length === byId.size && linked.length > 0;
+  return { ready, total: linked.length, ids: pickFrames(linked).map((x) => x.id), sig: hashOf(new TextEncoder().encode(linked.map((x) => `${x.id}:${x.processedHash ?? ''}`).join('|'))) };
+}
+function currentGif(ctx: AppCtx, articleId: string, doc: ArticleDoc | null): { gif: PhotoGif | null; gone: boolean } {
+  let meta: (Omit<PhotoGif, 'file' | 'bytes'> & { sig: string; gone?: boolean }) | null = null;
+  try { meta = JSON.parse(fs.readFileSync(gifMeta(ctx, articleId), 'utf-8')); } catch { return { gif: null, gone: false }; }
+  if (!meta || meta.gone) return { gif: null, gone: !!meta?.gone };
+  const file = gifFile(ctx, articleId);
+  const plan = gifPlan(ctx, articleId, doc);
+  const bytes = fs.existsSync(file) ? fs.readFileSync(file) : null;
+  if (!bytes || !plan.ready || plan.sig !== meta.sig || hashOf(bytes) !== meta.hash) {
+    fs.rmSync(file, { force: true });
+    fs.writeFileSync(gifMeta(ctx, articleId), JSON.stringify({ gone: true }));
+    return { gif: null, gone: true };
+  }
+  return { gif: { file, hash: meta.hash, at: meta.at, delay: meta.delay, frames: meta.frames, w: meta.w, h: meta.h, bytes: bytes.length }, gone: false };
+}
 
 export function photoBlockers(ctx: AppCtx, articleId: string, doc: ArticleDoc | null) {
   const all = items(ctx, articleId);
@@ -70,7 +96,8 @@ export function photoDraft(ctx: AppCtx, articleId: string, doc: ArticleDoc) {
   const blockers = photoBlockers(ctx, articleId, doc);
   if (blockers.length) throw new Error(blockers[0]);
   const parts = draftParts(ctx, articleId, doc);
-  return { ...parts, finish: (leftMarks: number[], order: string[]) => finishWith(ctx, articleId, parts, leftMarks, order) };
+  const { gif, gone: gifGone } = currentGif(ctx, articleId, doc);
+  return { ...parts, gif, gifGone, finish: (leftMarks: number[], order: string[]) => finishWith(ctx, articleId, parts, leftMarks, order) };
 }
 
 export function registerPhotoIpc(ctx: AppCtx) {
@@ -112,7 +139,9 @@ export function registerPhotoIpc(ctx: AppCtx) {
     const art = db.getArticle(articleId);
     const v = art?.currentVersionId ? db.getVersion(art.currentVersionId) : null;
     const last = db.recentJobs(articleId).find((j) => j.type === 'naver');
-    return { items: items(ctx, articleId), blockers: v ? photoBlockers(ctx, articleId, v.doc) : ['글을 먼저 만들어 주세요'], workDir: workDir(ctx, articleId), resumable: last?.state === 'failed' && last.errorCode !== 'existing-draft' && ctx.browser.isOpen() };
+    const doc = v?.doc ?? null;
+    const g = doc ? currentGif(ctx, articleId, doc) : { gif: null, gone: false };
+    return { items: items(ctx, articleId), blockers: v ? photoBlockers(ctx, articleId, v.doc) : ['글을 먼저 만들어 주세요'], workDir: workDir(ctx, articleId), resumable: last?.state === 'failed' && last.errorCode !== 'existing-draft' && ctx.browser.isOpen(), gif: g.gif, gifGone: g.gone, gifPlan: gifPlan(ctx, articleId, doc) };
   });
   handle('photos:faceModel', z.undefined(), () => {
     const dir = path.join(path.dirname(ctx.fontDir), 'face-models');
@@ -157,6 +186,39 @@ export function registerPhotoIpc(ctx: AppCtx) {
   });
   handle('photos:exclude', z.object({ articleId: Id, id: PhotoId, excluded: z.boolean() }), ({ articleId, id, excluded }) => { db.updatePhoto(articleId, id, { excluded, confirmed: false }); });
   handle('photos:openWork', Id, (articleId) => shell.openPath(workDir(ctx, articleId)));
+  const docOf = (articleId: string) => { const a = db.getArticle(articleId); return a?.currentVersionId ? db.getVersion(a.currentVersionId)?.doc ?? null : null; };
+  // GIF 재료: 확인이 끝난 처리본만 화면으로
+  handle('photos:gifFrame', Key, ({ articleId, id }) => {
+    const x = items(ctx, articleId).find((p) => p.id === id);
+    if (!x || x.excluded || !x.confirmed || x.status !== 'ready' || !x.processedFile) throw new Error('확인을 마친 사진만 GIF에 넣을 수 있어요');
+    const b = fs.readFileSync(x.processedFile);
+    if (hashOf(b) !== x.processedHash) throw new Error('처리본이 바뀌었어요. 다시 확인해 주세요.');
+    return new Uint8Array(b);
+  });
+  handle('photos:saveGif', z.object({ articleId: Id, sig: z.string().max(100), gif: z.instanceof(Uint8Array), at: z.enum(['bottom', 'top']), delay: z.number().int().min(10).max(1000), frames: z.number().int().min(2).max(100), w: z.number().int().min(1).max(4000), h: z.number().int().min(1).max(4000) }), ({ articleId, sig, gif, at, delay, frames, w, h }) => {
+    const plan = gifPlan(ctx, articleId, docOf(articleId));
+    if (!plan.ready || plan.sig !== sig) throw new Error('만드는 사이에 사진이 바뀌었어요. 다시 만들어 주세요.');
+    if (gif.length > GIF_MAX_BYTES + 1024 * 1024 || !isGif(gif)) throw new Error('GIF를 저장하지 못했어요');
+    const file = gifFile(ctx, articleId);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(`${file}.tmp`, gif);
+    fs.renameSync(`${file}.tmp`, file);
+    fs.writeFileSync(gifMeta(ctx, articleId), JSON.stringify({ sig, hash: hashOf(gif), at, delay, frames, w, h }));
+  });
+  handle('photos:gifAt', z.object({ articleId: Id, at: z.enum(['bottom', 'top']) }), ({ articleId, at }) => {
+    const meta = JSON.parse(fs.readFileSync(gifMeta(ctx, articleId), 'utf-8'));
+    fs.writeFileSync(gifMeta(ctx, articleId), JSON.stringify({ ...meta, at }));
+  });
+  handle('photos:removeGif', Id, (articleId) => { fs.rmSync(gifFile(ctx, articleId), { force: true }); fs.rmSync(gifMeta(ctx, articleId), { force: true }); });
+  handle('photos:saveGifAs', Id, async (articleId) => {
+    const { gif } = currentGif(ctx, articleId, docOf(articleId));
+    if (!gif) throw new Error('GIF를 다시 만들어 주세요');
+    const r = await dialog.showSaveDialog(ctx.win()!, { defaultPath: path.join(loadSettings(db).saveDir, '움직이는사진.gif'), filters: [{ name: 'GIF', extensions: ['gif'] }] });
+    if (r.canceled || !r.filePath) return null;
+    fs.copyFileSync(gif.file, r.filePath);
+    return r.filePath;
+  });
+
   // 남은 사진 이어 넣기: 편집기 내용이 기록과 맞을 때만. 안 맞으면 다시 넣지 않고 복사 · 폴더 열기로 안내
   handle('naver:resumePhotos', Id, (articleId) => {
     if (!naverAutoOn(loadSettings(db).naverAuto)) throw new Error(NAVER_AUTO_OFF_MSG); // 자동 입력 꺼짐이면 이어 넣기도 막음
@@ -166,7 +228,7 @@ export function registerPhotoIpc(ctx: AppCtx) {
     if (!v) throw new Error('글을 먼저 만들어 주세요');
     const d = photoDraft(ctx, articleId, v.doc);
     return runner.start('naver', articleId, '남은 사진 이어 넣는 중', async ({ signal, step }) => {
-      const r = await ctx.browser.resume({ title: v.title, cardFiles: d.files, photoAnchors: d.anchors }, (s) => step(STEP_LABEL[s]), signal);
+      const r = await ctx.browser.resume({ title: v.title, cardFiles: [...d.files, ...(d.gif ? [{ index: GIF_CARD, file: d.gif.file }] : [])], photoAnchors: d.anchors }, (s) => step(STEP_LABEL[s]), signal);
       if (r.state === 'mismatch') throw new Error(`자동으로 이어 넣지 않았어요: ${r.why}. [전체 복사]와 [처리본 폴더 열기]로 직접 넣어 주세요.`);
       return `입력 끝: ${d.finish(r.check.leftMarks, r.order)} · 발행 · 저장은 직접 눌러 주세요`;
     }).job;

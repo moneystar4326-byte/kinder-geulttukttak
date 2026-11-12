@@ -2,10 +2,10 @@
 // 네이버 화면은 건드리지 않음. 파일 경로는 메인에만 두고 화면에는 이름만 보냄
 import type { PasteStep } from '../../shared/paste';
 import { APP } from '../../shared/kinder';
-import { BODY_STYLE, HEADING_SIZE, type DraftBlock } from './browser-draft/editor';
+import { BODY_STYLE, GIF_CARD, HEADING_SIZE, type DraftBlock } from './browser-draft/editor';
 
 const STILL = /\.(png|jpe?g|webp|bmp)$/i;
-const markLabel = (b: DraftBlock) => b.text.replace(/^\[|\]$/g, '').trim();
+const markLabel = (b: DraftBlock) => (b.cardIndex === GIF_CARD ? '움직이는 사진' : b.text.replace(/^\[|\]$/g, '').trim());
 const shortLabel = (b: DraftBlock) => (b.kind === 'heading' ? b.text.split('\n')[0] : b.text.length > 20 ? `${b.text.slice(0, 20)}…` : b.text);
 
 // 소제목을 꾸며서 붙이기: 글자 · 줄 나눔은 글자만 복사(text)와 똑같고, 소제목 줄만 굵게 · 크기 24 (자동 입력 styleHeadings 와 같은 값)
