@@ -6,7 +6,7 @@ import OpenAI, { toFile } from 'openai';
 import { z } from 'zod';
 import { ApiError, toApiError } from '../errors';
 import { ARTICLE_META_JSON, ArticleMetaSchema,
-  BRIEF_JSON, BriefSchema, VERIFY_JSON, VerifySchema, CARD_COPY_JSON, cardCopySchema, CARD_ONE_JSON, CardOneSchema, MEMO_SPLIT_JSON, MemoSplitSchema, GENERATED_ARTICLE_JSON, GeneratedArticleSchema, KEYWORD_IDEAS_JSON, KeywordIdeasSchema, KEYWORD_PLAN_JSON, KeywordPlanSchema,
+  BRIEF_JSON, BriefSchema, VERIFY_JSON, VerifySchema, CARD_COPY_JSON, cardCopySchema, CARD_ONE_JSON, CardOneSchema, CARD_SHORT_JSON, CardShortSchema, MEMO_SPLIT_JSON, MemoSplitSchema, GENERATED_ARTICLE_JSON, GeneratedArticleSchema, KEYWORD_IDEAS_JSON, KeywordIdeasSchema, KEYWORD_PLAN_JSON, KeywordPlanSchema,
   PARAGRAPH_JSON, ParagraphSchema, PROOFREAD_JSON, ProofreadSchema, REVIEW_JSON, ReviewSchema, TITLES_JSON, TitlesSchema,
 } from '../../../shared/schemas';
 import { parsePlainDoc } from '../../../shared/plainDoc';
@@ -32,6 +32,7 @@ export interface TextAI {
   paragraph(doc: ArticleDoc, sectionId: string, index: number, instruction: string, o?: CallOpts): Promise<string>;
   // size = 이 카드가 든 묶음의 장수, no = 보여 주는 번호 / count = 만들 장수 (태권 글뚝딱 2.4.0 장수 고르기)
   cardOne(doc: ArticleDoc, title: string, index: number, current: { title: string; sub: string; scene: string }, others: string[], input?: P.CardInput, o?: CallOpts, writer?: Writer, noQuestion?: boolean, size?: number, no?: number): Promise<{ title: string; sub: string }>;
+  cardShorten(title: string, sub: string, max: number, o?: CallOpts): Promise<string>; // 넘친 카드 작은 글씨만 줄이기
   cardCopies(doc: ArticleDoc, title: string, input?: P.CardInput, o?: CallOpts, writer?: Writer, noQuestion?: boolean, count?: 1 | 2 | 3): Promise<{ title: string; sub: string; scene: string; afterSectionId: string; index: number }[]>;
   keywordIdeas(region: string, topic: string, kind: string, o?: CallOpts): Promise<string[]>;
   keywordPlan(q: { region: string; kind: string; topic: string; story: string; candidates: { keyword: string; volume: number | null }[] }, o?: CallOpts): Promise<KeywordPlanResult>;
@@ -164,6 +165,9 @@ export function createOpenAI(opts: { apiKey: string; textModel: string; imageMod
       let r = await make();
       if (P.VAGUE_SUB.test(r.sub)) { const again = await make(); if (!P.VAGUE_SUB.test(again.sub)) r = again; }
       return { title: r.title.trim(), sub: r.sub.trim() };
+    },
+    async cardShorten(title, sub, max, o) {
+      return (await json('card_short', 'text', P.SYSTEM_RULES, P.cardShortenPrompt(title, sub, max), CARD_SHORT_JSON, CardShortSchema, o)).sub.trim();
     },
     async cardCopies(doc, title, input, o, writer, noQuestion, count = 3) {
       const make = async () => (await json('cards', 'text', P.SYSTEM_RULES, P.cardCopyPrompt(doc, title, input, writer, noQuestion, count), CARD_COPY_JSON, cardCopySchema(count), o)).cards;

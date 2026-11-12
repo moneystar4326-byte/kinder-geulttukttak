@@ -132,6 +132,10 @@ export const PARAGRAPH_JSON = {
 
 // 카드 한 장 문구만 다시 (2026-10-18) — 그림은 그대로
 export const CardOneSchema = z.object({ title: z.string().min(1), sub: z.string().min(1) });
+// 넘친 카드 작은 글씨 줄이기 (태권 글뚝딱 2.4.1에서 옮김)
+export const CardShortSchema = z.object({ sub: z.string().min(1) });
+export const CARD_SHORT_JSON = { type: 'object', additionalProperties: false, required: ['sub'], properties: { sub: { type: 'string' } } } as const;
+
 export const CARD_ONE_JSON = {
   type: 'object', additionalProperties: false, required: ['title', 'sub'],
   properties: { title: { type: 'string', description: '카드 제목 10~28자' }, sub: { type: 'string', description: '2문장 60~110자: 제목에 대한 답 + 글 속 구체 내용' } },

@@ -101,6 +101,24 @@ export function registerIpc(ctx: AppCtx) {
     db, image, shooter: ctx.shooter, assetsDir: ctx.assetsDir, fontDir: ctx.fontDir, profile: () => db.getProfile(),
     autoRetry: settings().imageAutoRetry, monthlyImageLimit: settings().monthlyImageLimit, onUsage: onUsage(jobId),
   });
+  // 카드 글자가 넘치면 작은 글씨만 AI로 줄여 다시 얹어요 (그림은 그대로 · 그림 비용 없음). 한 장에 최대 2번, 그래도 넘치면 지금처럼 안내
+  // 태권 글뚝딱 2.4.1에서 옮김. 만들기 · 실패 다시 · 스타일 바꾸기 뒤에만 (원장님 · 선생님이 [문구 적용]한 직후는 그대로 두고 안내만)
+  // 줄인 글도 아이 이름 가리기(safeCopies)를 한 번 더 거침
+  async function fixOverflow(text: TextAI, cardSetId: string, input: ArticleInput | undefined, o: { signal: AbortSignal; step: (s: string) => void; jobId: string }) {
+    const svc = cardService(null);
+    for (const first of db.getCardSet(cardSetId)?.cards ?? []) {
+      let c = first;
+      for (let k = 0; k < 2 && c.overflow && c.status === 'done'; k++) {
+        if (o.signal.aborted) return;
+        o.step('카드 글자가 넘쳐 짧게 고치는 중');
+        const len = [...c.copy.sub].length;
+        const raw = await text.cardShorten(c.copy.title, c.copy.sub, Math.max(40, Math.floor(len * (k ? 0.6 : 0.75))), { signal: o.signal, onUsage: onUsage(o.jobId) }).catch(() => '');
+        const sub = raw ? safeCopies([{ title: c.copy.title, sub: raw }], input)[0].sub : '';
+        if (!sub || [...sub].length >= len) break;
+        c = await svc.updateCopy(c.id, { ...c.copy, sub });
+      }
+    }
+  }
 
   // ---------- 앱 · 설정 ----------
   handle('app:info', z.undefined(), () => ({
@@ -337,12 +355,16 @@ export function registerIpc(ctx: AppCtx) {
       const copies = safeCopies(await a.text.cardCopies(v.doc, v.title, art.input, { signal, onUsage: onUsage(jobId) }, art.input.writer, thinFacts(art.input), n), art.input);
       const cs = db.createCardSet(v.id, { ...style, mode }, copies);
       await cardService(a.image, jobId).renderSet(cs.id, { signal, onStep: step });
+      await fixOverflow(a.text, cs.id, art.input, { signal, step, jobId });
     }).job;
   });
   handle('cards:renderFailed', z.object({ articleId: Id, cardSetId: Id }), ({ articleId, cardSetId }) => {
     const a = ai();
     noCardJob(articleId);
-    return runner.start('cards', articleId, '실패한 카드 다시', ({ signal, step, jobId }) => cardService(a.image, jobId).renderSet(cardSetId, { signal, onStep: step, onlyFailed: true })).job;
+    return runner.start('cards', articleId, '실패한 카드 다시', async ({ signal, step, jobId }) => {
+      await cardService(a.image, jobId).renderSet(cardSetId, { signal, onStep: step, onlyFailed: true });
+      await fixOverflow(a.text, cardSetId, db.getArticle(articleId)?.input, { signal, step, jobId });
+    }).job;
   });
   handle('cards:renderOne', z.object({ articleId: Id, cardId: Id, newBackground: z.boolean() }), ({ cardId, newBackground }) => {
     const a = ai({ gate: newBackground }); // 배경을 그대로 두고 문구만 다시 합성하면 AI를 안 씀
@@ -380,6 +402,7 @@ export function registerIpc(ctx: AppCtx) {
         step(`카드 ${cardNo(all.map((x) => x.index), c.index)}/${all.length} 생성 중`);
         await svc.renderOne(c.id, { newBackground: needNew, signal });
       }
+      await fixOverflow(a.text, cardSetId, db.getArticle(articleId)?.input, { signal, step, jobId }); // 크기 · 스타일이 바뀌어 넘칠 수 있음
     }).job;
   });
 

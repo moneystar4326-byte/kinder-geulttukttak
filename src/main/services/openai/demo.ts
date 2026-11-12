@@ -123,6 +123,7 @@ export const demoText: TextAI = {
   async titles(_d, _i, o) { await wait(400, o?.signal); return ALT_TITLES[titleTurn++ % ALT_TITLES.length]; },
   async paragraph(doc, sectionId, index, _ins, o) { await wait(400, o?.signal); return doc.sections.find((s) => s.id === sectionId)?.paragraphs[index] ?? ''; },
   async cardOne(_d, _t, _i, cur, _o, _k, o) { await wait(400, o?.signal); return { title: `${cur.title.replace(/ \(새 문구\)$/, '')} (새 문구)`.slice(0, 28), sub: cur.sub }; },
+  async cardShorten(_t, sub, max, o) { await wait(200, o?.signal); return [...sub].slice(0, max).join(''); },
   async cardCopies(_d, _t, _k, o, _w, _n, count = 3) {
     await wait(500, o?.signal);
     const all = [

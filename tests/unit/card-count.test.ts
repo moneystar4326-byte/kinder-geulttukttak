@@ -97,3 +97,12 @@ test('카드 그림에 찍는 번호: 2장 묶음이면 "1 / 2 · 2 / 2", 예전
   assert.ok(cardHtml({ ...base, index: 2, no: 2, total: 2 } as any).includes('2 / 2'));
   assert.ok(cardHtml({ ...base, index: 1 } as any).includes('2 / 3'));
 });
+
+test('카드 글자 넘침 막기 (태권 글뚝딱 2.4.1에서 옮김): 1장 요약 카드는 60~90자, 제목이 길면 90자 이하 · 줄이기 지시는 사실 그대로', async () => {
+  const { cardShortenPrompt } = await import('../../src/main/services/openai/prompts');
+  assert.ok(cardCopyPrompt(doc, '제목', { kind: '행사 안내' }, undefined, false, 1).includes('이 카드의 sub 는 60~90자'));
+  assert.ok(cardCopyPrompt(doc, '제목', { kind: '행사 안내' }, undefined, false, 3).includes('title 이 15자를 넘으면 sub 는 90자 이하'));
+  const p = cardShortenPrompt('가을 운동회는 어떤 자리였나요?', '가'.repeat(107), 80);
+  assert.ok(p.includes('80자 이하') && p.includes('107자') && p.includes('새 사실') && p.includes('아이 이름'));
+  assert.equal([...(await demoText.cardShorten('t', '가'.repeat(107), 80))].length, 80);
+});

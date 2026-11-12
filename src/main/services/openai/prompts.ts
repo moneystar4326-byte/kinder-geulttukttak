@@ -402,7 +402,8 @@ ${s?.paragraphs[index] ?? ''}`;
 // 강담 실제 글 5개로 비교 확인: https://claude.ai/artifact/7uKPqZo24FEJZWp74yJmC4
 // 유치원판은 예시만 놀이 · 생활 말로 (규칙은 같음)
 const CARD_TITLE_RULE = 'title 10~28자: 카드1만 학부모가 궁금해할 질문으로 쓸 수 있다. 카드2 · 카드3 title 은 물음표 없이, 답이 담긴 짧은 문장으로 쓴다 (예: "블록은 쌓고 무너뜨리며 놀아요").';
-const CARD_SUB_RULE = `sub 는 꼭 2문장, 60~110자:
+// 카드 글자 넘침 (태권 글뚝딱 2.4.1에서 옮김): 제목이 길어 두 줄이면 작은 글씨 자리가 줄어듦 → 90자까지
+const CARD_SUB_RULE = `sub 는 꼭 2문장, 60~110자 (title 이 15자를 넘으면 sub 는 90자 이하):
 - 첫 문장 = title 에 대한 답. title 이 질문이면 바로 답한다 (예: "아니요, 처음엔 낯설어하는 게 당연해요."). 질문으로 끝내지 않는다.
 - 둘째 문장 = 그 답을 보여 주는 글 속 구체적인 내용 하나 — 놀이 · 활동 이름, 선생님이 도운 방법, 실제 장면, 날짜 · 행사 이름 중 글에 적힌 것을 그대로 쓴다.
 - "살펴요" · "짚어요" · "눈여겨봐요"처럼 막연한 말로 때우지 말고, 글에 적힌 대로 무엇을 했는지 · 무엇이 보였는지를 쓴다.
@@ -480,7 +481,7 @@ export function cardCopyPrompt(doc: ArticleDoc, title: string, input?: CardInput
   const r = cardSlots(count).map((s) => roleAt(input?.kind, brief?.purpose, count, s));
   return `아래 블로그 글로 카드뉴스 ${count}장 문구를 만들어라 (cards 는 정확히 ${count}개). 글에 있는 사실과 메시지만 쓴다.
 ${r.map((x, i) => `카드${i + 1} = ${x.guide}`).join(', ')}.
-${count === 1 ? '이 한 장만 봐도 글 내용을 알 수 있게 쓴다.' : `${count === 2 ? '두' : '세'} 장이 이 글 주제 하나로 이어지게 쓴다.`} 글 주제와 상관없는 유치원 정보(다른 서비스 · 활동)는 카드에 쓰지 않는다. 날짜 · 행사 이름은 글에 적힌 그대로.${cardWriter(writer)}
+${count === 1 ? '이 한 장만 봐도 글 내용을 알 수 있게 쓴다. 한 장에 다 담으려고 늘어놓지 말고 가장 중요한 것만 — 이 카드의 sub 는 60~90자.' : `${count === 2 ? '두' : '세'} 장이 이 글 주제 하나로 이어지게 쓴다.`} 글 주제와 상관없는 유치원 정보(다른 서비스 · 활동)는 카드에 쓰지 않는다. 날짜 · 행사 이름은 글에 적힌 그대로.${cardWriter(writer)}
 ${CARD_TITLE_RULE}
 ${CARD_SUB_RULE}\n${MATCH_RULE}${noQuestion ? `\n${NO_QUESTION}` : ''}${brief ? `
 ${cardBriefRule(brief)}` : ''}
@@ -528,4 +529,14 @@ ${memo}`;
 export function keywordIdeasPrompt(region: string, topic: string, kind: string) {
   return `유치원 블로그 글의 검색 키워드 후보를 10개 만들어라. 지역: ${region}, 주제: ${topic}, 글 종류: ${kindLabel(kind)}.
 학부모가 네이버에서 실제로 검색할 법한 짧은 표현 (2~4단어). 검색량 숫자는 쓰지 마라. 지역이 들어간 것과 안 들어간 것을 섞어라. 어린이집 · 영어유치원 · 놀이학교 · 학원 키워드는 쓰지 마라.`;
+}
+
+// 카드 글자가 넘쳤을 때 작은 글씨만 줄이기 (태권 글뚝딱 2.4.1에서 옮김). 그림은 그대로 · 새 사실 금지
+export function cardShortenPrompt(title: string, sub: string, max: number) {
+  return `카드뉴스 작은 글씨(sub)가 카드 밖으로 넘쳤다. 같은 뜻으로 ${max}자 이하로 줄여라.
+- 들어 있는 사실(날짜 · 행사 이름 · 놀이 · 활동 이름 · 숫자)은 글자 그대로 두고, 덜 중요한 것부터 뺀다. 새 사실 · 새 표현을 더하지 않는다.
+- 아이 이름 · 금액 · 입학 약속 · 진단하는 말을 쓰지 않는다.
+- 2문장을 유지하되, 줄이기 어려우면 1문장도 괜찮다. 물음표로 끝내지 않는다.
+[카드 제목] ${title}
+[지금 작은 글씨 ${[...sub].length}자] ${sub}`;
 }
