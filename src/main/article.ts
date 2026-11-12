@@ -1,8 +1,10 @@
 // 글 생성 파이프라인 (기획서 6장)
-// 입력 검증 → 지침 조립 → AI 초안 → 로컬 길이 · 반복 검사 → 모자라면 최대 2회 보완 → 흐름 다듬기 → 흐름 2차 점검 → (이야기 글) 지어낸 문장 검사 → AI 사실 비교(보조 점검) → 새 버전 저장
+// 입력 검증 → 지침 조립 → AI 초안 → 로컬 길이 · 반복 검사 → 지어낸 문장 검사 → AI 사실 비교(보조 점검) → 새 버전 저장
 import type { Db } from './db';
 import type { ArticleDoc, ArticleInput, DojoProfile, RevisionKind } from '../shared/types';
 import { bodyText, countDoc, minCharsForInput } from '../shared/count';
+import { styleIssues } from '../shared/overused';
+import { factsBlock } from './services/openai/prompts';
 import { localFlags, missingInputs, regionWarning } from '../shared/validation';
 import { areaTags, dongOf, locationLine, mentionsNearby } from '../shared/areas';
 import { decorateHeadings } from '../shared/format';
@@ -122,26 +124,15 @@ export async function generateArticle(deps: { db: Db; ai: TextAI; profile: DojoP
   try {
     ctx.step('글 생성 중');
     let doc = await ai.generate(profile, input, regionWarning(input, profile), o);
-    let expands = 0;
+    const expands = 0;
     ctx.step('검증 중');
     db.setArticleStatus(articleId, 'validating');
     const min = minCharsForInput(input);
-    const story = !!input.facts.story?.trim();
-    // 이야기 글은 분량 보완을 하지 않음 (보완 지시가 일반론 · 가정 조언으로 늘림 — 2026-10-28 GPT 검토)
-    while (!story && countDoc(doc).withoutSpaces < min && expands < MAX_EXPAND) {
-      expands++;
-      ctx.step(`분량 보완 중 (${expands}/${MAX_EXPAND})`);
-      doc = await ai.expand(doc, countDoc(doc).withoutSpaces, o, min);
-    }
-    ctx.step('흐름 다듬는 중');
-    doc = await polishDoc(ai, doc, input, o, ctx.signal, min);
-    ctx.step('흐름 2차 점검 중');
-    const checked = await proofreadDoc(ai, doc, input, o, ctx.signal, min);
-    doc = checked.doc;
-    if (story) {
-      ctx.step('지어낸 문장 검사 중');
-      doc = await verifyDoc(ai, doc, profile, input, o, ctx.signal);
-    }
+    // 2026-11-05 사용자: 다시 쓸수록 표현이 평평해짐 → 분량 보완 · 전체 다듬기 · 2차 점검을 빼고, 사실과 다른 문장만 고침
+    ctx.step('지어낸 문장 검사 중');
+    doc = await verifyDoc(ai, doc, profile, input, o, ctx.signal);
+    ctx.step('문장 호흡 다듬는 중');
+    doc = await warmDoc(ai, doc, profile, input, o, ctx.signal);
     ctx.step('사실 비교 점검 중');
     // 점검 실패는 표시만 하고 넘어가되, 멈추기를 눌렀으면 저장하지 않고 멈춤 (2026-10-18 버그 점검)
     const aiFlags = await ai.review(doc, profile, input, o).catch((e) => {
@@ -158,7 +149,7 @@ export async function generateArticle(deps: { db: Db; ai: TextAI; profile: DojoP
     const counts = countDoc(doc);
     const short = counts.withoutSpaces < min;
     const title = titleWithPrefix(doc.titleCandidates[0] ?? input.topic, input.titlePrefix);
-    const r = db.addVersion({ articleId, title, doc, counts, note: `AI 생성${[expands ? `분량 보완 ${expands}회` : '', checked.count ? `흐름 2차 점검 ${checked.count}곳` : ''].filter(Boolean).map((x) => ` (${x})`).join('')}` }, { baseVersionId });
+    const r = db.addVersion({ articleId, title, doc, counts, note: 'AI 생성' }, { baseVersionId });
     db.setArticleStatus(articleId, 'review');
     return { version: r.version, current: r.current, short, expands };
   } catch (e) {
@@ -217,6 +208,44 @@ export async function proofreadDoc(ai: TextAI, doc: ArticleDoc, input: ArticleIn
   }
 }
 
+// 재료 낱말이 글에 남았는지 보려고 뽑음 (조사는 끝 글자를 빼고 비교)
+const factWords = (text: string) => [...new Set(text.split(/[\s,.!?·()]+/).filter((w) => /^[가-힣A-Za-z]{2,}$/.test(w)).map((w) => (w.length > 2 ? w.slice(0, -1) : w)))];
+
+// 호흡 다듬기 결과를 쓸지 판단 (2026-11-05): 소제목 수가 같고, 없던 숫자가 없고, 숫자 · 검색어 · 재료 낱말을 잃지 않고, 분량이 너무 줄지 않을 때만
+export function acceptWarm(before: ArticleDoc, after: ArticleDoc['sections'], keywords: string[] = [], facts = ''): ArticleDoc | null {
+  if (after.length !== before.sections.length) return null;
+  const next: ArticleDoc = { ...before, sections: after.map((s, i) => ({ ...s, id: before.sections[i].id, heading: before.sections[i].heading })) };
+  const a = bodyText(before);
+  const b = bodyText(next);
+  const nums = (t: string) => new Set(t.match(/\d+/g) ?? []);
+  const na = nums(a);
+  const nb = nums(b);
+  if ([...nb].some((x) => !na.has(x)) || [...na].some((x) => !nb.has(x))) return null;
+  const flat = (t: string) => t.replace(/\s+/g, '');
+  if (keywords.map(flat).filter((k) => k && flat(a).includes(k)).some((k) => !flat(b).includes(k))) return null;
+  // 반복을 지우므로 분량은 줄어도 되지만, 재료 낱말은 지켜야 함
+  const had = factWords(facts).filter((w) => a.includes(w));
+  if (had.filter((w) => !b.includes(w)).length > had.length * 0.15) return null;
+  if (countDoc(next).withoutSpaces < countDoc(before).withoutSpaces * 0.5) return null;
+  return next;
+}
+
+// 말투를 입히고, 프로그램이 센 문제가 남으면 한 번만 더 (실패하거나 조건에 맞지 않으면 앞 글 그대로, 멈추기만 던짐)
+export async function warmDoc(ai: TextAI, doc: ArticleDoc, profile: DojoProfile, input: ArticleInput, o: CallOpts, signal: AbortSignal): Promise<ArticleDoc> {
+  const keywords = [input.mainKeyword, ...input.subKeywords];
+  const facts = bodyTextOfFacts(input);
+  try {
+    const first = acceptWarm(doc, await ai.warm(doc, profile, input, o), keywords, facts) ?? doc;
+    const issues = styleIssues(first, input.kind);
+    if (!issues.length) return first;
+    return acceptWarm(first, await ai.warm(first, profile, input, o, issues.join(' ')), keywords, facts) ?? first;
+  } catch (e: any) {
+    if (signal.aborted || e?.name === 'AbortError' || e?.code === 'cancelled') throw e;
+    return doc;
+  }
+}
+const bodyTextOfFacts = (input: ArticleInput) => factsBlock(input).replace(/^[^:\n]*:\s*/gm, '').replace(/\(없음[^)]*\)/g, '');
+
 // 이야기 글 지어낸 문장 검사 (태권 글뚝딱 2026-10-28에서 옮김): 지어낸 문장 · 틀린 숫자 · 해설 · 되풀이를 그 문장만 고침. 검사가 실패하면 고치지 않은 글 그대로 (멈추기만 던짐)
 export async function verifyDoc(ai: TextAI, doc: ArticleDoc, profile: DojoProfile, input: ArticleInput, o: CallOpts, signal: AbortSignal): Promise<ArticleDoc> {
   try {
@@ -245,13 +274,15 @@ export function applyVerifyFixes(doc: ArticleDoc, issues: VerifyIssue[], keyword
       break;
     }
   }
-  sections = sections.map((s) => ({ ...s, paragraphs: s.paragraphs.filter((p) => p.trim()) })).filter((s, i) => i === 0 || s.paragraphs.length);
+  // 문장을 지우고 이모지만 남은 문단도 뺌 (2026-11-05 시험)
+  sections = sections.map((s) => ({ ...s, paragraphs: s.paragraphs.filter((p) => /[^\s\p{Extended_Pictographic}\u{FE0F}\u{200D}]/u.test(p)) })).filter((s, i) => i === 0 || s.paragraphs.length);
   return { ...doc, sections };
 }
 
 // AI 메모 + 코드 점검을 합침 (중복 제거). 분량 부족은 추가 재료 요청으로
 export function mergeFlags(doc: ArticleDoc, profile: DojoProfile, input: ArticleInput, aiFlags: ArticleDoc['reviewFlags']) {
-  const story = !!input.facts.story?.trim();
+  // 2026-11-05: 분량 보완을 하지 않으므로 모든 글을 이야기 글처럼 재료 안내만
+  const story = true;
   // 이야기 글은 짧아도 실패가 아님 → "짧아요" 경고 대신 아래 재료 안내 하나만
   const flags = [...doc.reviewFlags, ...aiFlags, ...localFlags(doc, profile, input).filter((f) => !(story && f.code === 'too-short'))];
   const min = minCharsForInput(input);

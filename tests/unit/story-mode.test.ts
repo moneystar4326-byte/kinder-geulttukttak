@@ -17,15 +17,15 @@ const withStory: ArticleInput = {
   mainKeyword: '유치원운동회', subKeywords: ['가을운동회'],
 };
 
-test('이야기 글: 검색어 계획대로 2~3번, 일반론으로 늘리지 않음, 항목 이름 금지, 섹션 3~5개', () => {
+test('이야기 글: 검색어 계획대로 2~3번, 일반론으로 늘리지 않음, 항목 이름 금지, 소제목 3~4개', () => {
   const p = articlePrompt(DEMO_PROFILE, withStory, null);
   assert.match(p, /\[검색어 계획\]/);
   assert.match(p, /주요 "유치원운동회" 예: 보라매공원에서 유치원 운동회를 했어요\./);
   assert.doesNotMatch(p, /3~5번/);
   assert.doesNotMatch(p, /교육적 설명 · 지도 방향 · 가정에서 도울 점으로 채우되/);
-  assert.match(p, /일반론.*늘리지 않는다/);
+  assert.match(p, /교육 효과 · 육아 조언으로 늘리지 않는다/);
   assert.match(p, /항목 이름을 글에 쓰지 않는다/);
-  assert.match(p, /섹션 3~5개/);
+  assert.match(p, /"## 소제목"으로 3~4개/);
   assert.match(p, /원장님 · 선생님 이야기: 10월 24일/);
   // 태권도 말이 섞이지 않음
   assert.doesNotMatch(p, /도장|관장|태권/);
@@ -33,19 +33,18 @@ test('이야기 글: 검색어 계획대로 2~3번, 일반론으로 늘리지 �
   assert.match(polishPrompt({ titleCandidates: [], sections: [], tags: [], photoSuggestions: [], reviewFlags: [] }, withStory), /2~3번/);
 });
 
-test('한 줄로 쓰기 · 예전 칸 입력은 그대로 (3~5번, 섹션 5~7개, 최소 분량)', () => {
+test('한 줄로 쓰기 · 예전 칸 입력: 키워드 2~3번 · 소제목 3~4개 · 500자부터', () => {
   const old: ArticleInput = { ...base, topic: '촉감놀이', mainKeyword: '유치원 촉감놀이', facts: { ...base.facts, activities: '밀가루 반죽 촉감놀이'.repeat(30) } };
   const p = articlePrompt(DEMO_PROFILE, old, null);
-  assert.match(p, /3~5번/);
-  assert.match(p, /섹션 5~7개/);
-  assert.equal(minCharsForInput(old), 1500);
+  assert.match(p, /2~3번/);
+  assert.match(p, /"## 소제목"으로 3~4개/);
+  assert.equal(minCharsForInput(old), 500);
   assert.equal(minCharsForInput(withStory), STORY_MIN);
   // 재료가 적으면 짧게 (2026-11-02): 키워드 2~3번 · 섹션 3~5개 · 최소 800자
   const thin: ArticleInput = { ...old, facts: { ...base.facts, activities: '밀가루 반죽 촉감놀이' } };
   const t = articlePrompt(DEMO_PROFILE, thin, null);
-  assert.match(t, /섹션 3~5개/);
   assert.match(t, /2~3번/);
-  assert.equal(minCharsForInput(thin), 800);
+  assert.equal(minCharsForInput(thin), 500);
 });
 
 test('이야기가 있으면 칸별 필수는 묻지 않음, 입력 형식도 통과', () => {
@@ -81,7 +80,7 @@ test('이야기 글은 900자 넘으면 "짧아요" 경고 없음', async () => 
   const { localFlags } = await import('../../src/shared/validation');
   const doc = { titleCandidates: ['t'], sections: [{ id: 's1', paragraphs: ['가'.repeat(1000)] }], tags: [], photoSuggestions: [], reviewFlags: [] };
   assert.ok(!localFlags(doc, DEMO_PROFILE, withStory).some((f) => f.code === 'too-short'));
-  assert.ok(localFlags(doc, DEMO_PROFILE, { ...withStory, kind: '수업 후기', facts: { ...withStory.facts, story: '' } }).some((f) => f.code === 'too-short'));
+  assert.ok(localFlags(doc, DEMO_PROFILE, { ...withStory, kind: '교육 정보', facts: { ...withStory.facts, story: '' } }).some((f) => f.code === 'too-short'));
 });
 
 test('새 요청(keywords:plan)이 화면 → 앱 허용 목록에 있음 (빠지면 ② 검색어 확인이 늘 실패)', async () => {

@@ -114,6 +114,7 @@ let titleTurn = 0;
 export const demoText: TextAI = {
   async generate(_p, _i, _r, o) { await wait(900, o?.signal); const d = clone(DEMO_DOC); d.reviewFlags = [flag]; return d; },
   async expand(doc, _c, o) { await wait(300, o?.signal); return clone(doc); },
+  warm: async (d: ArticleDoc) => d.sections,
   async polish(doc, _i, o) { await wait(300, o?.signal); return clone(doc); },
   async proofread(_d, _i, o) { await wait(300, o?.signal); return []; },
   async review(_d, _p, _i, o) { await wait(400, o?.signal); return []; },

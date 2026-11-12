@@ -38,6 +38,10 @@ export const GENERATED_ARTICLE_JSON = {
   },
 } as const;
 
+// 줄글에 붙이는 제목 · 태그 · 사진 자리 (2026-11-05)
+export const ArticleMetaSchema = GeneratedArticleSchema.omit({ sections: true });
+export const ARTICLE_META_JSON = { ...GENERATED_ARTICLE_JSON, required: ['titleCandidates', 'tags', 'photoSuggestions', 'reviewFlags'], properties: { titleCandidates: GENERATED_ARTICLE_JSON.properties.titleCandidates, tags: GENERATED_ARTICLE_JSON.properties.tags, photoSuggestions: GENERATED_ARTICLE_JSON.properties.photoSuggestions, reviewFlags: GENERATED_ARTICLE_JSON.properties.reviewFlags } };
+
 export const ReviewSchema = z.object({
   flags: z.array(z.object({ code: z.string(), message: z.string(), sectionId: z.string() })),
 });
@@ -157,6 +161,7 @@ export const ProfileInput = z.object({
   contact: s(200).optional(),
   // 모집 · 행사 글에 그대로 들어가는 값이라 주소 모양만 확인 (2026-11-02 점검: "상담링크아님"도 저장됐음). 비워도 됨
   consultLink: s(300).refine((v) => !v.trim() || /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(v.trim()), '상담 링크는 https:// 로 시작하는 주소로 적어 주세요 (예: https://pf.kakao.com/채널주소)').optional(),
+  voiceSamples: s(3000).optional(),
   greeting: s(300).optional(),
   closing: s(300).optional(),
   blogUrl: s(300).optional(),

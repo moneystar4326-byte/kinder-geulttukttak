@@ -7,7 +7,8 @@ import type { Writer } from './kinder';
 // 메모만으로는 활동을 구체적으로 쓰기 어려운지 → 만들기 전에 물음 (2026-11-02). 교육 정보 글은 묻지 않음
 export const needsMoreMemo = (memo: string) => {
   const m = memo.trim();
-  return !!m && quickKind(m) !== '교육 정보' && m.replace(/\s/g, '').length < 100;
+  // 재료가 있어도 글쓴이 마음을 묻도록 넉넉히 (2026-11-05)
+  return !!m && !['교육 정보', '모집 안내'].includes(quickKind(m)) && m.replace(/\s/g, '').length < 300;
 };
 
 export const emptyInput = (p?: DojoProfile | null): ArticleInput => ({

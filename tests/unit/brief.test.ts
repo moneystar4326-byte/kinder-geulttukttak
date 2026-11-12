@@ -36,9 +36,9 @@ test('글 성격이 있으면 고른 종류(교육 정보) 대신 소식 흐름 
   assert.match(p, /\[주제 설명 글감/);
   assert.match(p, /이어달리기는 친구에게/);
   assert.match(p, /\[이 글에 넣지 않을 것\] 입학 상담 안내, 일반 육아 조언/);
-  assert.match(p, /공백 제외 900~1200자 목표, 최소 800자. 분량은 주제 설명 글감으로 채우고/);
+  assert.match(p, /공백 제외 700~1000자 목표, 최소 500자. 분량은 주제 설명 글감으로 채우고/);
   assert.match(p, /"원아" · "원생"처럼 딱딱하게 부르지 않는다/);
-  assert.match(p, /섹션 3~4개/);
+  assert.match(p, /"## 소제목"으로 3~4개/);
   assert.doesNotMatch(p, /도장|관장|태권|돌려차기|선수/);
 });
 
@@ -98,7 +98,7 @@ test('검사 결과 반영: 그 문장만 바꾸거나 지우고, 검색어 문�
   assert.equal(out.sections.length, 2);
 });
 
-test('이야기 글: 분량 보완 없이 다듬기 · 흐름 2차 점검 뒤 검사까지, 짧으면 지어내지 않았다는 안내', async () => {
+test('이야기 글: 분량 보완 · 다시 쓰기 없이 검사만, 짧으면 지어내지 않았다는 안내', async () => {
   const db = openDb(':memory:');
   const profile = db.saveProfile(DEMO_PROFILE);
   const art = db.createArticle(profile.id, input, [], false);
@@ -111,9 +111,10 @@ test('이야기 글: 분량 보완 없이 다듬기 · 흐름 2차 점검 뒤 �
     polish: async (d) => (calls.push('polish'), d),
     proofread: async () => (calls.push('proofread'), []),
     verify: async () => (calls.push('verify'), [{ sentence: '며칠 동안 연습했어요.', type: '지어냄', fix: '' }]),
+    warm: async (d) => (calls.push('warm'), d.sections),
   };
   const r = await generateArticle({ db, ai, profile }, art.id, { signal: new AbortController().signal, step: () => {} });
-  assert.deepEqual(calls, ['generate', 'polish', 'proofread', 'verify']);
+  assert.deepEqual(calls, ['generate', 'verify', 'warm']);
   assert.ok(!JSON.stringify(r.version.doc.sections).includes('며칠 동안 연습했어요'));
   assert.ok(r.version.doc.reviewFlags.some((f) => f.code === 'need-more-facts' && /지어내지 않으려고/.test(f.message)));
   assert.ok(!r.version.doc.reviewFlags.some((f) => f.code === 'too-short'));
@@ -170,12 +171,12 @@ test('주제와 재료가 다르면: 물어볼 말을 받고, 원장님 · 선�
 });
 
 // 2026-10-28 사용자: 600자는 짧다 → 글감으로 900자 안팎, ② 단계 물음에 답하면 1,200~1,500자
-test('재료가 짧으면 물음을 받고, 답은 사실로 · 답이 있으면 목표 분량이 늘어남', async () => {
+test('재료가 짧으면 물음을 받고, 답은 사실로 · 분량은 700~1,000자', async () => {
   const { cardCopyPrompt } = await import('../../src/main/services/openai/prompts');
   assert.match(briefPrompt({ kind: '교육 정보', topic: '가을 운동회', story: '이어달리기' }), /- asks: 재료에 장면/);
   const asked = { ...brief, asks: [{ question: '이어달리기 때 아이들은 바통을 어떻게 건넸나요?', answer: '서로 이름을 불러 주며 건넸어요' }, { question: '운동회에서 기억나는 장면이 있나요?' }] };
   const p = articlePrompt(DEMO_PROFILE, { ...input, brief: asked }, null);
-  assert.match(p, /공백 제외 1200~1500자 목표/);
+  assert.match(p, /공백 제외 700~1000자 목표/);
   assert.match(p, /- 서로 이름을 불러 주며 건넸어요 \(물음 "이어달리기 때 아이들은 바통을 어떻게 건넸나요\?"에 원장님 · 선생님이 적은 답\)/);
   assert.doesNotMatch(p, /운동회에서 기억나는 장면/); // 답 없는 물음은 글에 안 감
   const doc: ArticleDoc = { titleCandidates: [], sections: [{ id: 's1', paragraphs: ['가'] }], tags: [], photoSuggestions: [], reviewFlags: [] };

@@ -28,6 +28,7 @@ export interface DojoProfile {
   credentials?: string; // 확인 가능한 내용만
   contact?: string;
   consultLink?: string;
+  voiceSamples?: string; // 평소 쓰는 글 3~5편: AI가 말투만 따름 (2026-11-05)
   greeting?: string; // 글 맨 앞 첫인사 — 코드가 그대로 붙임 (2026-10-29 보람태권도 요청)
   closing?: string; // 글 맨 끝 끝인사
   blogUrl?: string;

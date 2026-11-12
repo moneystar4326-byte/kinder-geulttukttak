@@ -54,26 +54,7 @@ const setup = () => {
 };
 const ctx = () => ({ signal: new AbortController().signal, step: () => {} });
 
-test('글 만들기: 다듬기 다음 2차 점검 한 번, 고친 수를 버전 메모에', async () => {
-  const { db, profile, art } = setup();
-  const first = (await demoText.generate(profile, DEMO_INPUT, null)).sections[0].paragraphs[0];
-  const sentence = first.split(/(?<=[.!?])\s+/)[0];
-  const ai = fakeAI({ proofread: async () => [{ sectionId: 's1', before: sentence, after: '바꾼 첫 문장이에요.' }] });
-  const r = await generateArticle({ db, ai, profile }, art.id, ctx());
-  assert.deepEqual(ai.calls.filter((c) => c === 'polish' || c === 'proofread' || c === 'review'), ['polish', 'proofread', 'review']);
-  assert.match(r.version.doc.sections[0].paragraphs[0], /^바꾼 첫 문장이에요\./);
-  assert.match(r.version.note ?? '', /흐름 2차 점검 1곳/);
-});
 
-test('2차 점검이 실패하면 다듬은 글 그대로, 멈추기는 그대로 멈춤', async () => {
-  const { db, profile, art } = setup();
-  const r = await generateArticle({ db, ai: fakeAI({ proofread: async () => { throw new Error('형식 오류'); } }), profile }, art.id, ctx());
-  assert.ok(r.version.doc.sections.length > 0);
-  const s = setup();
-  const ac = new AbortController();
-  const ai = fakeAI({ proofread: async () => { ac.abort(); throw Object.assign(new Error('멈춤'), { name: 'AbortError' }); } });
-  await assert.rejects(generateArticle({ db: s.db, ai, profile: s.profile }, s.art.id, { signal: ac.signal, step: () => {} }));
-});
 
 test('2차 점검 지시문: 어색한 낱말 · 억지 이음 · 말투 섞임 · 반복 · 추측, 사실은 그대로', () => {
   const p = P.proofreadPrompt(doc(), DEMO_INPUT);

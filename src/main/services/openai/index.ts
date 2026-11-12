@@ -5,10 +5,11 @@ import path from 'node:path';
 import OpenAI, { toFile } from 'openai';
 import { z } from 'zod';
 import { ApiError, toApiError } from '../errors';
-import {
+import { ARTICLE_META_JSON, ArticleMetaSchema,
   BRIEF_JSON, BriefSchema, VERIFY_JSON, VerifySchema, CARD_COPY_JSON, CardCopySchema, CARD_ONE_JSON, CardOneSchema, MEMO_SPLIT_JSON, MemoSplitSchema, GENERATED_ARTICLE_JSON, GeneratedArticleSchema, KEYWORD_IDEAS_JSON, KeywordIdeasSchema, KEYWORD_PLAN_JSON, KeywordPlanSchema,
   PARAGRAPH_JSON, ParagraphSchema, PROOFREAD_JSON, ProofreadSchema, REVIEW_JSON, ReviewSchema, TITLES_JSON, TitlesSchema,
 } from '../../../shared/schemas';
+import { parsePlainDoc } from '../../../shared/plainDoc';
 import type { ArticleBrief, ArticleDoc, ArticleInput, DojoProfile, ReviewFlag, RevisionKind } from '../../../shared/types';
 import { APP, type Writer } from '../../../shared/kinder';
 import * as P from './prompts';
@@ -21,6 +22,7 @@ export interface Fix { sectionId: string; before: string; after: string }
 export interface TextAI {
   generate(p: DojoProfile, input: ArticleInput, regionNote: string | null, o?: CallOpts): Promise<ArticleDoc>;
   expand(doc: ArticleDoc, current: number, o?: CallOpts, min?: number): Promise<ArticleDoc>;
+  warm(doc: ArticleDoc, p: DojoProfile, input: ArticleInput, o?: CallOpts, note?: string): Promise<ArticleDoc['sections']>;
   polish(doc: ArticleDoc, input: ArticleInput, o?: CallOpts): Promise<ArticleDoc>;
   proofread(doc: ArticleDoc, input: ArticleInput, o?: CallOpts): Promise<Fix[]>;
   review(doc: ArticleDoc, p: DojoProfile, input: ArticleInput, o?: CallOpts): Promise<ReviewFlag[]>;
@@ -95,6 +97,15 @@ export function createOpenAI(opts: { apiKey: string; textModel: string; imageMod
     throw lastErr instanceof ApiError ? lastErr : new ApiError('schema', 'AI 응답 형식이 맞지 않았어요. 다시 시도해 주세요.', 'OpenAI', true);
   }
 
+  // 형식을 정하지 않은 줄글 (2026-11-05: JSON 틀에 맞춰 쓰면 문장이 뚝뚝 끊겨 먼저 편하게 씀)
+  async function plain(kind: string, instructions: string, input: string, o: CallOpts = {}): Promise<string> {
+    let res: any;
+    try { res = await client.responses.create({ model: opts.textModel, instructions, input }, { signal: o.signal }); } catch (e) { throw toApiError('OpenAI', e); }
+    o.onUsage?.({ model: opts.textModel, kind, reported: res.usage ?? null });
+    if (res.status === 'incomplete') throw new ApiError('schema', 'AI 응답이 중간에 끊겼어요. 다시 시도해 주세요.', 'OpenAI');
+    return String(res.output_text ?? '');
+  }
+
   // 유치원 카드 점검 (2026-10-27 요요유치원 시험: 제목 "밖에서 무엇을 하나요?"에 "풍경을 만나요"로 답함 · 카드끼리 같은 말 · 공원 글에 교실 그림)
   // 글처럼 만든 뒤 한 번 더 보고 고칠 곳만 고침. 실패하거나 모양이 다르면 처음 카드 그대로 (멈추기만 그대로 던짐)
   type CardCopyRow = { title: string; sub: string; scene: string; afterSectionId: string };
@@ -112,7 +123,15 @@ export function createOpenAI(opts: { apiKey: string; textModel: string; imageMod
 
   const text: TextAI = {
     async generate(p, input, regionNote, o) {
-      return normalizeDoc(await json('article', 'text', P.SYSTEM_RULES, P.articlePrompt(p, input, regionNote), GENERATED_ARTICLE_JSON, GeneratedArticleSchema, o));
+      // 글은 줄글로 쓰고 코드가 소제목으로 나눔. 제목 · 태그는 본문을 고치지 않는 따로 요청 (2026-11-05)
+      let sections = parsePlainDoc(await plain('text', P.DRAFT_RULES, P.articlePrompt(p, input, regionNote), o));
+      if (sections.length < 3) sections = parsePlainDoc(await plain('text', P.DRAFT_RULES, P.articlePrompt(p, input, regionNote), o));
+      if (sections.length < 3) throw new ApiError('schema', 'AI 응답 형식이 맞지 않았어요. 다시 시도해 주세요.', 'OpenAI', true);
+      const meta = await json('article_meta', 'text', P.SYSTEM_RULES, P.articleMetaPrompt({ titleCandidates: [], sections, tags: [], photoSuggestions: [], reviewFlags: [] }, input), ARTICLE_META_JSON, ArticleMetaSchema, o);
+      return normalizeDoc({ ...meta, sections: sections.map((s) => ({ ...s, heading: s.heading ?? '' })) });
+    },
+    async warm(doc, p, input, o, note) {
+      return parsePlainDoc(await plain('text', P.DRAFT_RULES, P.warmPrompt(doc, p, input, note), o));
     },
     async expand(doc, current, o, min) {
       return normalizeDoc(await json('article', 'text', P.SYSTEM_RULES, P.expandPrompt(doc, current, min), GENERATED_ARTICLE_JSON, GeneratedArticleSchema, o));

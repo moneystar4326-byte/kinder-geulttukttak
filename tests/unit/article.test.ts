@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../../src/main/db';
-import { generateArticle, MAX_EXPAND, reviseArticle } from '../../src/main/article';
+import { generateArticle, reviseArticle } from '../../src/main/article';
 import { normalizeDoc, type TextAI } from '../../src/main/services/openai';
 import { GeneratedArticleSchema } from '../../src/shared/schemas';
 import { DEMO_INPUT, DEMO_PROFILE, demoText } from '../../src/main/services/openai/demo';
@@ -30,11 +30,11 @@ function setup() {
   return { db, profile, art };
 }
 
-test('계속 모자라면 보완은 최대 2회, 완료 대신 추가 재료 요청', async () => {
+test('짧아도 분량 보완으로 늘리지 않고, 추가 재료를 요청', async () => {
   const { db, profile, art } = setup();
-  const ai = fakeAI({ generate: async () => shortDoc(10), expand: async () => shortDoc(20) });
+  const ai = fakeAI({ generate: async () => shortDoc(10) });
   const r = await generateArticle({ db, ai, profile }, art.id, ctx());
-  assert.equal(ai.calls.expand, MAX_EXPAND);
+  assert.equal(ai.calls.expand ?? 0, 0);
   assert.equal(r.short, true);
   assert.ok(r.version.doc.reviewFlags.some((f) => f.code === 'need-more-facts'));
 });
@@ -133,30 +133,20 @@ test('사실 점검 중에 멈추면 저장하지 않음', async () => {
 });
 
 // 흐름 다듬기 (2026-10-18)
-test('흐름 다듬기는 한 번, 다듬은 본문을 저장하고 제목 후보 · 태그는 유지', async () => {
+test('글 전체를 다시 쓰지 않고, 사실 검사만 함 (2026-11-05)', async () => {
   const { db, profile, art } = setup();
-  const ai = fakeAI({
-    polish: async (d) => ({ ...d, titleCandidates: ['바뀐', '제목', '들'], sections: d.sections.map((s, i) => (i === 0 ? { ...s, paragraphs: ['다듬은 첫 문단 ' + s.paragraphs.join(' ')] } : s)) }),
-  });
-  const r = await generateArticle({ db, ai, profile }, art.id, ctx());
-  assert.equal(ai.calls.polish, 1);
-  assert.ok(r.version.doc.sections[0].paragraphs[0].startsWith('다듬은 첫 문단'));
-  assert.notDeepEqual(r.version.doc.titleCandidates, ['바뀐', '제목', '들']);
+  const ai = fakeAI({});
+  await generateArticle({ db, ai, profile }, art.id, ctx());
+  assert.equal(ai.calls.polish ?? 0, 0);
+  assert.equal(ai.calls.proofread ?? 0, 0);
+  assert.equal(ai.calls.verify, 1);
 });
 
-test('다듬기가 실패하거나 분량 · 섹션을 줄이면 다듬기 전 글을 씀', async () => {
-  for (const polish of [async () => { throw new Error('형식 오류'); }, async (d: ArticleDoc) => ({ ...d, sections: d.sections.slice(0, 1) })] as TextAI['polish'][]) {
-    const { db, profile, art } = setup();
-    const r = await generateArticle({ db, ai: fakeAI({ polish }), profile }, art.id, ctx());
-    assert.ok(r.version.doc.sections.length > 1);
-    assert.equal(r.short, false);
-  }
-});
 
-test('다듬기 중에 멈추면 저장하지 않음', async () => {
+test('사실 검사 중에 멈추면 저장하지 않음', async () => {
   const { db, profile, art } = setup();
   const ac = new AbortController();
-  const ai = fakeAI({ polish: async () => { ac.abort(); throw Object.assign(new Error('멈춤'), { name: 'AbortError' }); } });
+  const ai = fakeAI({ verify: async () => { ac.abort(); throw Object.assign(new Error('멈춤'), { name: 'AbortError' }); } });
   await assert.rejects(() => generateArticle({ db, ai, profile }, art.id, { signal: ac.signal, step: () => {} }));
   assert.equal(db.listVersions(art.id).length, 0);
 });

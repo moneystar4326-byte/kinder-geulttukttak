@@ -20,7 +20,7 @@ const appendSpoken = (prev: string, text: string) => (prev.trim() ? `${prev.trim
 const TX = {
   thinMemo: '아이들이 가장 좋아한 것이나 기억에 남는 장면을 한 줄만 더 적으면 글이 훨씬 구체적으로 나와요. (예: 분수대 앞에서 비눗방울을 불었어요)',
   quickPh: ['예: 햇님반 친구들이랑 가을 낙엽 밟기 놀이를 했어요', '예: 7세반 아이 초등학교 입학 준비는 어떻게 하나요?', '예: 10월 30일 할로윈 파티 안내'],
-  quickHint: '주제나 오늘 있었던 일을 한 줄 적으면, 유치원 정보(지역 · 교육과정 특징 · 교육 철학)와 함께 글을 만들어요. 메모가 짧으면 만들기 전에 두세 가지를 묻고, 억지로 늘리지 않아 900~1,200자쯤으로 나와요. 적지 않은 장면 · 대화 · 아이 이름 · 금액은 만들지 않으니, 실제 있었던 일을 적을수록 글이 길고 풍성해져요.',
+  quickHint: '주제나 오늘 있었던 일을 한 줄 적으면, 유치원 정보(지역 · 교육과정 특징 · 교육 철학)와 함께 글을 만들어요. 메모가 짧으면 만들기 전에 두세 가지를 묻고, 학부모님이 궁금해할 질문과 답으로 500~800자쯤 써요. 적지 않은 장면 · 대화 · 아이 이름 · 금액은 만들지 않으니, 실제 있었던 일을 적을수록 글이 길고 풍성해져요.',
   topicHint: '예: 낙엽 밟기 바깥놀이',
   values: ['호기심', '배려', '나눔', '자신감', '도전', '협동', '즐거움', '자립', '감사'],
   // 자세히 쓰기 "어떤 일이 있었나요?" (글 종류별 예시 — 태권 글뚝딱 2026-10-28 흐름을 유치원 말로)
@@ -241,6 +241,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
   // 재료가 적으면 만들기 전에 물음 2~3개 (2026-11-02). 메모를 고치면 물음은 사라짐
   const [quickAsks, setQuickAsks] = useState<{ memo: string; items: { question: string; answer: string }[] } | null>(null);
   const asksNow = quickAsks && quickAsks.memo === quick.trim() ? quickAsks : null;
+  const thinMemoOnly = !!asksNow && !asksNow.items.some((a) => a.answer.trim()) && quick.replace(/\s/g, '').length < 100;
   const [quickCards, setQuickCards] = useState(true);
   const [quickPrefix, setQuickPrefixState] = useState(local.get('quick-prefix', true));
   // 태권 글뚝딱 2.2.11에서 옮김: 주변 장소가 비면 [동 유치원] 하나만 계속 붙는데 "돌아가며"로 안내돼 헷갈림
@@ -322,7 +323,8 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
                 <input value={a.answer} maxLength={500} placeholder="한 줄이면 돼요 (비워 둬도 돼요)" onChange={(e) => setQuickAsks({ ...asksNow, items: asksNow.items.map((x, j) => (j === i ? { ...x, answer: e.target.value } : x)) })} />
               </Field>
             ))}
-            <p className="hint">있었던 일만 적어 주세요. 답이 없으면 지금 메모로 짧게 만들어요.</p>
+            <p className="hint">있었던 일만 적어 주세요.</p>
+            {thinMemoOnly && <p className="hint"><b>답 없이 만들면 내용이 적은 짧은 안내 글이 돼요.</b> 한 칸만 적어도 글이 달라져요.</p>}
           </div>
         )}
         <div className="row" style={{ marginTop: 10 }}>
@@ -445,7 +447,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
               {!!briefReady.data.asks?.length && (
                 <div className="brief-check">
                   <b>한두 줄만 더 적어 주시면 글이 길고 생생해져요</b>
-                  <p className="hint">지금 재료로는 900~1,200자쯤 나와요. 하나라도 답하시면 1,200~1,500자를 목표로 써요.</p>
+                  <p className="hint">500~800자로 짧고 또렷하게 써요. 답을 적을수록 글이 구체적으로 나와요.</p>
                   {briefReady.data.asks.map((a, i) => (
                     <label key={i} className="brief-ask">
                       <span>{a.question}</span>
@@ -543,7 +545,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
                 <label className="row"><input type="checkbox" checked={input.greetings !== false} onChange={(e) => set({ greetings: e.target.checked })} /> 이 글에 넣기</label>
               </Field>
             )}
-            <p className="hint">{input.facts.story?.trim() ? '분량: 본문 공백 제외 약 900~1,200자 (② 단계 물음에 답하면 1,200~1,500자). 모자란 분량은 주제 설명으로 채우고, 지어내지 않아요.' : `분량: 본문 공백 제외 최소 1,500자, 목표 1,800~2,200자 (행사 · ${kindLabel('모집 안내')}는 최소 1,000자). 모자라면 사실을 더하지 않고 최대 2번 보완해요.`}</p>
+            <p className="hint">{input.facts.story?.trim() ? '분량: 본문 공백 제외 약 500~800자. 모자란 분량은 주제 설명으로 채우고, 지어내지 않아요.' : `분량: 본문 공백 제외 최소 1,500자, 목표 1,800~2,200자 (행사 · ${kindLabel('모집 안내')}는 최소 1,000자). 모자라면 사실을 더하지 않고 최대 2번 보완해요.`}</p>
           </div>
           <div className="panel">
             <Field label="만들 것"><Chips options={['글만', '글 + 카드 3장'] as const} value={input.withCards ? '글 + 카드 3장' : '글만'} onChange={(v) => set({ withCards: v !== '글만' })} /></Field>

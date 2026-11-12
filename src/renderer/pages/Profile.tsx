@@ -49,7 +49,7 @@ export function ProfilePage() {
           <Field label={APP.nameLabel} req hint="공식 표기"><input type="text" value={p.name} onChange={(e) => set({ name: e.target.value })} /></Field>
           {<Field label={`${APP.place} 유형`}><Chips options={KINDER_TYPES} value={(p.facilityType ?? '') as any} onChange={(v) => set({ facilityType: v === p.facilityType ? undefined : v })} /></Field>}
           <Field label="소재 지역" req hint={TX.region}><input type="text" value={p.region} onChange={(e) => set({ region: e.target.value })} /></Field>
-          <Field label="상세 주소" hint="필요할 때만 본문에 넣어요. 주변 장소 찾기에도 써요"><input type="text" value={p.address ?? ''} onChange={(e) => set({ address: e.target.value })} /></Field>
+          <Field label="상세 주소" hint="필요할 때만 본문에 넣어요. 주변 장소 찾기와, 글 끝 지도가 맞는 곳인지 대조할 때도 써요"><input type="text" value={p.address ?? ''} onChange={(e) => set({ address: e.target.value })} /></Field>
           <Field label="기본 문체" req><Chips options={TONES} value={p.tone} onChange={(v) => set({ tone: v })} /></Field>
           <Field label="네이버 지도 검색 이름" hint={`글 끝 ${APP.place} 지도 카드를 찾을 때 써요. 네이버 지도에 나오는 이름 그대로 (비우면 ${APP.nameLabel})`}><input type="text" value={p.mapName ?? ''} placeholder={p.name} onChange={(e) => set({ mapName: e.target.value })} /></Field>
           <Field label="네이버 블로그 주소" hint="초안 입력에 필요 (예: https://blog.naver.com/아이디). 블로그가 여러 개면 글을 넣을 블로그"><input type="url" value={p.blogUrl ?? ''} onChange={(e) => set({ blogUrl: e.target.value })} /></Field>
@@ -77,6 +77,9 @@ export function ProfilePage() {
           <h2>연락 · 브랜드</h2>
           <Field label="연락처" hint="글마다 넣을지 골라요"><input type="text" value={p.contact ?? ''} onChange={(e) => set({ contact: e.target.value })} /></Field>
           <Field label="상담 링크"><input type="url" value={p.consultLink ?? ''} onChange={(e) => set({ consultLink: e.target.value })} /></Field>
+          <Field label="평소 쓰는 글 (선택)" hint="알림장이나 안내문 3~5편을 붙여 넣으면 AI가 말투를 따라요. 아이 이름 · 연락처 같은 개인정보는 빼고 넣어 주세요. OpenAI로 전송돼요">
+            <textarea rows={6} maxLength={3000} value={p.voiceSamples ?? ''} onChange={(e) => set({ voiceSamples: e.target.value })} />
+          </Field>
           <Field label="첫인사" hint="모든 글 맨 앞에 적은 그대로 붙여요 (AI가 바꾸지 않음). 비우면 AI가 알아서 시작해요">
             <textarea rows={2} value={p.greeting ?? ''} placeholder={`예: 안녕하세요, ${p.name || '○○유치원'}입니다 😊`} onChange={(e) => set({ greeting: e.target.value })} />
           </Field>

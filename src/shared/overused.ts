@@ -27,3 +27,30 @@ export const overusedLine = (doc: Pick<ArticleDoc, 'sections'>) => {
   const list = overusedWords(doc);
   return list.length ? `\n[꼭 줄일 말 — 프로그램이 세어 봤다] ${list.map((x) => `"${x.word}" ${x.count}번`).join(', ')}. 각각 ${OVERUSED_MAX}번 아래로 줄인다. 다른 말로 바꾸기만 하지 말고, 이 글의 활동을 구체적으로 말하는 문장으로 고치거나 지운다.` : '';
 };
+
+// 앞 내용을 정리만 하는 문장 (2026-11-05 시험 글: "~함께 있었던 김장 체험이에요", "~마련되는 자리예요")
+const SUMMARY = /(했던|있었던|하는|되는|이어지는|담긴)\s*(체험|활동|자리|시간|구성|이야기|행사)(이에요|예요|이랍니다|랍니다)|빼놓을 수 없/;
+
+// 글 말투 점검 (2026-11-05 사용자가 고른 글: 질문 2~3개 + 어미 섞기). 질문 수 · "~했어요" 연속만 셈
+export function styleIssues(doc: Pick<ArticleDoc, 'sections'>, kind?: string) {
+  const issues: string[] = [];
+  const body = bodyText(doc);
+  const questions = (body.match(/[?？]/g) ?? []).length;
+  if (kind !== '교육 정보' && questions < 2) issues.push(`질문이 ${questions}개예요. 재료로 답할 수 있는 질문을 2~3개로 맞춘다.`);
+  if (questions > 3) issues.push(`질문이 ${questions}개예요. 3개 이하로 줄인다.`);
+  let run = 0;
+  let longest = 0;
+  for (const x of doc.sections.flatMap((s) => s.paragraphs).join(' ').split(/(?<=[.!?])\s+/)) {
+    run = /했어요[.!\s\p{Extended_Pictographic}\u{FE0F}]*$/u.test(x.trim()) ? run + 1 : 0;
+    longest = Math.max(longest, run);
+  }
+  if (longest >= 3) issues.push(`"~했어요"가 ${longest}번 이어져요. 2번 아래로 바꾼다.`);
+  const sentences = doc.sections.flatMap((s) => s.paragraphs).join(' ').split(/(?<=[.!?])\s+/);
+  const long = sentences.filter((x) => x.replace(/\s/g, '').length > 55);
+  if (long.length) issues.push(`너무 긴 문장을 둘로 나눈다: ${long.slice(0, 3).map((x) => `"${x.trim()}"`).join(' ')}`);
+  const summary = sentences.filter((x) => SUMMARY.test(x));
+  if (summary.length) issues.push(`정리만 하는 문장을 지우거나 구체적으로 고친다: ${summary.slice(0, 3).map((x) => `"${x.trim()}"`).join(' ')}`);
+  const line = overusedLine(doc);
+  if (line) issues.push(line.replace(/^\n/, ''));
+  return issues;
+}
