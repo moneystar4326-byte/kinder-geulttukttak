@@ -1,11 +1,12 @@
 // 로컬 SQLite (node:sqlite, Electron 44 · Node 24 내장 — 따로 빌드할 모듈 없음)
 // API 비밀키 · 네이버 쿠키는 여기에 저장하지 않음 (credentials · browser-profile 따로)
+import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
-import type { Article, ArticleInput, ArticleStatus, ArticleSummary, ArticleVersion, Card, CardSet, DojoProfile, Job, JobState, KeywordRow } from '../../shared/types';
+import type { Article, ArticleInput, ArticleStatus, ArticleSummary, ArticleVersion, Card, CardSet, DojoProfile, Job, JobState, KeywordRow, PhotoItem } from '../../shared/types';
 import { APP } from '../../shared/kinder';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const MIGRATIONS: string[] = [
   // 1
@@ -20,6 +21,9 @@ const MIGRATIONS: string[] = [
    CREATE TABLE jobs (id TEXT PRIMARY KEY, type TEXT NOT NULL, entity_id TEXT NOT NULL, state TEXT NOT NULL, step TEXT NOT NULL, progress_json TEXT NOT NULL DEFAULT '{}', error_code TEXT, message TEXT, started_at TEXT NOT NULL, updated_at TEXT NOT NULL);
    CREATE TABLE usage_records (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id TEXT, provider TEXT NOT NULL, model TEXT NOT NULL, kind TEXT NOT NULL, reported_usage_json TEXT NOT NULL, estimate_json TEXT NOT NULL, created_at TEXT NOT NULL);
    CREATE TABLE settings (key TEXT PRIMARY KEY, nonsecret_value TEXT NOT NULL);`,
+  // 2: 사진 폴더로 글쓰기 (태권 글뚝딱 2.5.0에서 옮김). processed_file 은 assets 기준 상대 경로 (자료 폴더를 옮겨도 그대로)
+  `CREATE TABLE article_photos (article_id TEXT NOT NULL, photo_id TEXT NOT NULL, hash TEXT NOT NULL, source_path TEXT NOT NULL, title TEXT NOT NULL, idx INTEGER NOT NULL, status TEXT NOT NULL, regions_json TEXT NOT NULL DEFAULT '[]', faces INTEGER NOT NULL DEFAULT 0, processed_file TEXT, processed_hash TEXT, confirmed INTEGER NOT NULL DEFAULT 0, excluded INTEGER NOT NULL DEFAULT 0, error TEXT, PRIMARY KEY (article_id, photo_id));
+   CREATE TABLE photo_usage (hash TEXT PRIMARY KEY, article_id TEXT NOT NULL, used_at TEXT NOT NULL);`,
 ];
 
 const now = () => new Date().toISOString();
@@ -33,6 +37,10 @@ export function openDb(file: string) {
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   const ver = Number((db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version);
   if (ver > SCHEMA_VERSION) throw new Error(`이 자료는 더 새 버전(${ver})의 ${APP.appName}에서 만들어졌어요. 프로그램을 업데이트해 주세요.`);
+  // 자료 버전을 올리면 옛 버전 앱이 못 열므로, 올리기 직전 자료를 그대로 복사해 둠 (태권 글뚝딱 2.6.0에서 옮김). 복사에 실패해도 앱은 켜짐
+  if (ver > 0 && ver < MIGRATIONS.length && file !== ':memory:' && !fs.existsSync(`${file}.before-v${ver}`)) {
+    try { db.exec('PRAGMA wal_checkpoint(TRUNCATE)'); fs.copyFileSync(file, `${file}.before-v${ver}`); } catch { /* 위 주석 */ }
+  }
   for (let v = ver; v < MIGRATIONS.length; v++) {
     db.exec('BEGIN');
     try { db.exec(MIGRATIONS[v]); db.exec(`PRAGMA user_version = ${v + 1}`); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; }
@@ -78,6 +86,7 @@ export function openDb(file: string) {
       for (const s of all('SELECT cs.id FROM card_sets cs JOIN article_versions v ON v.id = cs.article_version_id WHERE v.article_id=?', id)) run('DELETE FROM cards WHERE card_set_id=?', s.id);
       run('DELETE FROM card_sets WHERE article_version_id IN (SELECT id FROM article_versions WHERE article_id=?)', id);
       run('DELETE FROM article_versions WHERE article_id=?', id);
+      run('DELETE FROM article_photos WHERE article_id=?', id);
       run('DELETE FROM articles WHERE id=?', id);
       db.exec('COMMIT');
     } catch (e) { db.exec('ROLLBACK'); throw e; }
@@ -166,6 +175,23 @@ export function openDb(file: string) {
   }
   const setCardSetStyle = (id: string, style: CardSet['style']) => run('UPDATE card_sets SET style_json=? WHERE id=?', j(style), id);
 
+  // ---------- 사진 글 ----------
+  type PhotoRow = Omit<PhotoItem, 'processedFile'> & { processedFile?: string }; // processedFile: assets 기준 상대 경로
+  const rowToPhoto = (r: any): PhotoRow => ({ articleId: r.article_id, id: r.photo_id, hash: r.hash, sourcePath: r.source_path, title: r.title, idx: r.idx, status: r.status, regions: p(r.regions_json, []), faces: r.faces, processedFile: r.processed_file ?? undefined, processedHash: r.processed_hash ?? undefined, confirmed: !!r.confirmed, excluded: !!r.excluded, error: r.error ?? undefined });
+  function addPhotos(articleId: string, photos: { id: string; hash: string; sourcePath: string; title: string }[]) {
+    photos.forEach((x, i) => run("INSERT INTO article_photos (article_id,photo_id,hash,source_path,title,idx,status) VALUES (?,?,?,?,?,?,'pending')", articleId, x.id, x.hash, x.sourcePath, x.title, i));
+  }
+  const listPhotos = (articleId: string) => all('SELECT * FROM article_photos WHERE article_id=? ORDER BY idx', articleId).map(rowToPhoto);
+  const getPhoto = (articleId: string, id: string) => { const r = get('SELECT * FROM article_photos WHERE article_id=? AND photo_id=?', articleId, id); return r ? rowToPhoto(r) : null; };
+  function updatePhoto(articleId: string, id: string, patch: Partial<Pick<PhotoRow, 'hash' | 'status' | 'regions' | 'faces' | 'processedFile' | 'processedHash' | 'confirmed' | 'excluded' | 'error'>>) {
+    const n = { ...getPhoto(articleId, id)!, ...patch };
+    run('UPDATE article_photos SET hash=?, status=?, regions_json=?, faces=?, processed_file=?, processed_hash=?, confirmed=?, excluded=?, error=? WHERE article_id=? AND photo_id=?',
+      n.hash, n.status, j(n.regions), n.faces, n.processedFile ?? null, n.processedHash ?? null, n.confirmed ? 1 : 0, n.excluded ? 1 : 0, n.error ?? null, articleId, id);
+    return getPhoto(articleId, id)!;
+  }
+  const usedHashes = () => new Set(all('SELECT hash FROM photo_usage').map((r) => r.hash as string));
+  const markPhotosUsed = (articleId: string, hashes: string[]) => { for (const h of hashes) run('INSERT INTO photo_usage (hash,article_id,used_at) VALUES (?,?,?) ON CONFLICT(hash) DO UPDATE SET article_id=excluded.article_id, used_at=excluded.used_at', h, articleId, now()); };
+
   // ---------- 작업 ----------
   const rowToJob = (r: any): Job => ({ id: r.id, type: r.type, entityId: r.entity_id, state: r.state, step: r.step, startedAt: r.started_at, updatedAt: r.updated_at, errorCode: r.error_code ?? undefined, message: r.message ?? undefined });
   function createJob(type: Job['type'], entityId: string, step: string): Job {
@@ -213,6 +239,7 @@ export function openDb(file: string) {
     addVersion, getVersion, listVersions, setCurrentVersion, saveUserEdit,
     saveLookup, cachedLookup,
     createCardSet, getCardSet, latestCardSet, updateCard, getCard, refreshCardSetStatus, setCardSetStyle,
+    addPhotos, listPhotos, getPhoto, updatePhoto, usedHashes, markPhotosUsed,
     createJob, getJob, updateJob, activeJob, recentJobs, recoverInterrupted,
     addUsage, usageSummary, countUsage,
     getSetting, setSetting,

@@ -10,6 +10,7 @@ import { ARTICLE_META_JSON, ArticleMetaSchema,
   PARAGRAPH_JSON, ParagraphSchema, PROOFREAD_JSON, ProofreadSchema, REVIEW_JSON, ReviewSchema, TITLES_JSON, TitlesSchema,
 } from '../../../shared/schemas';
 import { parsePlainDoc } from '../../../shared/plainDoc';
+import { takePhotoMarks } from '../../../shared/photos';
 import type { ArticleBrief, ArticleDoc, ArticleInput, DojoProfile, ReviewFlag, RevisionKind } from '../../../shared/types';
 import { APP, type Writer } from '../../../shared/kinder';
 import * as P from './prompts';
@@ -58,7 +59,7 @@ export function normalizeDoc(raw: z.infer<typeof GeneratedArticleSchema>): Artic
     let id = s.id.trim() || `s${i + 1}`;
     while (ids.has(id)) id = `${id}_${i + 1}`;
     ids.add(id);
-    return { id, heading: s.heading.trim() || undefined, paragraphs: s.paragraphs.map((x) => x.trim()).filter(Boolean) };
+    return { id, heading: s.heading.trim() || undefined, paragraphs: s.paragraphs.map((x) => x.trim()).filter(Boolean), ...(s.photoId?.trim() ? { photoId: s.photoId.trim() } : {}) };
   }).filter((s) => s.paragraphs.length);
   return {
     titleCandidates: raw.titleCandidates.map((t) => t.trim()),
@@ -127,8 +128,10 @@ export function createOpenAI(opts: { apiKey: string; textModel: string; imageMod
   const text: TextAI = {
     async generate(p, input, regionNote, o) {
       // 글은 줄글로 쓰고 코드가 소제목으로 나눔. 제목 · 태그는 본문을 고치지 않는 따로 요청 (2026-11-05)
-      let sections = parsePlainDoc(await plain('text', P.DRAFT_RULES, P.articlePrompt(p, input, regionNote), o));
-      if (sections.length < 3) sections = parsePlainDoc(await plain('text', P.DRAFT_RULES, P.articlePrompt(p, input, regionNote), o));
+      // 사진 글: 장면 소제목 줄 앞의 [p01] 표시로 사진을 그 부분 아래에 붙임 (표시는 지움)
+      const draft = async () => { const x = parsePlainDoc(await plain('text', P.DRAFT_RULES, P.articlePrompt(p, input, regionNote), o)); return input.photoScenes ? takePhotoMarks(x, input.photoScenes.map((s) => s.id)) : x; };
+      let sections = await draft();
+      if (sections.length < 3) sections = await draft();
       if (sections.length < 3) throw new ApiError('schema', 'AI 응답 형식이 맞지 않았어요. 다시 시도해 주세요.', 'OpenAI', true);
       const meta = await json('article_meta', 'text', P.SYSTEM_RULES, P.articleMetaPrompt({ titleCandidates: [], sections, tags: [], photoSuggestions: [], reviewFlags: [] }, input), ARTICLE_META_JSON, ArticleMetaSchema, o);
       return normalizeDoc({ ...meta, sections: sections.map((s) => ({ ...s, heading: s.heading ?? '' })) });

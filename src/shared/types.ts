@@ -93,6 +93,7 @@ export interface ArticleInput {
   writer?: Writer; // 이 글을 쓰는 사람. 고른 때의 이름 · 반을 그대로 담음
   writerSign?: boolean; // 글 끝에 글쓴이 한 줄 (코드가 붙임)
   brief?: ArticleBrief; // 자세히 쓰기: 재료를 읽고 정한 글 성격 · 사실 · 주제 설명 글감 (2026-10-28)
+  photoScenes?: { id: string; title: string }[]; // 사진 폴더로 쓴 글: 사진 번호와 장면 제목 (있으면 사진 글)
 }
 
 // 짧은 재료로도 일반론 없이 쓰기 (태권 글뚝딱 2026-10-28, GPT 검토 반영): 글 성격을 먼저 정하고, 일반 설명은 미리 만든 글감에서만
@@ -113,7 +114,7 @@ export interface ArticleBrief {
 
 export interface KeywordPlanItem { role: '주요' | '보조'; keyword: string; sentence: string; why?: string }
 
-export interface Section { id: string; heading?: string; paragraphs: string[] }
+export interface Section { id: string; heading?: string; paragraphs: string[]; photoId?: string } // photoId: 이 섹션 글 바로 아래에 넣을 사진 (사진 글만)
 export interface ReviewFlag { code: string; message: string; sectionId?: string }
 export interface ArticleDoc {
   titleCandidates: string[];
@@ -210,3 +211,34 @@ export interface SettingsView {
 }
 
 export type RevisionKind = 'warmer' | 'professional' | 'less-promo' | 'titles' | 'paragraph';
+
+// 사진 폴더로 글쓰기 (태권 글뚝딱 2.5.0에서 옮김)
+export interface PhotoRegion { x: number; y: number; w: number; h: number; source: 'auto' | 'manual' } // 사진 크기에 대한 비율 0~1
+export interface ScannedPhoto {
+  path: string;
+  name: string;
+  hash: string; // 내용 해시: 이름을 바꿔도 같은 사진
+  title: string;
+  needsTitle: boolean;
+  order: number | null;
+  takenAt: string; // 촬영 시각, 없으면 수정 시각 ("YYYY-MM-DD HH:MM:SS")
+  used: boolean;
+  problem?: 'heic' | 'copying' | 'unreadable';
+}
+export interface PhotoItem {
+  articleId: string;
+  id: string; // p01 …
+  hash: string;
+  sourcePath: string;
+  title: string;
+  idx: number;
+  status: 'pending' | 'ready' | 'failed';
+  regions: PhotoRegion[];
+  faces: number; // 자동으로 찾은 얼굴 수
+  processedFile?: string; // 절대 경로 (화면 · 입력이 같은 파일을 씀)
+  processedHash?: string;
+  confirmed: boolean;
+  excluded: boolean;
+  error?: string;
+}
+export interface PhotoState { items: PhotoItem[]; blockers: string[]; workDir: string; resumable: boolean }

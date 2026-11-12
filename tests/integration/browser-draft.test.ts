@@ -170,3 +170,35 @@ test('사진 버튼이 처음 한 번 안 먹어도(팝업이 가림) 다시 눌
   await E.insertCardsAtMarks(p2, f2, files, (i, ok, w) => { if (!ok) why2.push(`${i}:${w}`); });
   assert.deepEqual(why2, ['1:mark-missing']);
 });
+
+test('사진 글: 장면 글 바로 아래 순서대로 들어가고, 끊겨도 남은 사진만 이어 넣음 (태권 글뚝딱 2.5.0에서 옮김)', { skip: !exe && '크롬 · 엣지 없음' }, async () => {
+  const { page } = await open();
+  const f = (await E.findEditor(page, 5000))!;
+  const secs = [{ id: 's1', paragraphs: ['도입 문단'] }, { id: 's2', heading: '장면 하나', paragraphs: ['첫 장면 글'] }, { id: 's3', heading: '장면 둘', paragraphs: ['둘째 장면 글'] }, { id: 's4', heading: '장면 셋', paragraphs: ['셋째 장면 글'] }, { id: 's5', paragraphs: ['마무리 문단'] }];
+  const photos = ['s2', 's3', 's4'].map((sectionId, i) => ({ sectionId, index: E.PHOTO_BASE + i, title: `장면 ${i + 1}` }));
+  const shots = photos.map((p, i) => ({ index: p.index, file: files[i].file }));
+  const anchors = [{ title: '장면 1', lastLine: '첫 장면 글' }, { title: '장면 2', lastLine: '둘째 장면 글' }, { title: '장면 3', lastLine: '셋째 장면 글' }];
+  await E.pasteBody(page, f, E.blocksToText(buildBlocks(secs, [], [], photos)), async (p, _f, text) => { await p.evaluate((t) => (window as any).__paste(t), text); });
+  // 1번 사진까지만 넣고 끊김
+  assert.deepEqual(await E.insertCardsAtMarks(page, f, shots.slice(0, 1)), [true]);
+  assert.deepEqual((await E.verify(f, '', shots.map((c) => c.index))).leftMarks, [E.PHOTO_BASE + 2, E.PHOTO_BASE + 3]);
+  assert.ok((await E.photoOrderProblems(await E.readLayout(f), anchors)).length > 0, '다 안 들어가면 순서 대조 실패');
+  const texts = () => f.locator(E.SEL.bodyParagraph).allInnerTexts();
+  // 기록과 다르면 다시 넣지 않음
+  assert.equal(E.resumePlan(await texts(), 0, shots).ok, false);
+  assert.equal(E.resumePlan(await texts(), 3, shots).ok, false);
+  // 늦게 올라온 사진: 그 자리 글자만 지우고 그다음부터
+  const late = E.resumePlan(await texts(), 2, shots);
+  assert.ok(late.ok && late.late?.index === E.PHOTO_BASE + 1 && late.left.length === 1);
+  // 맞으면 남은 사진만
+  const plan = E.resumePlan(await texts(), 1, shots);
+  assert.ok(plan.ok && plan.late === null);
+  if (plan.ok) assert.deepEqual(await E.insertCardsAtMarks(page, f, plan.left), [true, true]);
+  const check = await E.verify(f, '', shots.map((c) => c.index));
+  assert.equal(check.images, 3);
+  assert.deepEqual(check.leftMarks, []);
+  assert.deepEqual(E.photoOrderProblems(await E.readLayout(f), anchors), []);
+  assert.deepEqual(await page.$$eval('#body .se-image', (els) => els.map((e) => (e as HTMLElement).dataset.name)), ['gtd-card-1.png', 'gtd-card-2.png', 'gtd-card-3.png']);
+  // 다 들어간 뒤에는 이어 넣을 것이 없음
+  assert.equal(E.resumePlan(await texts(), 3, shots).ok, false);
+});

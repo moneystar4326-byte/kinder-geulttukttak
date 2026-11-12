@@ -2,6 +2,7 @@
 import type { ArticleBrief, ArticleDoc, ArticleInput, DojoProfile, RevisionKind } from '../../../shared/types';
 import { bodyText, MIN_CHARS, minCharsForInput, TARGET_RANGE, targetRangeForInput, thinMaterial } from '../../../shared/count';
 import { overusedLine } from '../../../shared/overused';
+import { namesFromScenes } from '../../../shared/photos';
 import { nearbyLine } from '../../../shared/areas';
 import { spacedKeyword } from '../../../shared/validation';
 import { cardSlots, roleAt, storyBrief } from '../../../shared/cardRoles';
@@ -146,6 +147,8 @@ const isStory = (input: ArticleInput) => !!input.facts.story?.trim();
 // 재료가 적어 글이 짧으면 키워드도 이야기 글만큼만 (짧은 글에 3~5번이면 억지로 끼운 문장이 됨)
 const lightKeyword = (input: ArticleInput) => isStory(input) || thinMaterial(input);
 function keywordLines(input: ArticleInput) {
+  // 사진 글은 재료만큼 짧아서 검색어를 억지로 넣지 않음 (태권 글뚝딱 2026-11-05에서 옮김)
+  if (input.photoScenes) return `[주요 키워드] ${input.mainKeyword} (본문에는 "${spacedKeyword(input.mainKeyword)}"처럼 많아야 한 번, 어색하면 쓰지 않는다. 제목과 태그에는 써도 된다)`;
   const plan = input.keywordPlan ?? [];
   if (plan.length) return `[검색어 계획] 아래 문장 예시처럼 자연스러운 자리에만 넣는다. 주요는 2~3번, 보조는 1번씩. 횟수를 채우려고 문장을 만들지 않는다. 띄어쓰기 · 조사 변형은 괜찮다 ("유치원소풍" → "유치원 소풍").
 ${plan.map((k) => `- ${k.role} "${k.keyword}" 예: ${k.sentence}`).join('\n')}`;
@@ -165,6 +168,32 @@ const greetLine = (p: DojoProfile, input: ArticleInput) => {
   return lines.join('');
 };
 
+// 사진 폴더로 쓴 글 (태권 글뚝딱 2.5.0 · 2026-11-05 "재료만큼 짧고 따뜻하게"에서 옮김)
+// 장면 칸 글자만 사실 자료로 보냄. AI는 사진을 보지 못함 (사진은 보내지 않음)
+// 유치원판은 글을 줄글로 쓰므로 장면 부분의 소제목 줄 맨 앞에 [p01] 표시를 받아 코드가 사진을 붙임 (shared/photos takePhotoMarks)
+export function photoBlock(input: ArticleInput) {
+  const scenes = input.photoScenes;
+  if (!scenes?.length) return '';
+  const names = namesFromScenes(scenes.map((s) => s.title));
+  return `
+
+[사진 장면 — 사실. 사진은 프로그램이 넣고 너는 사진을 볼 수 없다]
+${scenes.map((s) => `- ${s.id}: ${s.title}`).join('\n')}
+[사진 글 규칙 — 위 [형식] · [분량] · [구성]보다 이 규칙이 우선]
+- 짜임: 소제목 없는 도입 문단 → 장면마다 "## [사진 번호] 소제목" 줄로 시작하는 부분을 위 순서대로 하나씩 (예: "## [${scenes[0].id}] ${scenes[0].title.slice(0, 12)}") → 마지막에 "## 소제목" 줄로 시작하는 마무리 부분 (사진 번호 없이). 사진 번호는 빠짐없이 한 번씩, 소제목 줄 맨 앞에만 쓴다. 본문 문장에는 사진 번호를 쓰지 않는다.
+- 사진은 그 부분 글 바로 아래에 들어간다. 그 부분 글은 그 장면 이야기로 끝난다.
+- 재료만큼만 쓴다. 장면 칸이 한 줄이면 그 부분은 있었던 일 하나와 그 일을 이해시키는 설명 한두 문장으로 끝낸다. 글자 수를 채우려고 같은 일을 다시 말하거나 늘리지 않는다. 짧은 글이 맞다.
+- 목소리는 위 [글의 목소리] 그대로: 선생님이 학부모님께 오늘 유치원에서 있었던 일을 들려주듯 해요체로, 한 문장 40자 안팎. 학부모님이 궁금해할 질문은 글 전체에 2~3개 넣고 바로 뒤에서 답한다 (장면이 하나뿐이면 하나도 괜찮다). 아이들이 한 일을 먼저 쓰고, 선생님 마음은 글 전체에서 한두 문장만.
+- [주제 설명 글감]이 있어도 장면 뒤 설명 한두 문장에 맞는 것만 고른다. 4개를 채우지 않아도 된다.
+- 꾸민 말을 쓰지 않는다: "소중한 순간", "작은 창", "한 뼘 성장", "추억", "그 시간을 들여다보는".
+- "사진으로 남겼어요", "사진에 담겼어요", "카메라에는" 같은 말로 쓰지 않고 그 장면 자체를 말한다. "사진"이라는 말은 글 전체에서 두 번까지만 쓴다.
+- 광고 문장을 쓰지 않는다: "찾고 계신가요?", "만나 보세요", "상담 문의". 교육 철학 · 교육과정 소개 문구도 쓰지 않는다.
+- 아이는 이름 · 별명 대신 "한 친구", "아이들", "○○반 친구들"로 쓴다.${names.length ? ` 다음은 아이 이름일 수 있으니 글에 쓰지 않는다: ${names.join(', ')}.` : ''}
+- 검색어와 지역은 위 규칙보다 이 규칙이 우선이다. 주요 키워드는 본문에 많아야 두 번, 보조 키워드와 ${APP.place} 주변은 어색하면 쓰지 않는다. ${APP.place} 이름은 마무리에 한 번 자연스럽게 쓴다.
+- 오늘 있었던 일은 주제와 장면 칸에 있는 것만 쓴다. 아이의 말 · 감정 · 결과를 지어내지 않고, 표정 · 옷 · 날씨 · 분위기처럼 사진을 보아야 알 수 있는 묘사를 하지 않는다.
+- 놀이 방법 · 이 또래에게 흔한 모습 같은 일반 설명은 써도 되지만, 우리 아이들이 실제로 한 일처럼 쓰지 않는다. 발달 효과는 말하지 않는다.`;
+}
+
 export function articlePrompt(p: DojoProfile, input: ArticleInput, regionNote: string | null) {
   const story = isStory(input);
   const brief = story ? input.brief : undefined;
@@ -178,7 +207,7 @@ ${keywordLines(input)}
 [문체] ${input.tone}${input.tone === '따뜻한 설명형' ? ' — 친근한 해요체 ("~해요", "~드려요"). 딱딱한 "~합니다"는 쓰지 않는다' : ' — 차분한 존댓말, 너무 딱딱하지 않게'}${writerLine(input.writer)}
 [마무리] ${input.ending} — 마지막 섹션의 끝 문단으로 쓴다. 마무리 · 인사만 담은 섹션을 따로 만들지 않는다.${greetLine(p, input)}
 [${APP.nameLabel}] "${p.name}" — 도입이나 마무리 문단에 글자 그대로 자연스럽게 1~2번 넣는다. 광고 문구처럼 되풀이하지 않는다.
-[분량] 본문(소제목+문단) 공백 제외 ${lo}~${hi}자 목표${story ? `, 최소 ${minCharsForInput(input)}자. 분량은 주제 설명 글감으로 채우고, 같은 사실을 되풀이하거나 재료에 없는 일을 만들어 채우지 않는다.` : `, 최소 ${minCharsForInput(input)}자.`} ${story
+[분량] 본문(소제목+문단) 공백 제외 ${lo}~${hi}자 목표${input.photoScenes ? '. 재료가 적으면 더 짧아도 된다. 같은 사실을 되풀이하거나 재료에 없는 일을 만들어 채우지 않는다.' : story ? `, 최소 ${minCharsForInput(input)}자. 분량은 주제 설명 글감으로 채우고, 같은 사실을 되풀이하거나 재료에 없는 일을 만들어 채우지 않는다.` : `, 최소 ${minCharsForInput(input)}자.`} ${story
     ? (brief
       ? '있었던 일과 주제 설명 글감으로만 쓴다. 짜임: 있었던 일 하나 → 그것을 이해시키는 설명 (예: "처음엔 반죽을 손끝으로만 콕콕 찔러 봤어요. 이 나이 아이들은 낯선 촉감을 손끝부터 조심스럽게 탐색하거든요."). 일반 육아 조언 · 입학 권유 · 주제와 상관없는 유치원 소개로 늘리지 않는다. 인사 · 감사 문장은 합쳐서 3문장 이하. 아이들을 "원아" · "원생"처럼 딱딱하게 부르지 않는다 ("우리 아이들", "○○반 친구들").'
       : '원장님 · 선생님 이야기 속 놀이 · 장면 · 아이들 모습 · 선생님이 도운 것을 구체적으로 풀어 쓰고, 각 일 뒤에 그 활동이 어떤 것인지 이해시키는 설명을 붙인다. 교육 효과 · 육아 조언으로 늘리지 않는다.')
@@ -195,7 +224,7 @@ ${profileBlock(p, input)}
 [이번 글 재료 — 사실${story ? '. 원장님 · 선생님이 쓴 이야기가 중심. "선생님이 도운 점" · "전달 가치" · "관찰 장면" 같은 항목 이름을 글에 쓰지 않는다' : ''}]
 ${factsBlock(input)}${brief ? `
 [글 성격] ${brief.purpose} — ${brief.note}
-${briefBlock(brief)}` : ''}`;
+${briefBlock(brief)}` : ''}${photoBlock(input)}`;
 }
 
 export function expandPrompt(doc: ArticleDoc, current: number, min = MIN_CHARS) {
@@ -221,13 +250,17 @@ export function articleMetaPrompt(doc: ArticleDoc, input: ArticleInput) {
 ${doc.sections.map((s) => `(${s.id}) ${s.heading ?? ''}\n${s.paragraphs.join('\n')}`).join('\n\n')}`;
 }
 
+// 사진 글 호흡 다듬기: 재료만큼 짧은 글을 늘리지 않음 (태권 글뚝딱 2026-11-05: 다듬기가 짧은 사진 글에 검색어 · 일반 설명을 다시 늘림)
+const PHOTO_WARM = `
+[사진 글] 장면마다 사진이 붙는 짧은 글이다. 늘리지 않는다. 소제목 수를 그대로 두어야 사진이 제자리에 들어간다. "사진"이라는 말은 글 전체에서 두 번까지, 광고 문장 · ${APP.place} 소개 문구는 지운다.`;
+
 // 사실을 확인한 글의 호흡만 다듬기 (2026-11-05). 끊어진 문장을 잇고, 평소 쓰는 글의 말투를 입힘. 적용 조건은 코드: article.ts warmDoc
 export function warmPrompt(doc: ArticleDoc, p: DojoProfile, input: ArticleInput, note = '') {
   return `아래 [글]은 사실 확인이 끝난 블로그 글이다. [글의 목소리]처럼 읽히도록 문장의 호흡만 다듬어라.
 할 일: 40자를 크게 넘는 문장은 둘로 나눈다. 끊어진 문장을 잇는다. 같은 사실을 두 번 말하면 한 번만 남긴다. 정리만 하는 문장과 설명만으로 된 문단은 지운다. 있었던 일에 붙은 설명은 한두 문장만 남기고, 재료에 없는 진행 순서 · 놀이 이름은 지운다.
 지킬 것: 사실을 더하지 않는다. 숫자 · 이름 · 놀이 · 음식 · 반 이름과 있었던 일은 빠뜨리지 않는다. 아이들의 감정이나 말을 새로 만들지 않는다. 소제목 수와 소제목 글자는 그대로 둔다. 질문의 답은 재료에 있어야 한다.
 형식: 도입 문단으로 시작하고 소제목 줄은 "## 소제목"으로 쓴다. 문단 사이는 빈 줄. 글만 출력한다.
-${WARM_STYLE}${p.voiceSamples?.trim() ? `
+${WARM_STYLE}${input.photoScenes ? PHOTO_WARM : ''}${p.voiceSamples?.trim() ? `
 [이 유치원의 평소 글 — 문장 길이 · 어미 · 호흡을 이 글처럼 맞춘다. 내용은 가져오지 않는다]
 ${p.voiceSamples.trim()}` : ''}${note ? `
 [꼭 고칠 것 — 프로그램이 세어 봤다] ${note}` : ''}
@@ -299,7 +332,7 @@ export function verifyPrompt(doc: ArticleDoc, p: DojoProfile, input: ArticleInpu
 - 지어냄: 우리 아이들 · 유치원 · 행사에 대해 사실에 없는 내용 (감정, 아이의 말, 노력, 준비 과정, 인원, 발달 · 건강 효과, 일정, 금액)
 - 틀림: 숫자 · 나이 · 반 이름 · 날짜가 사실과 다름
 연결 문장 · 되풀이 · 표현이 어색한 것은 고치지 않는다 (2026-11-05: 사실 검사가 초안의 30~45%를 지워 글이 끊김). 틀린 사실과 지어낸 일만 본다.
-문제가 아닌 것: 인사 · 감사 표현, 학부모님께 전하는 바람 · 인사, 재료에 적힌 선생님의 마음, [주제 설명 글감]에 있는 일반 설명, 활동이 어떤 것인지 · 왜 어려운지 · 이 또래에게 흔한 모습을 말하는 일반 설명, ${APP.place} 정보에 있는 사실, 주제 · ${APP.place} 이름 · 검색어(${kws.join(', ') || '없음'}).
+${input.photoScenes ? '- 사진 글: 표정 · 옷 · 날씨 · 분위기처럼 사진을 보아야 알 수 있는 묘사는 장면 칸에 없으면 지어냄으로 본다. 아이 이름 · 별명이 있으면 "한 친구"로 고친다.\n' : ''}문제가 아닌 것: 인사 · 감사 표현, 학부모님께 전하는 바람 · 인사, 재료에 적힌 선생님의 마음, [주제 설명 글감]에 있는 일반 설명, 활동이 어떤 것인지 · 왜 어려운지 · 이 또래에게 흔한 모습을 말하는 일반 설명, ${APP.place} 정보에 있는 사실, 주제 · ${APP.place} 이름 · 검색어(${kws.join(', ') || '없음'}).
 sentence 는 글에 있는 문장 그대로 (한 문장). fix 는 고친 문장, 지울 거면 빈 문자열. 문장을 지우면 다음 문장의 "그중에는", "이때는" 같은 말이 가리킬 곳을 잃지 않는지 보고, 잃는다면 지우지 말고 fix 로 고친다. 사실이 담긴 문장은 되풀이처럼 보여도 그 사실이 글에 한 번은 남게 한다. 재료에 없는 먹는 법 · 육아 조언은 지어냄으로 본다. 검색어가 든 문장은 지우지 말고 검색어를 남긴 채 고친다. 문제가 없으면 issues 빈 배열.
 
 [사실 — ${APP.place}]

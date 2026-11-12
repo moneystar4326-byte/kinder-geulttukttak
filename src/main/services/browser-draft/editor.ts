@@ -18,8 +18,11 @@ export const SEL = {
 
 // 붙여넣을 본문: 소제목 · 문단 사이 빈 줄, 카드 자리는 [카드 n · 제목] 줄
 export interface DraftBlock { kind: 'heading' | 'paragraph' | 'card'; text: string; cardIndex?: number }
-export const cardMark = (i: number, title: string) => `[카드 ${i + 1} · ${title.replace(/[\[\]]/g, '')}]`;
-export const isCardMark = (t: string, i: number) => new RegExp(`^\\[카드\\s*${i + 1}\\s*·`).test(t.replace(/[​﻿]/g, '').trim());
+// 사진 글의 사진 자리는 따로 표시 (카드 0~2 와 겹치지 않게 — 태권 글뚝딱 2.5.0에서 옮김)
+export const PHOTO_BASE = 100;
+const markName = (i: number) => (i >= PHOTO_BASE ? `사진 ${i - PHOTO_BASE + 1}` : `카드 ${i + 1}`);
+export const cardMark = (i: number, title: string) => `[${markName(i)} · ${title.replace(/[\[\]]/g, '')}]`;
+export const isCardMark = (t: string, i: number) => new RegExp(`^\\[${markName(i).replace(' ', '\\s*')}\\s*·`).test(t.replace(/[​﻿]/g, '').trim());
 
 export function blocksToText(blocks: DraftBlock[]) {
   return blocks.map((b) => b.text).join('\n\n');
@@ -261,4 +264,38 @@ export async function verify(f: Frame, title: string, cardIndexes: number[]) {
   const texts = await f.locator(SEL.bodyParagraph).allInnerTexts().catch(() => [] as string[]);
   const leftMarks = cardIndexes.filter((i) => texts.some((x) => isCardMark(x, i))).map((i) => i + 1);
   return { titleOk: t === title.trim(), images, leftMarks, paragraphs: texts.filter((x) => x.trim()).length };
+}
+
+// 사진 글 순서 대조 (태권 글뚝딱 2.5.0에서 옮김): 각 장면의 마지막 글줄 바로 다음이 사진이어야 함. 위에서 아래로 차례대로 찾음
+const LAYOUT_JS = `Array.from(document.querySelectorAll('.se-component.se-image, p.se-text-paragraph')).filter((e) => !e.closest('.se-documentTitle')).map((e) => e.matches('.se-component.se-image') ? '[img]' : e.innerText)`;
+export const readLayout = (f: Frame): Promise<string[]> => f.evaluate(LAYOUT_JS);
+const flat = (t: string) => t.replace(/[\s\u200b\ufeff]/g, '');
+export function photoOrderProblems(layout: string[], anchors: { title: string; lastLine: string }[]) {
+  const items = layout.map((x) => (x === '[img]' ? x : flat(x))).filter(Boolean);
+  const out: string[] = [];
+  let at = 0;
+  for (const a of anchors) {
+    const i = items.indexOf(flat(a.lastLine), at);
+    if (i < 0) { out.push(`"${a.title}" 장면 글을 찾지 못했어요`); continue; }
+    if (items[i + 1] !== '[img]') out.push(`"${a.title}" 글 바로 아래에 사진이 없어요`);
+    at = i + 1;
+  }
+  return out;
+}
+// 시간 초과였던 사진이 늦게 올라왔을 때 남은 자리 글자만 지움
+export async function removeMark(page: Page, f: Frame, i: number) {
+  const paras = f.locator(SEL.bodyParagraph);
+  const at = (await paras.allInnerTexts()).findIndex((t) => isCardMark(t, i));
+  if (at < 0) return;
+  await paras.nth(at).click({ clickCount: 3 });
+  await page.keyboard.press('Backspace');
+}
+
+// 이어 넣기 판단: 남은 자리 글자 · 사진 수가 기록과 맞을 때만 (안 맞으면 다시 넣지 않음 — 같은 사진 두 장 방지)
+export function resumePlan<T extends { index: number }>(texts: string[], images: number, files: T[]) {
+  const left = files.filter((c) => texts.some((t) => isCardMark(t, c.index)));
+  const expected = files.length - left.length;
+  if (images === expected + 1 && left.length) return { ok: true as const, late: left[0], left: left.slice(1) }; // 시간 초과였던 사진이 늦게 올라옴
+  if (images !== expected || !left.length) return { ok: false as const, why: `편집기 내용이 기록과 달라요 (사진 ${images}장, 기록 ${expected}장)` };
+  return { ok: true as const, late: null, left };
 }

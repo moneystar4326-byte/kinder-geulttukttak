@@ -46,7 +46,7 @@ export const minCharsFor = (kind?: string) => (kind && SHORT_KINDS.includes(kind
 // 2026-10-28 사용자: 600자는 짧다 → 주제 설명 글감을 더 써서 최소 800 (목표 900~1,200), ② 단계 물음에 답하면 목표 1,200~1,500
 // 2026-11-05 사용자: 문장 품질은 태권 글뚝딱처럼 → 설명을 붙일 만큼 700~1,000자 (500자는 요약 글이 되고, 1,200자는 설명만 있는 문단이 생김: 같은 날 시험)
 export const STORY_MIN = 500;
-type CountInput = { kind?: string; facts?: { story?: string }; brief?: { asks?: { answer?: string }[] } };
+type CountInput = { kind?: string; facts?: { story?: string }; brief?: { asks?: { answer?: string }[] }; photoScenes?: unknown[] };
 const hasStory = (input?: CountInput) => !!input?.facts?.story?.trim();
 // 2026-11-02 사용자: 짧은 메모를 1,500자로 늘리면 어느 글에나 맞는 태도 문장으로 차서 어색함 → 재료가 적으면 글도 짧게
 // 교육 정보는 일반 설명이 곧 내용이라 그대로. 800자 아래로는 내리지 않음 (2026-10-28 사용자: 600자는 짧다)
@@ -58,8 +58,14 @@ const THIN_KIND = (input?: CountInput) => !hasStory(input) && input?.kind !== '�
 export const thinMaterial = (input?: CountInput) => THIN_KIND(input) && materialChars(input) < THIN_CHARS;
 const smallMaterial = (input?: CountInput) => THIN_KIND(input) && materialChars(input) < SMALL_CHARS;
 export const storyAnswers = (input?: CountInput) => (input?.brief?.asks ?? []).filter((a) => a.answer?.trim()).length;
+// 사진 글 (태권 글뚝딱 2026-11-05에서 옮김): 장면 칸에 적은 만큼만 씀. 자유롭게 찍은 사진은 짧은 소식 글로 (장면당 몇 자를 채우게 하면 반복 · 일반 설명이 생김)
+const PHOTO_MIN = 200;
+const photoRange = (input: CountInput): readonly [number, number] => {
+  const m = materialChars(input);
+  return [Math.max(PHOTO_MIN, Math.round(m * 1.3)), Math.min(1400, Math.max(450, m * 3))];
+};
 // 이야기 · 행사 글은 분량 보완 없음, 교육 정보만 기존 기준
-export const minCharsForInput = (input: CountInput) => (!hasStory(input) && input.kind === '교육 정보' ? minCharsFor(input.kind) : STORY_MIN);
+export const minCharsForInput = (input: CountInput) => (input.photoScenes ? photoRange(input)[0] : !hasStory(input) && input.kind === '교육 정보' ? minCharsFor(input.kind) : STORY_MIN);
 export const targetRangeForInput = (input: CountInput): readonly [number, number] =>
-  !hasStory(input) && input.kind === '교육 정보' ? targetRangeFor(input.kind) : [700, 1000];
+  input.photoScenes ? photoRange(input) : !hasStory(input) && input.kind === '교육 정보' ? targetRangeFor(input.kind) : [700, 1000];
 export const targetRangeFor = (kind?: string): readonly [number, number] => (kind && SHORT_KINDS.includes(kind) ? [1200, 1600] : TARGET_RANGE);

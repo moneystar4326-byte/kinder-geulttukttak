@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '../App';
-import { call, local, onJob, type ArticleBundle, type Job } from '../api';
+import { assetUrl, call, local, onJob, type ArticleBundle, type Job } from '../api';
 import { fmtDate, JobBar, Msg, useMsg } from '../components/ui';
 import { DocEditor, type Draft, type ParaSel } from '../editor/DocEditor';
 import { TypingStage } from '../editor/TypingStage';
 import { CardsPanel, type CardPref } from '../components/CardsPanel';
 import { MobilePreview } from '../components/MobilePreview';
+import { PhotoCheckPanel } from '../components/PhotoCheckPanel';
 import { PasteHelper } from '../components/PasteHelper';
 import { naverAutoOn } from '../../shared/naverAuto';
 import { FirstTip } from '../guide/voice';
 import { localFlags } from '../../shared/validation';
 import { minCharsForInput } from '../../shared/count';
 import { cardCountOf, resolveCardCount, storyBrief } from '../../shared/cardRoles';
-import type { DojoProfile, RevisionKind } from '../../shared/types';
+import type { DojoProfile, PhotoState, RevisionKind } from '../../shared/types';
 import { APP } from '../../shared/kinder';
 
 const same = (a: Draft | null, b: Draft | null) => JSON.stringify(a) === JSON.stringify(b);
@@ -30,6 +31,7 @@ export function ArticlePage({ id }: { id: string }) {
   const [instr, setInstr] = useState('');
   const [typing, setTyping] = useState(false);
   const [profile, setProfile] = useState<DojoProfile | null>(null);
+  const [photoSt, setPhotoSt] = useState<PhotoState | null>(null);
   const [pref, setPrefState] = useState<CardPref>(local.get(`card-pref-${id}`, { style: '따뜻한 일러스트', size: '1080x1350', mode: 'ai' } as CardPref));
   const [exp, setExp] = useState({ txt: true, md: false, cards: true, zip: false });
   const msg = useMsg();
@@ -154,6 +156,10 @@ export function ArticlePage({ id }: { id: string }) {
     naverMsg.clear();
     try { setNaverJob(await call<Job>('naver:fill', { articleId: id, onExisting, typing: naverTyping, map: naverMap })); } catch (e) { naverMsg.err(e); }
   }
+  async function resumePhotos() {
+    naverMsg.clear();
+    try { setNaverJob(await call<Job>('naver:resumePhotos', id)); } catch (e) { naverMsg.err(e); }
+  }
   async function exportNow() {
     if (dirty) await save();
     try {
@@ -164,6 +170,10 @@ export function ArticlePage({ id }: { id: string }) {
   const flags = draft && profile ? [...draft.doc.reviewFlags.filter((f) => !/^(too-short|banned|avoid-word|repeat|keyword-heavy|fee|child-name)$/.test(f.code)), ...localFlags(draft.doc, profile, b.article.input)] : draft?.doc.reviewFlags ?? [];
   const cardsDone = b.cardSet?.cards.filter((c) => c.status === 'done').length ?? 0;
   const autoOn = naverAutoOn(info.settings.naverAuto);
+  // 사진 글: 얼굴 가림을 모두 확인하기 전에는 네이버 넣기 · 붙여넣기 도우미를 막음
+  const photoMode = !!b.article.input.photoScenes;
+  const photoBlocked = photoMode && (photoSt?.blockers.length ?? 1) > 0;
+  const photoFlags = photoMode && photoBlocked && <ul className="flags" style={{ marginTop: 8 }}>{(photoSt?.blockers ?? ['사진을 확인하고 있어요']).slice(0, 4).map((t, i) => <li key={i}><span className="badge warn">확인</span> {t}</li>)}</ul>;
   // 지도: 붙여넣기 도우미와 '네이버에 초안 입력'이 같은 값을 씀 (두 곳에 같은 칸을 보여 줌)
   const mapBox = <label className="row" style={{ marginTop: 8 }}><input type="checkbox" checked={naverMap} onChange={(e) => setNaverMap(e.target.checked)} /> 글 끝에 {APP.place} 지도 넣기 (네이버 지도 카드)</label>;
   // 가장 최근 버전이 AI 결과인데 현재 버전이 아니면 (고치는 동안 도착) 알려 줌
@@ -184,6 +194,7 @@ export function ArticlePage({ id }: { id: string }) {
       {aiAside && <div className="note warn">AI 결과("{aiAside.note}")가 이력에 따로 저장됐어요. 그동안 고친 글이 있어서 바꾸지 않았어요. <button className="btn link" onClick={async () => { try { if (dirty) await save(); await call('article:setCurrent', { id, versionId: aiAside.id }); await load(true); } catch (e) { msg.err(e); } }}>AI 결과로 바꾸기</button> <button className="btn link" onClick={() => setDismissed(aiAside.id)}>닫기</button></div>}
       {!draft && !busy && <div className="note info">아직 글이 없어요. <button className="btn link" onClick={regenerate}>글 만들기</button></div>}
       {draft && <FirstTip id="A11" />}
+      {photoMode && <PhotoCheckPanel articleId={id} doc={draft?.doc} refresh={`${JSON.stringify(saved?.doc)}|${naverJob?.state}|${naverJob?.updatedAt}`} onState={setPhotoSt} />}
 
       {draft && (
         <div className="split">
@@ -203,7 +214,7 @@ export function ArticlePage({ id }: { id: string }) {
               <button className="btn small" disabled={busy || !sel} onClick={() => revise('paragraph')}>선택 문단 수정</button>
             </div>
             {busy && <p className="note info">AI가 고치는 중이라 잠시 편집을 막아 둘게요. 끝나면 바로 고칠 수 있어요.</p>}
-            <DocEditor draft={draft} onChange={setDraft} sel={sel} onSelect={setSel} prefix={b.article.input.titlePrefix} readOnly={busy} kind={b.article.input.kind} story={!!b.article.input.facts.story?.trim()} min={minCharsForInput(b.article.input)} />
+            <DocEditor draft={draft} onChange={setDraft} sel={sel} onSelect={setSel} prefix={b.article.input.titlePrefix} readOnly={busy} kind={b.article.input.kind} story={!!b.article.input.facts.story?.trim()} min={minCharsForInput(b.article.input)} photoOf={photoMode ? (pid) => { const x = photoSt?.items.find((i) => i.id === pid); const src = x && !x.excluded && x.status === 'ready' ? assetUrl(info.dataDir, x.processedFile, x.processedHash) : ''; return <div style={{ margin: '8px 0' }}>{src ? <img src={src} alt={`${x!.title} 처리본`} style={{ maxWidth: '100%', maxHeight: 240, borderRadius: 6, display: 'block' }} /> : <span className="hint">{x?.excluded ? '이 사진은 뺐어요' : '사진 처리 중'}</span>}</div>; } : undefined} />
           </div>
 
           <div>
@@ -236,10 +247,11 @@ export function ArticlePage({ id }: { id: string }) {
 
             <MobilePreview title={draft.title} doc={draft.doc} />
 
+            {photoFlags && <div className="panel"><h2>사진 글 넣기 전에 확인할 것</h2>{photoFlags}</div>}
             {/* 붙여넣기 도우미 (태권 글뚝딱 2.8.0에서 옮김): 기본 방법. 지도 칸은 '네이버에 초안 입력'과 같은 값을 씀 */}
             <PasteHelper articleId={id} opts={{ map: naverMap }} beforeStart={async () => { if (dirty) await save(); }}
-              blocked={!b.version ? '글을 먼저 만들어 주세요' : undefined}
-              refreshKey={b.cardSet?.id ?? ''}>
+              blocked={!b.version ? '글을 먼저 만들어 주세요' : photoBlocked ? '사진 얼굴 가림 확인이 끝나야 쓸 수 있어요 (위 사진 확인 칸)' : undefined}
+              refreshKey={`${b.cardSet?.id ?? ''}|${photoSt?.items.map((x) => `${x.id}${x.confirmed ? 1 : 0}${x.excluded ? 1 : 0}${x.processedHash ?? ''}`).join(',') ?? ''}`}>
               {mapBox}
             </PasteHelper>
 
@@ -248,7 +260,7 @@ export function ArticlePage({ id }: { id: string }) {
             <div className="panel" data-testid="naver-auto-panel">
               <h2>네이버 블로그에 초안 입력 <span className="badge warn">선택한 기능 · 계정 제한 위험 있음</span></h2>
               <FirstTip id="F01" />
-              <p>제목 · 본문 · 카드를 네이버 편집기에 넣고 멈춰요. <b>저장 · 발행은 {APP.owner}이 직접</b> 눌러 주세요.</p>
+              <p>제목 · 본문 · {photoMode ? '사진' : '카드'}을 네이버 편집기에 넣고 멈춰요. <b>저장 · 발행은 {APP.owner}이 직접</b> 눌러 주세요.</p>
               <p className="hint">처음이면 열린 창에서 직접 로그인해 주세요 (최대 5분 기다려요). 편집기에 쓰던 글이 있으면 덮어쓰지 않아요.</p>
               <JobBar job={naverJob} />
               {naverJob?.state === 'succeeded' && <div className={`note ${/못해|빠졌|사진 없이/.test(naverJob.step ?? '') ? 'warn' : 'ok'}`}>{naverJob.step} — 네이버 창에서 내용을 확인한 뒤 직접 저장 · 발행해 주세요. (프로그램은 네이버 저장 여부를 확인하지 않아요)</div>}
@@ -259,9 +271,11 @@ export function ArticlePage({ id }: { id: string }) {
                 </div>
               )}
               <div className="row">
-                <button className="btn primary" disabled={running(naverJob) || !b.version} onClick={() => naverFill('new')}>네이버에 초안 입력</button>
+                <button className="btn primary" disabled={running(naverJob) || !b.version || photoBlocked} onClick={() => naverFill('new')}>네이버에 초안 입력</button>
+                {photoMode && photoSt?.resumable && !running(naverJob) && <button className="btn small" onClick={resumePhotos}>남은 사진 이어 넣기</button>}
                 <button className="btn small" onClick={() => call('naver:openLogin').catch((e) => naverMsg.err(e))}>네이버 창 열기 · 로그인</button>
               </div>
+              {photoFlags}
               {mapBox}
               <label className="row"><input type="checkbox" checked={naverTyping} onChange={(e) => setNaverTyping(e.target.checked)} /> 타이핑처럼 넣기 (촬영용 · 초당 {info.settings.typingSpeed}자, 설정에서 속도 변경)</label>
               {naverTyping && draft && <p className="hint">본문 {draft.doc.sections.reduce((n, s) => n + (s.heading?.length ?? 0) + s.paragraphs.join('').length, 0).toLocaleString()}자 → 약 {Math.ceil(draft.doc.sections.reduce((n, s) => n + (s.heading?.length ?? 0) + s.paragraphs.join('').length, 0) / info.settings.typingSpeed / 60)}분 걸려요. 입력 중에는 네이버 창을 누르지 마세요.</p>}
@@ -286,7 +300,7 @@ export function ArticlePage({ id }: { id: string }) {
       )}
       <Msg m={msg.m} />
 
-      {(b.version || b.cardSet) && (
+      {!photoMode && (b.version || b.cardSet) && (
         <>
           <JobBar job={cardJob} />
           <CardsPanel articleId={id} cs={b.cardSet} pref={pref} setPref={setPref} busy={running(cardJob)} onChanged={() => load()} hasVersion={!!b.version} kind={b.article?.input?.kind} purpose={storyBrief(b.article?.input)?.purpose} count={cardCountOf(b.article.input) || resolveCardCount(info.settings.cardCount, b.article.input.kind)} />

@@ -113,7 +113,17 @@ const wait = (ms: number, signal?: AbortSignal) => new Promise<void>((ok, fail) 
 
 let titleTurn = 0;
 export const demoText: TextAI = {
-  async generate(_p, _i, _r, o) { await wait(900, o?.signal); const d = clone(DEMO_DOC); d.reviewFlags = [flag]; return d; },
+  async generate(_p, i, _r, o) {
+    await wait(900, o?.signal);
+    const d = clone(DEMO_DOC); d.reviewFlags = [flag];
+    // 사진 글: 장면마다 사진이 붙은 섹션 (태권 글뚝딱 2.5.0에서 옮김)
+    if (i.photoScenes) d.sections = [
+      { id: 's1', paragraphs: [`데모 글이에요. 주제: ${i.topic}`] },
+      ...i.photoScenes.map((x, n) => ({ id: `s${n + 2}`, heading: x.title, paragraphs: [`"${x.title}" 장면을 설명하는 데모 문단이에요.`], photoId: x.id })),
+      { id: `s${i.photoScenes.length + 2}`, heading: '마무리', paragraphs: ['데모 글의 마무리 문단이에요.'] },
+    ];
+    return d;
+  },
   async expand(doc, _c, o) { await wait(300, o?.signal); return clone(doc); },
   warm: async (d: ArticleDoc) => d.sections,
   async polish(doc, _i, o) { await wait(300, o?.signal); return clone(doc); },

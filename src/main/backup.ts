@@ -43,6 +43,7 @@ function addDir(z: Zippable, dir: string, prefix: string) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, e.name);
     const key = `${prefix}/${e.name}`;
+    if (key === 'assets/photo-work') continue; // 사진 글 처리본은 넣지 않음 (원본 폴더에서 다시 만듦 · 아이 사진을 백업 파일로 퍼뜨리지 않게)
     if (e.isDirectory()) addDir(z, full, key);
     else z[key] = [fs.readFileSync(full), { level: /\.(png|jpe?g|webp|zip)$/i.test(e.name) ? 0 : 6 }];
   }

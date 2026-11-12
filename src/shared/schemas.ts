@@ -5,7 +5,7 @@ import { APP } from './kinder';
 
 export const GeneratedArticleSchema = z.object({
   titleCandidates: z.array(z.string().min(1)).length(3),
-  sections: z.array(z.object({ id: z.string().min(1), heading: z.string(), paragraphs: z.array(z.string()).min(1) })).min(3),
+  sections: z.array(z.object({ id: z.string().min(1), heading: z.string(), paragraphs: z.array(z.string()).min(1), photoId: z.string().optional() })).min(3),
   tags: z.array(z.string()),
   photoSuggestions: z.array(z.object({ afterSectionId: z.string(), caption: z.string() })),
   reviewFlags: z.array(z.object({ code: z.string(), message: z.string(), sectionId: z.string() })),
@@ -210,6 +210,7 @@ export const ArticleInputSchema = z.object({
   keywordPlan: z.array(z.object({ role: z.enum(['주요', '보조']), keyword: s(60), sentence: s(300), why: s(100).optional() })).max(3).optional(),
   greetings: z.boolean().optional(),
   titlePrefix: s(60).optional(),
+  photoScenes: z.array(z.object({ id: s(10), title: s(100) })).max(10).optional(),
   writer: Writer.optional(),
   writerSign: z.boolean().optional(),
   brief: z.object({
@@ -225,7 +226,7 @@ export const ArticleInputSchema = z.object({
 
 export const DocSchema = z.object({
   titleCandidates: z.array(s(200)),
-  sections: z.array(z.object({ id: s(40), heading: s(200).optional(), paragraphs: z.array(s(8000)) })),
+  sections: z.array(z.object({ id: s(40), heading: s(200).optional(), paragraphs: z.array(s(8000)), photoId: s(10).optional() })),
   tags: z.array(s(60)),
   photoSuggestions: z.array(z.object({ afterSectionId: s(40), caption: s(300) })),
   reviewFlags: z.array(z.object({ code: s(40), message: s(1000), sectionId: s(40).optional() })),

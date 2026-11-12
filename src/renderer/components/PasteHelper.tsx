@@ -90,10 +90,14 @@ export function PasteHelper({ articleId, opts, beforeStart, blocked, refreshKey,
   const copyText = async (p: Plan, step: number, what: string) => { await call('paste:copy', { ...at(p, step), rich }); setCopied(`${what} 복사했어요. 네이버 편집기에서 넣을 자리를 클릭하고 키보드 ${PASTE_KEY} 를 눌러 주세요.`); };
   const copyImage = async (p: Plan, step: number, item: number, label: string) => { await call('paste:copy', at(p, step, item)); setCopied(`"${label}" 그림을 복사했어요. 편집기에서 넣을 자리를 클릭하고 키보드 ${PASTE_KEY} 를 눌러 주세요.`); };
   const show = async (p: Plan, step: number, item: number, label: string) => { await call('paste:show', at(p, step, item)); setCopied(`"${label}" 파일 위치를 열었어요. 편집기로 끌어 놓거나, 편집기 버튼으로 이 파일을 골라 주세요.`); };
-  const advance = (step: number) => setPos({ step, item: 0 });
+  // 다음 단계로. 끝까지 갔으면 사진 글의 사진을 '사용한 사진'으로 기록 (태권 글뚝딱 2.8.0에서 옮김 · 실패해도 진행은 그대로)
+  const advance = (p: Plan, step: number) => {
+    setPos({ step, item: 0 });
+    if (step >= p.steps.length) call('paste:finish', { ...arg, stamp: p.stamp }).catch(() => {});
+  };
   // 목록의 단계 버튼: 지금 단계(또는 그 뒤)면 다음으로. 이미 지난 단계를 다시 복사할 때는 위치를 그대로 둠
   // (빠진 것만 다시 붙이려다 위치가 뒤로 가서 뒤쪽 글을 또 붙여 두 번 들어가지 않게)
-  const pass = (i: number) => { if (i >= posRef.current.step) advance(i + 1); };
+  const pass = (p: Plan, i: number) => { if (i >= posRef.current.step) advance(p, i + 1); };
 
   // [다음 ▶]: 지금 단계를 복사(또는 파일 위치 열기)하고 다음으로
   const next = act(async (p) => {
@@ -106,7 +110,7 @@ export function PasteHelper({ articleId, opts, beforeStart, blocked, refreshKey,
       if (item + 1 < s.items.length) { setPos({ step, item: item + 1 }); return; }
     } else if (s.kind === 'style') setCopied(STYLE_DONE);
     else await copyText(p, step, s.kind === 'place' ? `${APP.place} 이름을` : `"${s.label}"을`);
-    advance(step + 1);
+    advance(p, step + 1);
   });
 
   const done = plan && pos.step >= plan.steps.length;
@@ -141,9 +145,9 @@ export function PasteHelper({ articleId, opts, beforeStart, blocked, refreshKey,
                 <div className="row">
                   <span style={{ width: 22 }}>{st}</span>
                   <b className="grow">{i + 1}. {stepTitle(s)}</b>
-                  {(s.kind === 'title' || s.kind === 'text') && <button className="btn small" disabled={busy} onClick={act(async (p) => { await copyText(p, i, `"${s.label}"을`); pass(i); })}>복사</button>}
-                  {s.kind === 'style' && <button className="btn small" disabled={busy} onClick={act(async () => { setCopied(STYLE_DONE); pass(i); })}>다 골랐어요</button>}
-                  {s.kind === 'place' && <button className="btn small" disabled={busy} onClick={act(async (p) => { await copyText(p, i, `${APP.place} 이름을`); pass(i); })}>이름 복사</button>}
+                  {(s.kind === 'title' || s.kind === 'text') && <button className="btn small" disabled={busy} onClick={act(async (p) => { await copyText(p, i, `"${s.label}"을`); pass(p, i); })}>복사</button>}
+                  {s.kind === 'style' && <button className="btn small" disabled={busy} onClick={act(async (p) => { setCopied(STYLE_DONE); pass(p, i); })}>다 골랐어요</button>}
+                  {s.kind === 'place' && <button className="btn small" disabled={busy} onClick={act(async (p) => { await copyText(p, i, `${APP.place} 이름을`); pass(p, i); })}>이름 복사</button>}
                 </div>
                 {s.kind === 'style' && (
                   <p className="hint" style={{ margin: '4px 0 0 22px' }}>

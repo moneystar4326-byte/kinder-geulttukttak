@@ -27,6 +27,7 @@ import { collectNearby, lookupAddress, prefixOptions } from '../services/nearby'
 import type { PlaceResult } from '../services/browser-draft/editor';
 import { createCardService, type Shooter } from '../services/card-renderer';
 import { blogIdOf, buildBlocks, STEP_LABEL, type BrowserDraft } from '../services/browser-draft';
+import { PHOTO_BASE } from '../services/browser-draft/editor';
 import { pasteSteps } from '../services/paste-helper';
 import { PASTE_STALE } from '../../shared/paste';
 import { NAVER_AUTO_OFF_MSG, NAVER_AUTO_TERMS_VERSION, naverAutoOn } from '../../shared/naverAuto';
@@ -35,6 +36,7 @@ import { exportFiles, makeBackup, readBackupManifest } from '../backup';
 import { ApiError, toApiError } from '../services/errors';
 import { log } from '../log';
 import { SERVER, type License } from '../license';
+import { photoDraft, registerPhotoIpc, removePhotoWork } from './photos';
 
 // 1.0.2부터 유치원 전용 서버(kinder.growmoment.co.kr)가 유치원 글뚝딱 최신 버전만 알려 줌
 const LATEST_FOR_KINDER = true;
@@ -58,7 +60,7 @@ const S = z.string().max(4000);
 const Id = z.string().min(1).max(64);
 
 // 오류는 사용자 문장으로만 돌려줌 (API 원문 오류를 주 화면에 그대로 노출하지 않음)
-function handle<A extends z.ZodTypeAny>(channel: string, schema: A, fn: (arg: z.infer<A>) => unknown) {
+export function handle<A extends z.ZodTypeAny>(channel: string, schema: A, fn: (arg: z.infer<A>) => unknown) {
   ipcMain.handle(channel, async (_e, raw) => {
     const parsed = schema.safeParse(raw);
     if (!parsed.success) return { ok: false, error: issueMessage(parsed.error.issues[0]) };
@@ -311,7 +313,7 @@ export function registerIpc(ctx: AppCtx) {
     const version = article.currentVersionId ? db.getVersion(article.currentVersionId) : null;
     return { article, version, versions: db.listVersions(id).map((v) => ({ id: v.id, note: v.note, createdAt: v.createdAt, title: v.title, counts: v.counts })), cardSet: db.latestCardSet(id), jobs: db.recentJobs(id) };
   });
-  handle('article:delete', Id, (id) => db.deleteArticle(id));
+  handle('article:delete', Id, (id) => { db.deleteArticle(id); removePhotoWork(ctx, id); });
   handle('article:generate', Id, (id) => {
     const a = ai();
     const profile = profileOrThrow();
@@ -433,6 +435,8 @@ export function registerIpc(ctx: AppCtx) {
     return true;
   });
 
+  registerPhotoIpc(ctx);
+
   // ---------- 네이버 ----------
   handle('naver:status', z.undefined(), async () => ({ open: ctx.browser.isOpen(), loggedIn: await ctx.browser.loggedIn(), browser: findBrowser(settings().browserPath)?.name ?? null }));
   const noNaverJob = () => { if (runner.runningOf(['naver'])) throw new Error('지금 네이버에 글을 넣는 중이에요. 끝난 뒤 다시 눌러 주세요.'); };
@@ -463,34 +467,36 @@ export function registerIpc(ctx: AppCtx) {
     if (!v) throw new Error('글을 먼저 만들어 주세요');
     const p = db.getProfile();
     if (!p) throw new Error(`${APP.place} 정보를 먼저 저장해 주세요`);
+    const photo = art.input.photoScenes ? photoDraft(ctx, articleId, v.doc) : null; // 얼굴 가림을 확인하지 않은 사진 · 끊어진 연결 · 본문의 아이 이름이 있으면 여기서 멈춤
     const cs = db.latestCardSet(articleId);
     const cards = (cs?.cards ?? []).filter((c) => c.status === 'done' && c.outputPath);
     if (cs && cards.some((c) => c.overflow)) throw new Error('글자가 넘친 카드가 있어요. 카드 문구를 줄인 뒤 넣어 주세요.');
     // 사진이 빠지는 이유를 끝 안내에 같이 알려 줌: 카드가 아예 없거나, 만들기에 실패한 카드
     const slots = (cs?.cards ?? []).map((c) => c.index); // 보여 주는 번호는 묶음 안 순서 (2장 묶음이면 카드 1 · 2)
     const missing = (cs?.cards ?? []).filter((c) => !(c.status === 'done' && c.outputPath)).map((c) => cardNo(slots, c.index));
-    const cardNote = !cs ? '카드를 아직 만들지 않아 사진 없이 넣었어요 (카드를 만든 뒤 넣으면 사진도 같이 들어가요)' : missing.length ? `카드 ${missing.join(', ')}번은 만들어지지 않아 빠졌어요 (카드 화면에서 다시 만들기)` : '';
+    const cardNote = photo ? '' : !cs ? '카드를 아직 만들지 않아 사진 없이 넣었어요 (카드를 만든 뒤 넣으면 사진도 같이 들어가요)' : missing.length ? `카드 ${missing.join(', ')}번은 만들어지지 않아 빠졌어요 (카드 화면에서 다시 만들기)` : '';
     // 글쓴이 줄("○○반 담임 선생님 드림")은 본문 끝 문단에 이미 들어 있어서 따로 넣지 않음
-    const blocks = buildBlocks(v.doc.sections, cards.map((c) => ({ title: c.copy.title, afterSectionId: c.afterSectionId, index: c.index })), v.doc.tags);
-    const cardFiles = cards.map((c) => ({ index: c.index, file: c.outputPath! }));
-    return { v, p, slots, cardNote, blocks, cardFiles, noCards: !cs, missingCards: missing };
+    const blocks = buildBlocks(v.doc.sections, cards.map((c) => ({ title: c.copy.title, afterSectionId: c.afterSectionId, index: c.index })), v.doc.tags, photo?.marks);
+    const cardFiles = [...(photo?.files ?? []), ...cards.map((c) => ({ index: c.index, file: c.outputPath! }))];
+    return { v, p, photo, slots, cardNote, blocks, cardFiles, noCards: !photo && !cs, missingCards: photo ? [] : missing };
   }
   handle('naver:fill', z.object({ articleId: Id, onExisting: z.enum(['stop', 'new']), typing: z.boolean().optional(), map: z.boolean().optional() }), ({ articleId, onExisting, typing, map }) => {
     needAuto();
     noNaverJob();
-    const { v, p, slots, cardNote, blocks, cardFiles } = draftInputs(articleId);
+    const { v, p, photo, slots, cardNote, blocks, cardFiles } = draftInputs(articleId);
     if (!p.blogUrl) throw new Error(`${APP.place} 정보에 네이버 블로그 주소를 적어 주세요 (예: https://blog.naver.com/아이디)`);
     return runner.start('naver', articleId, STEP_LABEL.open, async ({ signal, step }) => {
       // 카카오 키가 있으면 주소의 도로명 · 지번을 받아 지도 대조에 씀. 실패해도 입력은 그대로
       const kakao = map && p.address?.trim() ? vault.get('kakao') : null;
       const known = kakao ? await lookupAddress(kakao, p.address!, signal).catch(() => null) : null;
-      const r = await ctx.browser.fill({ blogUrl: p.blogUrl!, title: v.title, blocks, headings: v.doc.sections.flatMap((s) => (s.heading ? headingLines(s.heading) : [])), cardFiles, onExisting, typing: typing ? settings().typingSpeed : undefined, place: map ? { name: p.mapName?.trim() || p.name, address: p.address, region: p.region, known: known ?? undefined } : undefined }, (s) => step(STEP_LABEL[s]), signal);
+      const r = await ctx.browser.fill({ blogUrl: p.blogUrl!, title: v.title, blocks, headings: v.doc.sections.flatMap((s) => (s.heading ? headingLines(s.heading) : [])), cardFiles, onExisting, typing: typing ? settings().typingSpeed : undefined, place: map ? { name: p.mapName?.trim() || p.name, address: p.address, region: p.region, known: known ?? undefined } : undefined, photoAnchors: photo?.anchors }, (s) => step(STEP_LABEL[s]), signal);
       if (r.state === 'need-login') throw new Error('네이버 로그인이 끝나지 않았어요. 열린 창에서 직접 로그인한 뒤 다시 눌러 주세요.');
       if (r.state === 'existing-draft') throw Object.assign(new Error('네이버 편집기에 작성 중인 글이 있어 덮어쓰지 않았어요. 새 글로 시작할지 골라 주세요.'), { code: 'existing-draft' });
       if (r.state === 'not-owner') throw new Error(`글쓰기 화면을 열지 못했어요. 로그인한 네이버 아이디가 blog.naver.com/${r.blogId} 의 주인인지 확인해 주세요.`);
       const c = r.check;
-      const leftCards = c.leftMarks.map((n) => cardNo(slots, n - 1));
-      const msg = [`제목 ${c.titleOk ? '확인' : '다름 — 직접 확인 필요'}`, `이미지 ${c.images}장`, cardNote, r.map ? placeNote(r.map) : '', leftCards.length ? `카드 ${leftCards.join(', ')}번은 올리지 못해 자리 글자가 남아 있어요 (네이버 창에서 그 자리에 직접 올려 주세요 · 저장 폴더에 카드 파일이 있어요)` : '', '발행 · 저장은 직접 눌러 주세요'].filter(Boolean).join(' · ');
+      const photoNote = photo ? photo.finish(c.leftMarks, r.order) : ''; // 사진을 다 못 넣었으면 여기서 멈춤 (이어 넣기)
+      const leftCards = c.leftMarks.filter((n) => n <= PHOTO_BASE).map((n) => cardNo(slots, n - 1));
+      const msg = [`제목 ${c.titleOk ? '확인' : '다름 — 직접 확인 필요'}`, `이미지 ${c.images}장`, photoNote, cardNote, r.map ? placeNote(r.map) : '', leftCards.length ? `카드 ${leftCards.join(', ')}번은 올리지 못해 자리 글자가 남아 있어요 (네이버 창에서 그 자리에 직접 올려 주세요 · 저장 폴더에 카드 파일이 있어요)` : '', '발행 · 저장은 직접 눌러 주세요'].filter(Boolean).join(' · ');
       return `입력 끝: ${msg}`;
     }).job;
   });
@@ -531,7 +537,7 @@ export function registerIpc(ctx: AppCtx) {
     if (s.kind === 'place') { await clipboard.writeText(s.name); return true; }
     const f = files[step][item ?? 0];
     if (s.kind !== 'media' || !f || !s.items[item ?? 0]?.image) throw new Error('이 파일은 그림으로 복사할 수 없어요. [파일 위치 열기]로 올려 주세요.');
-    if (!fs.existsSync(f)) throw new Error('그림 파일이 없어졌어요. 카드를 다시 만들어 주세요.');
+    if (!fs.existsSync(f)) throw new Error('그림 파일이 없어졌어요. 카드나 사진을 다시 만들어 주세요.');
     const buf = /\.png$/i.test(f) ? fs.readFileSync(f) : nativeImage.createFromPath(f).toPNG();
     if (!buf.length) throw new Error('그림을 읽지 못했어요. [파일 위치 열기]로 올려 주세요.');
     await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(buf)], { type: 'image/png' }) })]);
@@ -541,6 +547,12 @@ export function registerIpc(ctx: AppCtx) {
     const f = fresh(o).files[step]?.[item ?? 0];
     if (!f || !fs.existsSync(f)) throw new Error('파일을 찾지 못했어요. 다시 만들어 주세요.');
     shell.showItemInFolder(f);
+    return true;
+  });
+  // 끝까지 했을 때: 사진 글이면 '사용한 사진'으로 기록 (자동 입력과 같게 — 다음에 같은 사진을 고르면 알려 줌)
+  handle('paste:finish', PasteOpts.extend({ stamp: z.string().max(64) }), (o) => {
+    const { d } = fresh(o);
+    if (d.photo) db.markPhotosUsed(o.articleId, d.photo.hashes);
     return true;
   });
   // 평소 쓰는 브라우저로 글쓰기 주소만 엶 (로그인 · 입력은 원장님 · 선생님이)

@@ -15,8 +15,17 @@
 | react-dom | 19.3.1 | MIT |
 | scheduler | 0.28.0 | MIT |
 | zod | 4.6.7 | MIT |
+| @vladmandic/face-api (얼굴 위치 찾기 · 모델 SSD MobileNet V1 포함) | 1.7.15 | MIT |
 
 Electron 에는 Chromium · Node.js 가 포함되어 있으며, 해당 고지는 설치 폴더의 `LICENSES.chromium.html` · `LICENSE.electron.txt` 에 있습니다.
+
+## 그림
+
+| 이름 | 용도 | 라이선스 |
+|---|---|---|
+| Noto Emoji 2D PNG (동물 11종, googlefonts/noto-emoji) | 사진 글 얼굴 가림 | Apache-2.0 |
+
+얼굴 위치 찾기 모델(`resources/face-models/ssd_mobilenetv1_model*`)은 @vladmandic/face-api 패키지에 들어 있는 것과 같은 파일이고 같은 MIT 라이선스입니다. 얼굴을 알아보는(누구인지 맞히는) 모델은 넣지 않았습니다.
 
 ## 폰트 (카드 이미지에 사용)
 

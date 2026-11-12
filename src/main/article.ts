@@ -8,6 +8,7 @@ import { factsBlock } from './services/openai/prompts';
 import { localFlags, missingInputs, regionWarning } from '../shared/validation';
 import { areaTags, dongOf, locationLine, mentionsNearby } from '../shared/areas';
 import { decorateHeadings } from '../shared/format';
+import { hideSceneNames, keepPhotoLinks, photoLinkErrors } from '../shared/photos';
 import type { CallOpts, Fix, TextAI, VerifyIssue } from './services/openai';
 
 export const MAX_EXPAND = 2;
@@ -115,24 +116,48 @@ export async function generateArticle(deps: { db: Db; ai: TextAI; profile: DojoP
   const { db, ai, profile } = deps;
   const art = db.getArticle(articleId);
   if (!art) throw new Error('글을 찾지 못했어요');
-  const input = art.input;
+  let input = art.input;
+  const photoIds = input.photoScenes?.map((s) => s.id);
   const miss = missingInputs(input);
   if (miss.length) throw new Error(`먼저 채워 주세요: ${miss.join(', ')}`);
   const baseVersionId = art.currentVersionId;
   const o: CallOpts = { signal: ctx.signal, onUsage: deps.onUsage };
   db.setArticleStatus(articleId, 'generating');
   try {
+    // 사진 글: 장면 칸에서 글 성격 · 주제 설명 글감을 먼저 정함 (자세히 쓰기와 같은 길 — 태권 글뚝딱 2.5.0에서 옮김). 실패해도 글은 만듦
+    if (photoIds && !input.brief) {
+      ctx.step('장면 정리 중');
+      try {
+        const brief = await ai.brief({ kind: input.kind, topic: input.topic, story: input.facts.story ?? '' }, o);
+        input = { ...input, brief };
+        db.updateArticleInput(articleId, input, art.keywords);
+      } catch (e: any) { if (ctx.signal.aborted || e?.name === 'AbortError' || e?.code === 'cancelled') throw e; }
+    }
     ctx.step('글 생성 중');
     let doc = await ai.generate(profile, input, regionWarning(input, profile), o);
+    if (photoIds && photoLinkErrors(doc, photoIds).length) { // 사진 연결이 틀리면 한 번만 다시, 그래도 틀리면 글을 넘기지 않음
+      ctx.step('사진 연결 다시 맞추는 중');
+      doc = await ai.generate(profile, input, regionWarning(input, profile), o);
+      const errs = photoLinkErrors(doc, photoIds);
+      if (errs.length) throw new Error(`글과 사진을 연결하지 못했어요. 다시 시도해 주세요. (${errs[0]})`);
+    }
+    // 사진 글: 검사 · 다듬기가 섹션을 없애 사진 연결이 깨지면 그 단계 전 글을 씀
+    const linked = (next: ArticleDoc, prev: ArticleDoc) => {
+      if (!photoIds) return next;
+      const kept = keepPhotoLinks(prev, next);
+      return photoLinkErrors(kept, photoIds).length ? prev : kept;
+    };
     const expands = 0;
     ctx.step('검증 중');
     db.setArticleStatus(articleId, 'validating');
     const min = minCharsForInput(input);
     // 2026-11-05 사용자: 다시 쓸수록 표현이 평평해짐 → 분량 보완 · 전체 다듬기 · 2차 점검을 빼고, 사실과 다른 문장만 고침
     ctx.step('지어낸 문장 검사 중');
-    doc = await verifyDoc(ai, doc, profile, input, o, ctx.signal);
+    doc = linked(await verifyDoc(ai, doc, profile, input, o, ctx.signal), doc);
     ctx.step('문장 호흡 다듬는 중');
-    doc = await warmDoc(ai, doc, profile, input, o, ctx.signal);
+    doc = linked(await warmDoc(ai, doc, profile, input, o, ctx.signal), doc);
+    // 사진 글: 장면 칸에 적힌 아이 이름이 글에 들어가면 코드가 "한 친구"로 바꿈 (안내를 해도 들어가는 일이 있음)
+    if (input.photoScenes) doc = hideSceneNames(doc, input.photoScenes.map((s) => s.title));
     ctx.step('사실 비교 점검 중');
     // 점검 실패는 표시만 하고 넘어가되, 멈추기를 눌렀으면 저장하지 않고 멈춤 (2026-10-18 버그 점검)
     const aiFlags = await ai.review(doc, profile, input, o).catch((e) => {
@@ -286,7 +311,10 @@ export function mergeFlags(doc: ArticleDoc, profile: DojoProfile, input: Article
   // 이야기 글은 짧아도 실패가 아님 → "짧아요" 경고 대신 아래 재료 안내 하나만
   const flags = [...doc.reviewFlags, ...aiFlags, ...localFlags(doc, profile, input).filter((f) => !(story && f.code === 'too-short'))];
   const min = minCharsForInput(input);
-  if (countDoc(doc).withoutSpaces < min) flags.push({ code: 'need-more-facts', message: story
+  // 사진 글: 장면 칸이 짧으면 글도 짧게 씀 (태권 글뚝딱 2026-11-05에서 옮김)
+  if (input.photoScenes && input.photoScenes.some((s) => s.title.replace(/\s/g, '').length < 15)) flags.push({ code: 'need-more-facts', message: '장면이 짧은 사진이 있어 글도 짧게 썼어요. 찍을 때 있었던 일을 한 줄 더 적으면 글이 더 따뜻해져요.' });
+  else if (input.photoScenes && countDoc(doc).withoutSpaces < min) flags.push({ code: 'need-more-facts', message: `지어내지 않으려고 글을 짧게 썼어요. 사진마다 장면 칸을 조금 더 자세히 적으면 ${min.toLocaleString()}자 넘게 쓸 수 있어요.` });
+  else if (countDoc(doc).withoutSpaces < min) flags.push({ code: 'need-more-facts', message: story
     ? `재료가 짧아 글도 짧게 썼어요 (지어내지 않으려고요). ② 단계 물음에 답하거나 "어떤 일이 있었나요?"에 장면 · 아이들 모습을 한 줄 더 적으면 ${min.toLocaleString()}자 넘게 쓸 수 있어요.`
     : `보완해도 ${min.toLocaleString()}자에 모자라요. 한 놀이 · 활동, 선생님이 도운 점, 관찰 장면을 조금 더 적어 주시면 다시 만들 수 있어요.` });
   const seen = new Set<string>();
@@ -331,6 +359,10 @@ export async function reviseArticle(deps: { db: Db; ai: TextAI; profile: DojoPro
   // AI가 글 전체를 다시 쓰면 고른 글쓴이 줄이 빠질 수 있어 다시 붙임 (유치원 · 2026-10-27 버그 점검)
   doc = withWriterSign(doc, art.input, profile);
   doc = { ...doc, reviewFlags: mergeFlags({ ...doc, reviewFlags: [] }, profile, art.input, doc.reviewFlags.filter((f) => f.code === 'demo')) };
+  if (art.input.photoScenes) { // 다듬기 AI가 섹션을 없애 사진 연결이 깨지면 저장하지 않음
+    doc = keepPhotoLinks(base.doc, doc);
+    if (photoLinkErrors(doc, art.input.photoScenes.map((s) => s.id)).length) throw new Error('고치는 중에 글과 사진 연결이 깨져서 저장하지 않았어요. 다시 시도해 주세요.');
+  }
   // 사용자가 그동안 고쳐 저장했다면 base 와 현재가 달라 → 새 버전은 남기되 현재 글을 덮어쓰지 않음
   ctx.signal.throwIfAborted();
   return db.addVersion({ articleId, title, doc, counts: countDoc(doc), note }, { baseVersionId: req.baseVersionId });

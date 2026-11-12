@@ -25,13 +25,14 @@ export interface DraftRequest {
   onExisting: 'stop' | 'new'; // 네이버 "작성 중인 글" 창: 멈추고 묻기 / 새 글로 시작 (쓰던 글은 임시저장에 남음)
   typing?: number; // 있으면 촬영용 타이핑 입력 (초당 글자 수), 없으면 붙여넣기
   place?: { name: string; address?: string; region?: string; known?: { road?: string; jibun?: string } }; // 있으면 글 끝에 네이버 지도 카드 (이름으로 찾고 주소로 대조)
+  photoAnchors?: { title: string; lastLine: string }[]; // 사진 글: 입력 후 순서 대조용
 }
 
 export type DraftResult =
   | { state: 'need-login' }
   | { state: 'existing-draft' }
   | { state: 'not-owner'; blogId: string }
-  | { state: 'filled'; check: Awaited<ReturnType<typeof E.verify>>; placed: boolean[]; bolded: number; steps: DraftStep[]; map: E.PlaceResult | null };
+  | { state: 'filled'; check: Awaited<ReturnType<typeof E.verify>>; placed: boolean[]; bolded: number; steps: DraftStep[]; map: E.PlaceResult | null; order: string[] };
 
 export function blogIdOf(url: string) {
   return url.match(/blog\.naver\.com\/([A-Za-z0-9_-]+)/)?.[1] ?? null;
@@ -89,7 +90,7 @@ export function createBrowserDraft(opts: { profileDir: string; browserPath?: () 
       const step = (s: DraftStep) => { steps.push(s); onStep(s); if (signal?.aborted) throw Object.assign(new Error('멈췄어요'), { name: 'AbortError' }); };
       const id = blogIdOf(req.blogUrl);
       if (!id) throw new Error(`${APP.place} 정보에 네이버 블로그 주소가 없어요 (예: https://blog.naver.com/아이디)`);
-      for (const c of req.cardFiles) if (!fs.existsSync(c.file)) throw new Error(`카드 ${c.index + 1}번 파일이 없어요. 카드를 다시 만들어 주세요.`);
+      for (const c of req.cardFiles) if (!fs.existsSync(c.file)) throw new Error(c.index >= E.PHOTO_BASE ? `사진 ${c.index - E.PHOTO_BASE + 1}번 처리본 파일이 없어요. 사진 확인 칸에서 다시 처리해 주세요.` : `카드 ${c.index + 1}번 파일이 없어요. 카드를 다시 만들어 주세요.`);
 
       step('open');
       const p = await page();
@@ -138,9 +139,33 @@ export function createBrowserDraft(opts: { profileDir: string; browserPath?: () 
       }
       step('verify');
       const check = await E.verify(f, req.title, req.cardFiles.map((c) => c.index));
+      const order = req.photoAnchors ? E.photoOrderProblems(await E.readLayout(f), req.photoAnchors) : [];
       await f.click(E.SEL.title).catch(() => {}); // 맨 위로
       step('done');
-      return { state: 'filled', check, placed, bolded, steps, map };
+      return { state: 'filled', check, placed, bolded, steps, map, order };
+    },
+
+    // 사진 글: 중간에 끊긴 입력 이어 넣기. 창이 살아 있고 남은 자리 글자 · 사진 수가 기록과 맞을 때만 (안 맞으면 다시 넣지 않음)
+    async resume(req: { title: string; cardFiles: { index: number; file: string }[]; photoAnchors: { title: string; lastLine: string }[] }, onStep: (s: DraftStep) => void, signal?: AbortSignal) {
+      if (!ctx) return { state: 'mismatch' as const, why: '네이버 창이 닫혔어요' };
+      const p = await page();
+      const f = await E.findEditor(p, 5000);
+      if (!f) return { state: 'mismatch' as const, why: '글쓰기 화면을 찾지 못했어요' };
+      const texts = await f.locator(E.SEL.bodyParagraph).allInnerTexts();
+      const plan = E.resumePlan(texts, await f.locator(E.SEL.imageComponent).count(), req.cardFiles);
+      if (!plan.ok) return { state: 'mismatch' as const, why: plan.why };
+      if (plan.late) await E.removeMark(p, f, plan.late.index);
+      const left = plan.left;
+      for (const c of left) if (!fs.existsSync(c.file)) throw new Error('처리본 파일이 없어졌어요. 다시 처리하고 확인해 주세요.');
+      onStep('cards');
+      if (signal?.aborted) throw Object.assign(new Error('멈췄어요'), { name: 'AbortError' });
+      const placed = await E.insertCardsAtMarks(p, f, left, (i, ok, why) => { if (!ok) opts.log?.('naver-card-failed', `사진 ${i + 1}: ${why}`); });
+      onStep('verify');
+      const check = await E.verify(f, req.title, req.cardFiles.map((c) => c.index));
+      const order = E.photoOrderProblems(await E.readLayout(f), req.photoAnchors);
+      await f.click(E.SEL.title).catch(() => {});
+      onStep('done');
+      return { state: 'filled' as const, check, placed, order };
     },
   };
 }
@@ -148,7 +173,7 @@ export type BrowserDraft = ReturnType<typeof createBrowserDraft>;
 
 // 초안 블록 만들기: 권장 배치 = 도입 → 카드1 → … (카드의 afterSectionId 기준, 없으면 도입 뒤 · 가운데 · 마무리 앞)
 // 문단은 휴대폰에서 읽기 좋게 짧은 줄로 끊고, 맨 끝에 #태그 한 줄 (그 뒤에 지도)
-export function buildBlocks(sections: { id: string; heading?: string; paragraphs: string[] }[], cards: { title: string; afterSectionId?: string; index?: number }[], tags: string[] = []): E.DraftBlock[] {
+export function buildBlocks(sections: { id: string; heading?: string; paragraphs: string[] }[], cards: { title: string; afterSectionId?: string; index?: number }[], tags: string[] = [], photos?: { sectionId: string; index: number; title: string }[]): E.DraftBlock[] {
   const ids = sections.map((s) => s.id);
   const n = ids.length;
   const fallback = [0, Math.floor((n - 1) / 2), Math.max(n - 2, 0)]; // 도입 뒤 · 가운데 · 마무리 앞
@@ -162,6 +187,7 @@ export function buildBlocks(sections: { id: string; heading?: string; paragraphs
   for (const s of sections) {
     if (s.heading) out.push({ kind: 'heading', text: headingLines(s.heading).join('\n') });
     for (const para of s.paragraphs) for (const chunk of mobileParagraphs(para)) out.push({ kind: 'paragraph', text: chunk });
+    for (const ph of photos ?? []) if (ph.sectionId === s.id) out.push({ kind: 'card', text: E.cardMark(ph.index, ph.title), cardIndex: ph.index }); // 사진 글: 그 장면 글 바로 아래
     for (const i of after.get(s.id) ?? []) { const n = cards[i].index ?? i; out.push({ kind: 'card', text: E.cardMark(n, cards[i].title), cardIndex: n }); }
   }
   if (tags.length) out.push({ kind: 'paragraph', text: tagLine(tags) });

@@ -11,7 +11,8 @@ const CHANNELS = [
   'cards:plan', 'cards:renderFailed', 'cards:renderOne', 'cards:updateCopy', 'cards:suggestCopy', 'cards:restyle', 'cards:saveAs',
   'export:run', 'backup:create', 'backup:restore',
   'naver:status', 'naver:openLogin', 'naver:close', 'naver:clearSession', 'naver:fill',
-  'paste:plan', 'paste:copy', 'paste:show', 'paste:openWrite',
+  'paste:plan', 'paste:copy', 'paste:show', 'paste:openWrite', 'paste:finish',
+  'photos:folder', 'photos:pickFolder', 'photos:scan', 'photos:bytes', 'photos:create', 'photos:state', 'photos:faceModel', 'photos:source', 'photos:saveProcessed', 'photos:markFailed', 'photos:retry', 'photos:confirm', 'photos:exclude', 'photos:verify', 'photos:openWork', 'naver:resumePhotos',
   'naverAuto:consent', 'naverAuto:off',
   'job:cancel', 'job:get', 'usage:summary', 'shell:open', 'shell:showFile', 'jarvis:take',
 ] as const;

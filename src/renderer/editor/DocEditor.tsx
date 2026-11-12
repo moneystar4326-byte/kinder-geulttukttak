@@ -1,11 +1,12 @@
 // 본문 편집: 소제목 · 문단을 안정적인 id 로 유지
+import type { ReactNode } from 'react';
 import type { ArticleDoc } from '../../shared/types';
 import { countChars, countDoc, minCharsFor, STORY_MIN } from '../../shared/count';
 
 export interface Draft { title: string; doc: ArticleDoc }
 export interface ParaSel { sectionId: string; index: number }
 
-export function DocEditor({ draft, onChange, sel, onSelect, prefix, readOnly, kind, story, min }: { draft: Draft; onChange: (d: Draft) => void; sel: ParaSel | null; onSelect: (s: ParaSel | null) => void; prefix?: string; readOnly?: boolean; kind?: string; story?: boolean; min?: number }) {
+export function DocEditor({ draft, onChange, sel, onSelect, prefix, readOnly, kind, story, min, photoOf }: { photoOf?: (id: string) => ReactNode; draft: Draft; onChange: (d: Draft) => void; sel: ParaSel | null; onSelect: (s: ParaSel | null) => void; prefix?: string; readOnly?: boolean; kind?: string; story?: boolean; min?: number }) {
   const MIN = min ?? (story ? STORY_MIN : minCharsFor(kind));
   const { doc } = draft;
   const counts = countDoc(doc);
@@ -49,6 +50,7 @@ export function DocEditor({ draft, onChange, sel, onSelect, prefix, readOnly, ki
             );
           })}
           <button className="btn link small" onClick={() => setSection(s.id, (x) => ({ ...x, paragraphs: [...x.paragraphs, ''] }))}>+ 문단 추가</button>
+          {s.photoId && photoOf?.(s.photoId)}
         </div>
       ))}
 

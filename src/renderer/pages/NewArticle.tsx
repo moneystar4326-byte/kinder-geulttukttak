@@ -40,8 +40,8 @@ const TX = {
 };
 
 // 유치원: 누가 쓰는 글인가요? (유치원 정보의 글쓴이 목록, 없으면 원장님)
-const DIRECTOR: Writer = { id: 'director', role: '원장', name: '' };
-function WriterPick({ writers, value, onChange, sign, onSign }: { writers: Writer[]; value?: Writer; onChange: (w: Writer) => void; sign: boolean; onSign: (v: boolean) => void }) {
+export const DIRECTOR: Writer = { id: 'director', role: '원장', name: '' };
+export function WriterPick({ writers, value, onChange, sign, onSign }: { writers: Writer[]; value?: Writer; onChange: (w: Writer) => void; sign: boolean; onSign: (v: boolean) => void }) {
   const list = writers.some((w) => w.role === '원장') ? writers : [DIRECTOR, ...writers];
   return (
     <div className="row" style={{ marginBottom: 10 }}>
