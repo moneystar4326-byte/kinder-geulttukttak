@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../App';
 import { call } from '../api';
-import { Field, Msg, useMsg } from '../components/ui';
+import { Chips, Field, Msg, useMsg } from '../components/ui';
 import { AccountPanel } from '../components/Account';
 import { SetupGuide } from '../guide/SetupGuide';
 import { KeyGuide } from '../guide/KeyGuide';
@@ -140,6 +140,7 @@ export function SettingsPage() {
         <Field label="내보내기 폴더"><div className="row"><input className="grow" type="text" value={form.saveDir} readOnly /><button className="btn small" onClick={async () => { const d = await call<string | null>('settings:pickDir'); if (d) { set({ saveDir: d }); await reload(); } }}>바꾸기</button></div></Field>
         <div className="grid2">
           <Field label="타이핑 연출 속도 (초당 글자)" hint="5~80까지 넣을 수 있어요 (촬영엔 15~30 권장). 네이버 타이핑 입력에도 같은 속도"><input type="number" min={5} max={80} value={form.typingSpeed} onChange={(e) => set({ typingSpeed: Number(e.target.value) })} /></Field>
+          <CardCountField value={form.cardCount ?? 'auto'} onChange={(v) => set({ cardCount: v })} usedImages={usage?.rows.filter((r) => r.kind === 'image').reduce((n, r) => n + r.calls, 0) ?? 0} limit={form.monthlyImageLimit} />
           <Field label="이번 달 AI 그림 한도 (장)" hint="한도에 닿으면 그림 요청을 보내지 않아요"><input type="number" min={0} max={500} value={form.monthlyImageLimit} onChange={(e) => set({ monthlyImageLimit: Number(e.target.value) })} /></Field>
           <Field label="그림 실패 시 자동 재시도 (회)" hint="일시 오류에만. 이미 과금됐을 수 있어 0~2회"><input type="number" min={0} max={2} value={form.imageAutoRetry} onChange={(e) => set({ imageAutoRetry: Number(e.target.value) })} /></Field>
           <Field label="같은 키워드 재조회 간격 (시간)" hint="이 시간 안에는 저장된 조회 결과를 보여 주고 '저장된 결과'로 표시"><input type="number" min={0} max={168} value={form.keywordCacheHours} onChange={(e) => set({ keywordCacheHours: Number(e.target.value) })} /></Field>
@@ -199,6 +200,30 @@ function SecretaryPanel({ onGuide }: { onGuide: (stepId: string) => void }) {
         ))}
       </ul>
       <p className="hint">각 칸 제목 옆 [설명 보기]를 누르면 그 칸을 설명해 드려요. 처음부터 다시 하려면 <button className="btn link" onClick={() => onGuide('A00')}>설치 도우미 처음부터</button></p>
+    </div>
+  );
+}
+
+// 카드뉴스 기본 장수 (태권 글뚝딱 2.4.0에서 옮김: 1 · 2 · 3장으로 그림 비용 아끼기). 글마다 새 글 작성 ③에서 바꿀 수 있어요
+// 비용은 어림: AI 그림 1장 약 45원 (태권 글뚝딱 2026-10 실사용 기록 기준, 실제 청구는 OpenAI 사용량 화면)
+const PER_IMAGE = 45;
+const COUNT_OPTS = ['글 종류에 맞게', '1장', '2장', '3장'] as const;
+function CardCountField({ value, onChange, usedImages, limit }: { value: 'auto' | 1 | 2 | 3; onChange: (v: 'auto' | 1 | 2 | 3) => void; usedImages: number; limit: number }) {
+  const [posts, setPosts] = useState(20);
+  const avg = value === 'auto' ? 0.7 * 3 + 0.3 * 1 : value; // 글 종류에 맞게: 놀이 · 성장 · 교육 70%(3장) · 행사 · 모집 30%(1장)로 어림
+  const imgs = Math.round(posts * avg);
+  const save = posts * 3 * PER_IMAGE - imgs * PER_IMAGE;
+  return (
+    // <label>(Field) 안에 두면 설명 글을 눌러도 첫 버튼이 눌려서 div 로
+    <div className="field">
+      <span>카드뉴스 기본 장수</span>
+      <Chips options={COUNT_OPTS} value={value === 'auto' ? COUNT_OPTS[0] : COUNT_OPTS[value]} onChange={(v) => onChange(v === COUNT_OPTS[0] ? 'auto' : (COUNT_OPTS.indexOf(v) as 1 | 2 | 3))} />
+      <div className="note info" style={{ margin: '8px 0 0' }}>
+        한 달에 글 <select value={posts} onChange={(e) => setPosts(Number(e.target.value))} style={{ width: 'auto', display: 'inline-block', padding: '2px 6px' }}>{[10, 20, 30].map((n) => <option key={n} value={n}>{n}편</option>)}</select> 쓰면
+        AI 그림 약 <b>{imgs}장 · {(imgs * PER_IMAGE).toLocaleString()}원</b>{save > 0 ? <> (늘 3장보다 약 <b>{save.toLocaleString()}원</b> 아낌)</> : ''}.
+        <br /><span className="hint">이번 달 그림 {usedImages}장 / 한도 {limit}장 · 어림값이에요 (그림 1장 약 {PER_IMAGE}원). 템플릿 배경은 그림 비용이 없어요.</span>
+      </div>
+      <small>{value === 'auto' ? '행사 · 모집 안내는 1장, 나머지는 3장. 1장은 글 전체를 담은 요약 카드예요. 글마다 새 글 작성 ③에서 바꿀 수 있어요' : `모든 새 글이 ${value}장으로 시작해요. 글마다 새 글 작성 ③에서 바꿀 수 있어요`}</small>
     </div>
   );
 }

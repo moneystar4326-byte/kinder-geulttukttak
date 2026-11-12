@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Db } from './db';
 import { APP } from '../shared/kinder';
+import type { CardCountSetting } from '../shared/cardRoles';
 
 export interface AppSettings {
   setupDone: boolean;
@@ -16,6 +17,7 @@ export interface AppSettings {
   monthlyImageLimit: number;
   browserPath: string;
   keywordCacheHours: number; // 같은 검색어 재조회 간격 (약관 · 한도 확인 전까지 짧게)
+  cardCount: CardCountSetting; // 카드뉴스 기본 장수 (그림 비용 아끼기). 'auto' = 글 종류에 맞게
 }
 
 export const DEFAULTS: AppSettings = {
@@ -28,6 +30,7 @@ export const DEFAULTS: AppSettings = {
   monthlyImageLimit: 60,
   browserPath: '',
   keywordCacheHours: 24,
+  cardCount: 'auto',
 };
 
 export function loadSettings(db: Db): AppSettings {
@@ -43,6 +46,7 @@ export function saveSettings(db: Db, patch: Partial<AppSettings>) {
   next.imageAutoRetry = Math.min(2, Math.max(0, Math.round(next.imageAutoRetry)));
   next.monthlyImageLimit = Math.min(500, Math.max(0, Math.round(next.monthlyImageLimit)));
   next.keywordCacheHours = Math.min(168, Math.max(0, Math.round(next.keywordCacheHours)));
+  if (![1, 2, 3, 'auto'].includes(next.cardCount)) next.cardCount = 'auto';
   next.textModel = next.textModel.trim() || DEFAULTS.textModel;
   next.imageModel = next.imageModel.trim() || DEFAULTS.imageModel;
   db.setSetting('app', next);

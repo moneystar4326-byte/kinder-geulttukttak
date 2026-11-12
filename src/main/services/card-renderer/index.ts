@@ -10,6 +10,7 @@ import type { CallOpts, ImageAI } from '../openai';
 import { kinderBackgroundPrompt, kinderRefLead } from '../openai/image-prompt';
 import { APP } from '../../../shared/kinder';
 import { cardHtml, copyHints, sizeOf, type Measure } from './template';
+import { cardNo } from '../../../shared/cardRoles';
 
 export interface Shooter { shoot(html: string, w: number, h: number, outFile: string): Promise<Measure> }
 
@@ -73,7 +74,7 @@ export function createCardService(deps: CardDeps) {
     const dir = cardDir(deps.assetsDir, cs, card.index);
     const out = path.join(dir, 'card.png');
     const html = cardHtml({
-      copy: card.copy, index: card.index, style: cs.style.style, size: cs.style.size,
+      copy: card.copy, index: card.index, no: cardNo(cs.cards.map((x) => x.index), card.index), total: cs.cards.length, style: cs.style.style, size: cs.style.size,
       brand: prof?.brand ?? APP.brand, dojoName: prof?.name ?? '',
       logoFile: prof?.logoPath && fs.existsSync(prof.logoPath) ? prof.logoPath : undefined, logoScale: prof?.logoScale,
       backgroundFile: card.backgroundPath && fs.existsSync(card.backgroundPath) ? card.backgroundPath : undefined,
@@ -109,13 +110,13 @@ export function createCardService(deps: CardDeps) {
     return card;
   }
 
-  // 3장 차례로. 성공한 장은 건너뜀 (실패한 장만 다시)
+  // 묶음 장수(1~3장)만큼 차례로. 성공한 장은 건너뜀 (실패한 장만 다시)
   async function renderSet(cardSetId: string, opts: { onStep?: (s: string) => void; signal?: AbortSignal; onlyFailed?: boolean } = {}) {
     const cs = db.getCardSet(cardSetId)!;
     for (const c of cs.cards) {
       if (opts.signal?.aborted) break;
       if (opts.onlyFailed && c.status === 'done') continue;
-      opts.onStep?.(`카드 ${c.index + 1}/3 생성 중`);
+      opts.onStep?.(`카드 ${cardNo(cs.cards.map((x) => x.index), c.index)}/${cs.cards.length} 생성 중`);
       await renderOne(c.id, { signal: opts.signal });
     }
     return db.refreshCardSetStatus(cs.id);

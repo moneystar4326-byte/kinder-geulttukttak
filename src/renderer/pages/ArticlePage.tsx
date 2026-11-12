@@ -9,7 +9,7 @@ import { MobilePreview } from '../components/MobilePreview';
 import { FirstTip } from '../guide/voice';
 import { localFlags } from '../../shared/validation';
 import { minCharsForInput } from '../../shared/count';
-import { storyBrief } from '../../shared/cardRoles';
+import { cardCountOf, resolveCardCount, storyBrief } from '../../shared/cardRoles';
 import type { DojoProfile, RevisionKind } from '../../shared/types';
 import { APP } from '../../shared/kinder';
 
@@ -252,7 +252,7 @@ export function ArticlePage({ id }: { id: string }) {
               <label className="row"><input type="checkbox" checked={naverTyping} onChange={(e) => setNaverTyping(e.target.checked)} /> 타이핑처럼 넣기 (촬영용 · 초당 {info.settings.typingSpeed}자, 설정에서 속도 변경)</label>
               {naverTyping && draft && <p className="hint">본문 {draft.doc.sections.reduce((n, s) => n + (s.heading?.length ?? 0) + s.paragraphs.join('').length, 0).toLocaleString()}자 → 약 {Math.ceil(draft.doc.sections.reduce((n, s) => n + (s.heading?.length ?? 0) + s.paragraphs.join('').length, 0) / info.settings.typingSpeed / 60)}분 걸려요. 입력 중에는 네이버 창을 누르지 마세요.</p>}
               <p className="hint">네이버가 "작성 중인 글"을 물으면 새 글로 시작해요 (쓰던 글은 네이버 임시저장에 남아요). 편집기에 이미 글자가 있으면 덮어쓰지 않고 멈춰요.</p>
-              {b.cardSet && cardsDone < 3 && <p className="hint">완성된 카드 {cardsDone}장만 넣어요.</p>}
+              {b.cardSet && cardsDone < b.cardSet.cards.length && <p className="hint">완성된 카드 {cardsDone}장만 넣어요.</p>}
               <Msg m={naverMsg.m} />
               <p className="hint" style={{ marginTop: 8 }}>자동 입력이 안 되면: [전체 복사]로 붙여넣고, 카드는 [PNG 저장]으로 받아 직접 올리면 돼요.</p>
             </div>
@@ -274,7 +274,7 @@ export function ArticlePage({ id }: { id: string }) {
       {(b.version || b.cardSet) && (
         <>
           <JobBar job={cardJob} />
-          <CardsPanel articleId={id} cs={b.cardSet} pref={pref} setPref={setPref} busy={running(cardJob)} onChanged={() => load()} hasVersion={!!b.version} kind={b.article?.input?.kind} purpose={storyBrief(b.article?.input)?.purpose} />
+          <CardsPanel articleId={id} cs={b.cardSet} pref={pref} setPref={setPref} busy={running(cardJob)} onChanged={() => load()} hasVersion={!!b.version} kind={b.article?.input?.kind} purpose={storyBrief(b.article?.input)?.purpose} count={cardCountOf(b.article.input) || resolveCardCount(info.settings.cardCount, b.article.input.kind)} />
         </>
       )}
 

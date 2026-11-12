@@ -129,12 +129,12 @@ export function openDb(file: string) {
 
   // ---------- 카드 ----------
   const rowToCard = (r: any): Card => ({ id: r.id, cardSetId: r.card_set_id, index: r.idx, copy: p(r.copy_json, { title: '', sub: '', scene: '' }), backgroundPath: r.background_path ?? undefined, outputPath: r.output_path ?? undefined, status: r.status, error: r.error ?? undefined, overflow: !!r.overflow, afterSectionId: r.after_section_id ?? undefined });
-  function createCardSet(articleVersionId: string, style: CardSet['style'], copies: (Card['copy'] & { afterSectionId?: string })[]): CardSet {
+  function createCardSet(articleVersionId: string, style: CardSet['style'], copies: (Card['copy'] & { afterSectionId?: string; index?: number })[]): CardSet {
     const id = randomUUID();
     db.exec('BEGIN');
     try {
       run('INSERT INTO card_sets (id,article_version_id,status,style_json,created_at) VALUES (?,?,?,?,?)', id, articleVersionId, 'pending', j(style), now());
-      copies.forEach((c, i) => run('INSERT INTO cards (id,card_set_id,idx,copy_json,status,after_section_id) VALUES (?,?,?,?,?,?)', randomUUID(), id, i, j({ title: c.title, sub: c.sub, scene: c.scene }), 'pending', c.afterSectionId ?? null));
+      copies.forEach((c, i) => run('INSERT INTO cards (id,card_set_id,idx,copy_json,status,after_section_id) VALUES (?,?,?,?,?,?)', randomUUID(), id, c.index ?? i, j({ title: c.title, sub: c.sub, scene: c.scene }), 'pending', c.afterSectionId ?? null));
       db.exec('COMMIT');
     } catch (e) { db.exec('ROLLBACK'); throw e; }
     return getCardSet(id)!;

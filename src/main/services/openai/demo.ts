@@ -2,6 +2,7 @@
 // 모든 결과는 미리 써 둔 샘플 · 가상 값. "새싹예시유치원"은 실제 유치원이 아님 (시험용 가상 이름)
 import type { ArticleDoc, ArticleInput, DojoProfile, KeywordRow } from '../../../shared/types';
 import type { ImageAI, TextAI } from './index';
+import { cardSlots } from '../../../shared/cardRoles';
 
 export const DEMO_PROFILE: DojoProfile = {
   id: 'default',
@@ -122,13 +123,14 @@ export const demoText: TextAI = {
   async titles(_d, _i, o) { await wait(400, o?.signal); return ALT_TITLES[titleTurn++ % ALT_TITLES.length]; },
   async paragraph(doc, sectionId, index, _ins, o) { await wait(400, o?.signal); return doc.sections.find((s) => s.id === sectionId)?.paragraphs[index] ?? ''; },
   async cardOne(_d, _t, _i, cur, _o, _k, o) { await wait(400, o?.signal); return { title: `${cur.title.replace(/ \(새 문구\)$/, '')} (새 문구)`.slice(0, 28), sub: cur.sub }; },
-  async cardCopies(_d, _t, _k, o) {
+  async cardCopies(_d, _t, _k, o, _w, _n, count = 3) {
     await wait(500, o?.signal);
-    return [
+    const all = [
       { title: '바깥놀이터에서 무엇을 했나요?', sub: '놀이터에 떨어진 낙엽을 모았어요. 노란 잎, 빨간 잎을 하나씩 주우며 소리와 감촉을 느꼈어요.', scene: 'preschoolers gathering colorful autumn leaves on a safe playground, a teacher kneeling beside them', afterSectionId: 's1' },
       { title: '모은 낙엽으로 왕관을 만들었어요', sub: '종이 띠에 마음에 드는 잎을 골라 붙였어요. 망설이던 친구도 끝에는 가장 큰 잎을 골랐어요.', scene: 'preschoolers sitting at a low table outdoors gluing autumn leaves onto paper crowns, a teacher nearby', afterSectionId: 's4' },
       { title: '산책길 낙엽 하나로도 충분해요', sub: '가정에서도 낙엽을 주우며 색과 소리를 이야기해 보세요. 낯설어하면 먼저 보여 주고 기다려 주세요.', scene: 'a parent and a young child picking up autumn leaves on a park path', afterSectionId: 's6' },
     ];
+    return cardSlots(count).map((s) => ({ ...all[s], index: s })); // 장수만큼 (1장 [0] · 2장 [0, 2])
   },
   // 데모: AI 대신 메모를 그대로 활동 칸에 (나누지 않음)
   async splitMemo(memo, _k, _t, o) { await wait(300, o?.signal); return { activities: memo.trim() }; },

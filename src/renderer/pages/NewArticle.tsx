@@ -12,6 +12,11 @@ import { buildQuickInput, emptyInput, needsMoreMemo, quickTopic, thinMemo } from
 import { quickKind } from '../../shared/quick';
 import { MicButton } from '../components/MicButton';
 import { APP, kindLabel, writerLabel, type Writer } from '../../shared/kinder';
+import { cardCountOf, resolveCardCount, type CardCount, type CardCountSetting } from '../../shared/cardRoles';
+
+// 카드 장수 고르기 (태권 글뚝딱 2.4.0에서 옮김: 그림 비용 아끼기). 기본은 [설정] → 카드뉴스 기본 장수
+const COUNT_LABEL = ['글만', '카드 1장', '카드 2장', '카드 3장'] as const;
+const AUTO_NOTE = '글 종류에 맞게 (행사 · 모집 안내 1장, 나머지 3장)';
 
 // 말로 넣은 글은 적어 둔 메모 뒤에 이어 붙임
 const appendSpoken = (prev: string, text: string) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text);
@@ -84,6 +89,10 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
   useEffect(() => { call<string[]>('profile:prefixOptions', { region: input.region }).then(setPrefixes).catch(() => {}); }, [input.region, profile]);
 
   const set = (p: Partial<ArticleInput>) => setInput({ ...input, ...p });
+  // 장수를 직접 고르기 전에는 설정의 기본 장수를 글 종류에 맞춰 따라가요
+  const [countTouched, setCountTouched] = useState(input.cardCount != null);
+  useEffect(() => { if (!countTouched && input.withCards) set({ cardCount: resolveCardCount(info.settings.cardCount, input.kind) }); }, [input.kind, info.settings.cardCount]); // eslint-disable-line
+  const setCount = (n: CardCount) => { setCountTouched(true); set({ cardCount: n, withCards: n > 0 }); };
   const setF = (p: Partial<ArticleInput['facts']>) => setInput({ ...input, facts: { ...input.facts, ...p } });
   const naverReady = !!(info.secrets.naverApiKey && info.secrets.naverSecret && info.secrets.naverCustomer);
   // 이야기 → 질문 칸 나누기. 메모에 없는 칸은 비어 있음 (지어내지 않음). 이미 적은 칸은 덮어쓰지 않음
@@ -242,7 +251,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
   const [quickAsks, setQuickAsks] = useState<{ memo: string; items: { question: string; answer: string }[] } | null>(null);
   const asksNow = quickAsks && quickAsks.memo === quick.trim() ? quickAsks : null;
   const thinMemoOnly = !!asksNow && !asksNow.items.some((a) => a.answer.trim()) && quick.replace(/\s/g, '').length < 100;
-  const [quickCards, setQuickCards] = useState(true);
+  const [quickCards, setQuickCards] = useState<CardCountSetting | 0>(info.settings.cardCount ?? 'auto');
   const [quickPrefix, setQuickPrefixState] = useState(local.get('quick-prefix', true));
   // 태권 글뚝딱 2.2.11에서 옮김: 주변 장소가 비면 [동 유치원] 하나만 계속 붙는데 "돌아가며"로 안내돼 헷갈림
   const quickNames = prefixNames(profile?.region ?? '', profile?.nearbyAreas ?? []);
@@ -275,7 +284,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
       }
       // 제목 앞 동네 이름: 글마다 돌아가며 ([신대방동 유치원] → [롯데낙천대아파트 유치원] → …)
       const titlePrefix = quickPrefix ? autoPrefix(profile?.region ?? '', profile?.nearbyAreas ?? [], (await call<unknown[]>('article:list').catch(() => [])).length) : '';
-      const q = buildQuickInput({ memo, profile, main, subs, withCards: quickCards, titlePrefix, writer, writerSign });
+      const q = buildQuickInput({ memo, profile, main, subs, withCards: quickCards !== 0, cardSetting: quickCards || undefined, titlePrefix, writer, writerSign });
       const answered = (asksNow?.items ?? []).filter((a) => a.answer.trim()).map((a) => `${a.question} ${a.answer.trim()}`).join('\n');
       const input = answered ? { ...q, facts: { ...q.facts, scenes: answered } } : q;
       const art = await call<{ id: string }>('article:create', { input, keywords: chosen });
@@ -313,7 +322,12 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
         <div className="row" style={{ marginTop: 10 }}>
           <label className="row"><input type="checkbox" checked={quickPrefix} onChange={(e) => setQuickPrefix(e.target.checked)} /> 제목 앞에 동네 이름 붙이기 <span className="hint">{quickNames.length > 1 ? `(${quickNames.join(' · ')} 중 돌아가며${dongOf(profile?.region ?? '') ? `, [${dongOf(profile?.region ?? '')} ${APP.term}]은 세 편에 한 번` : ''})` : quickNames.length ? `(주변 장소가 없어 ${quickNames[0]}만 붙어요)` : `(${APP.place} 정보에 지역 · 주변 장소가 없어요)`}</span></label>
           {quickPrefix && quickNames.length <= 1 && <span className="hint" style={{ flexBasis: "100%", order: 1 }}>가까운 아파트 · 초등학교 · 역 이름을 {APP.place} 정보 → 주변 장소에 적으면 제목 앞 이름이 돌아가며 붙어요. <button className="btn link" onClick={() => go({ page: 'profile' })}>주변 장소 적으러 가기</button></span>}
-          <label className="row"><input type="checkbox" checked={quickCards} onChange={(e) => setQuickCards(e.target.checked)} /> 카드뉴스 3장도 만들기 {quickCards && card.mode === 'ai' && <span className="hint">(AI 그림 3장 비용 발생)</span>}</label>
+          <label className="row">카드뉴스
+            <select value={String(quickCards)} onChange={(e) => { const v = e.target.value; setQuickCards(v === 'auto' ? 'auto' : (Number(v) as 0 | 1 | 2 | 3)); }} style={{ width: 'auto' }}>
+              <option value="auto">{AUTO_NOTE}</option><option value="0">만들지 않기</option><option value="1">1장</option><option value="2">2장</option><option value="3">3장</option>
+            </select>
+            {quickCards !== 0 && card.mode === 'ai' && <span className="hint">(AI 그림 {quickCards === 'auto' ? '1~3' : quickCards}장 비용 발생 · 기본값은 [설정]에서)</span>}
+          </label>
         </div>
         {asksNow && !busy && (
           <div className="note info" style={{ marginTop: 10 }}>
@@ -548,12 +562,14 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
             <p className="hint">{input.facts.story?.trim() ? '분량: 본문 공백 제외 약 500~800자. 모자란 분량은 주제 설명으로 채우고, 지어내지 않아요.' : `분량: 본문 공백 제외 최소 1,500자, 목표 1,800~2,200자 (행사 · ${kindLabel('모집 안내')}는 최소 1,000자). 모자라면 사실을 더하지 않고 최대 2번 보완해요.`}</p>
           </div>
           <div className="panel">
-            <Field label="만들 것"><Chips options={['글만', '글 + 카드 3장'] as const} value={input.withCards ? '글 + 카드 3장' : '글만'} onChange={(v) => set({ withCards: v !== '글만' })} /></Field>
+            <Field label="만들 것" hint={cardCountOf(input) === 1 ? '글 전체를 담은 요약 카드 1장을 만들어요' : cardCountOf(input) === 2 ? '첫 카드와 마지막 카드만 만들어요 (가운데 카드는 빠져요)' : undefined}>
+              <Chips options={COUNT_LABEL} value={COUNT_LABEL[cardCountOf(input)]} onChange={(v) => setCount(COUNT_LABEL.indexOf(v) as CardCount)} />
+            </Field>
             {input.withCards && (
               <>
                 <Field label="카드 스타일"><Chips options={CARD_STYLES} value={card.style} onChange={(v) => setCard({ ...card, style: v })} /></Field>
                 <Field label="크기"><Chips options={['1080x1350', '1080x1080'] as const} value={card.size} onChange={(v) => setCard({ ...card, size: v })} /></Field>
-                <Field label="배경" hint={card.mode === 'ai' ? 'AI가 글자 없는 그림을 그리고, 한글 · 로고는 프로그램이 얹어요 (그림 3장 비용 발생)' : 'AI 그림 없이 색 · 모양 템플릿 (그림 비용 없음)'}>
+                <Field label="배경" hint={card.mode === 'ai' ? `AI가 글자 없는 그림을 그리고, 한글 · 로고는 프로그램이 얹어요 (그림 ${cardCountOf(input)}장 비용 발생)` : 'AI 그림 없이 색 · 모양 템플릿 (그림 비용 없음)'}>
                   <Chips options={['AI 배경', '템플릿'] as const} value={card.mode === 'ai' ? 'AI 배경' : '템플릿'} onChange={(v) => setCard({ ...card, mode: v === 'AI 배경' ? 'ai' : 'template' })} />
                 </Field>
               </>

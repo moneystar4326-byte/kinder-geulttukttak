@@ -7,7 +7,7 @@ import { CARD_STYLES, type BriefPurpose, type CardMode, type CardSize, type Card
 
 export interface CardPref { style: CardStyle; size: CardSize; mode: CardMode }
 
-import { cardRoles } from '../../shared/cardRoles';
+import { cardNo, roleAt } from '../../shared/cardRoles';
 
 function CardBox({ card, cs, articleId, busy, onChanged, kind, purpose }: { card: Card; cs: CardSet; articleId: string; busy: boolean; onChanged: () => void; kind?: string; purpose?: BriefPurpose }) {
   const { info } = useApp();
@@ -30,15 +30,16 @@ function CardBox({ card, cs, articleId, busy, onChanged, kind, purpose }: { card
     if (newBackground && cs.style.mode === 'ai' && !confirm('그림을 새로 그려요 (그림 1장 비용 발생). 계속할까요?')) return;
     try { await call('cards:renderOne', { articleId, cardId: card.id, newBackground }); onChanged(); } catch (e) { msg.err(e); }
   };
+  const no = cardNo(cs.cards.map((x) => x.index), card.index); // 2장 묶음이면 카드 1 · 2
   const src = assetUrl(info.dataDir, card.outputPath, `${card.status}-${card.copy.title}-${card.copy.sub}-${card.backgroundPath ?? ''}-${cs.style.style}-${cs.style.size}-${cs.style.mode}`);
   return (
     <div className="card">
-      {card.status === 'done' && src ? <img src={src} alt={`카드 ${card.index + 1}`} /> : (
-        <div className="ph">{card.status === 'running' ? `카드 ${card.index + 1}/3 생성 중…` : card.status === 'failed' ? `실패: ${card.error ?? ''}` : '대기 중'}</div>
+      {card.status === 'done' && src ? <img src={src} alt={`카드 ${no}`} /> : (
+        <div className="ph">{card.status === 'running' ? `카드 ${no}/${cs.cards.length} 생성 중…` : card.status === 'failed' ? `실패: ${card.error ?? ''}` : '대기 중'}</div>
       )}
       <div style={{ marginTop: 8 }}>
         {/* 2026-10-18 사용자: "설명이 부족하다" → 카드 역할 · 칸 이름 · 버튼마다 하는 일 */}
-        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>카드 {card.index + 1} · {cardRoles(kind, purpose)[card.index]?.label ?? ''}</div>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>카드 {no} · {roleAt(kind, purpose, cs.cards.length, card.index).label}</div>
         {card.overflow && <div className="note warn">글자가 카드 밖으로 넘쳐요. 아래 글을 조금 줄이고 [문구 적용]을 눌러 주세요.</div>}
         <div className="hint" style={{ fontWeight: 600 }}>큰 글씨 (카드 제목)</div>
         <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -61,33 +62,38 @@ function CardBox({ card, cs, articleId, busy, onChanged, kind, purpose }: { card
   );
 }
 
-export function CardsPanel({ articleId, cs, pref, setPref, busy, onChanged, hasVersion, kind, purpose }: { articleId: string; cs: CardSet | null; pref: CardPref; setPref: (p: CardPref) => void; busy: boolean; onChanged: () => void; hasVersion: boolean; kind?: string; purpose?: BriefPurpose }) {
+export function CardsPanel({ articleId, cs, pref, setPref, busy, onChanged, hasVersion, kind, purpose, count }: { articleId: string; cs: CardSet | null; pref: CardPref; setPref: (p: CardPref) => void; busy: boolean; onChanged: () => void; hasVersion: boolean; kind?: string; purpose?: BriefPurpose; count: number }) {
   const { info } = useApp();
   const msg = useMsg();
+  // 장수: 글 설정 → [설정]의 기본 장수. 여기서 이 글만 바꿀 수 있어요 (태권 글뚝딱 2.4.0에서 옮김)
+  const [n, setN] = useState(Math.min(3, Math.max(1, count)) as 1 | 2 | 3);
+  useEffect(() => { setN(Math.min(3, Math.max(1, count)) as 1 | 2 | 3); }, [count]);
   const make = async () => {
-    if (pref.mode === 'ai' && !confirm('AI 그림 3장을 만들어요 (그림 비용 발생). 계속할까요?')) return;
-    try { await call('cards:plan', { articleId, style: pref }); onChanged(); } catch (e) { msg.err(e); }
+    if (pref.mode === 'ai' && !confirm(`AI 그림 ${n}장을 만들어요 (그림 비용 발생). 계속할까요?`)) return;
+    try { await call('cards:plan', { articleId, style: pref, count: n }); onChanged(); } catch (e) { msg.err(e); }
   };
   const restyle = async () => {
     if (!cs) return;
     const needNew = pref.mode === 'ai' && (cs.style.mode !== 'ai' || cs.style.style !== pref.style);
-    if (needNew && !confirm('스타일이 바뀌어 그림 3장을 새로 그려요 (그림 비용 발생). 계속할까요?')) return;
+    if (needNew && !confirm(`스타일이 바뀌어 그림 ${cs.cards.length}장을 새로 그려요 (그림 비용 발생). 계속할까요?`)) return;
     try { await call('cards:restyle', { articleId, cardSetId: cs.id, style: pref }); onChanged(); } catch (e) { msg.err(e); }
   };
   const failed = cs?.cards.filter((c) => c.status === 'failed').length ?? 0;
   return (
     <div className="panel">
       <div className="head" style={{ marginBottom: 8 }}>
-        <h2 style={{ margin: 0 }}>카드뉴스 3장</h2>
+        <h2 style={{ margin: 0 }}>카드뉴스 {cs ? cs.cards.length : n}장</h2>
         {cs && <span className="badge">{cs.style.style} · {cs.style.size} · {cs.style.mode === 'ai' ? 'AI 배경' : '템플릿'}</span>}
       </div>
       <div className="row" style={{ marginBottom: 10 }}>
         <Chips options={CARD_STYLES} value={pref.style} onChange={(v) => setPref({ ...pref, style: v })} />
         <Chips options={['1080x1350', '1080x1080'] as const} value={pref.size} onChange={(v) => setPref({ ...pref, size: v })} />
         <Chips options={['AI 배경', '템플릿'] as const} value={pref.mode === 'ai' ? 'AI 배경' : '템플릿'} onChange={(v) => setPref({ ...pref, mode: v === 'AI 배경' ? 'ai' : 'template' })} />
+        <Chips options={['1장', '2장', '3장'] as const} value={`${n}장` as '1장'} onChange={(v) => setN(Number(v[0]) as 1 | 2 | 3)} />
       </div>
+      {n < 3 && <p className="hint">{n === 1 ? '글 전체를 담은 요약 카드 1장을 만들어요.' : '첫 카드와 마지막 카드만 만들어요.'} 장수는 [문구부터 새로 만들기]부터 적용돼요.</p>}
       <div className="row" style={{ marginBottom: 12 }}>
-        <button className="btn primary" disabled={busy || !hasVersion} onClick={make}>{cs ? '문구부터 새로 만들기' : '카드 3장 만들기'}</button>
+        <button className="btn primary" disabled={busy || !hasVersion} onClick={make}>{cs ? `문구부터 새로 만들기 (${n}장)` : `카드 ${n}장 만들기`}</button>
         {cs && <button className="btn" disabled={busy} onClick={restyle}>이 문구로 스타일 · 크기만 바꾸기</button>}
         {failed > 0 && <button className="btn" disabled={busy} onClick={() => call('cards:renderFailed', { articleId, cardSetId: cs!.id }).then(onChanged).catch((e) => msg.err(e))}>실패한 {failed}장만 다시</button>}
       </div>

@@ -86,6 +86,7 @@ export interface ArticleInput {
   ending: string;
   includeProfile: { philosophy: boolean; classFeatures: boolean; credentials: boolean; contact: boolean; address: boolean };
   withCards: boolean;
+  cardCount?: 0 | 1 | 2 | 3; // 카드뉴스 장수 (태권 글뚝딱 2.4.0에서 옮김). 없으면 withCards 로 (true = 3장)
   keywordPlan?: KeywordPlanItem[]; // 자세히 쓰기 검색어 확인: 고른 검색어와 넣을 문장 예시 (있으면 이대로 씀)
   greetings?: boolean; // false 면 이 글에는 첫인사 · 끝인사를 붙이지 않음 (없으면 붙임)
   titlePrefix?: string; // 예: [롯데낙천대아파트 유치원] — 코드가 제목 앞에 붙임 (AI에 동네 이름을 맡기지 않음)

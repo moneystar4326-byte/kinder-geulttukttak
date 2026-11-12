@@ -3,6 +3,7 @@ import { AUDIENCES, ENDINGS, type ArticleInput, type DojoProfile } from './types
 import { fallbackKeyword } from './validation';
 import { quickEnding, quickKind, quickWhen } from './quick';
 import type { Writer } from './kinder';
+import { resolveCardCount, type CardCountSetting } from './cardRoles';
 
 // 메모만으로는 활동을 구체적으로 쓰기 어려운지 → 만들기 전에 물음 (2026-11-02). 교육 정보 글은 묻지 않음
 export const needsMoreMemo = (memo: string) => {
@@ -25,7 +26,7 @@ export const quickTopic = (memo: string) => {
   return first.length > 40 ? `${first.slice(0, 40)}…` : first;
 };
 
-export function buildQuickInput(o: { memo: string; profile: DojoProfile | null; main?: string; subs?: string[]; withCards: boolean; titlePrefix: string; writer?: Writer; writerSign?: boolean }): ArticleInput {
+export function buildQuickInput(o: { memo: string; profile: DojoProfile | null; main?: string; subs?: string[]; withCards: boolean; titlePrefix: string; writer?: Writer; writerSign?: boolean; cardSetting?: CardCountSetting }): ArticleInput {
   const memo = o.memo.trim();
   const topic = quickTopic(memo);
   const base = emptyInput(o.profile);
@@ -38,6 +39,7 @@ export function buildQuickInput(o: { memo: string; profile: DojoProfile | null; 
     // 모집 · 행사 글은 "상담 안내로 마무리"인데 연락처를 안 넘기면 AI가 막연한 문의 문장만 씀 (2026-10-29 유치원 정보 점검) → 적어 둔 연락처 · 상담 링크를 넘김
     includeProfile: { philosophy: true, classFeatures: true, credentials: true, contact: kind === '모집 안내' || kind === '행사 안내', address: false },
     withCards: o.withCards,
+    cardCount: o.withCards ? resolveCardCount(o.cardSetting, kind) : 0, // 설정의 기본 장수 (글 종류에 맞게면 행사 · 모집 1장)
     titlePrefix: o.titlePrefix,
   };
 }

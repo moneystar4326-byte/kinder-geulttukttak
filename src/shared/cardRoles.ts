@@ -64,3 +64,39 @@ export const storyBrief = (input?: { facts?: { story?: string }; brief?: Article
 
 export const cardRoles = (kind?: ArticleKind | string, purpose?: BriefPurpose) =>
   purpose ? BRIEF_CARD_ROLES[purpose] : CARD_ROLES[(kind as ArticleKind) in CARD_ROLES ? (kind as ArticleKind) : '수업 후기'];
+
+// ---------- 카드 장수 고르기 (태권 글뚝딱 2.4.0에서 옮김: 설정에서 1 · 2 · 3장, 그림 비용 아끼기) ----------
+// 1장 = 글 전체를 담은 한 장 요약 카드 (3장 중 하나를 자르지 않음), 2장 = 첫 카드 + 마지막 카드, 3장 = 지금 그대로
+// 카드 자리 번호(Card.index)는 0 · 1 · 2 그대로 써서 글 속 위치 규칙(도입 뒤 · 가운데 · 마무리 앞)을 바꾸지 않음
+export type CardCount = 0 | 1 | 2 | 3;
+export type CardCountSetting = 'auto' | 1 | 2 | 3;
+
+export const SUMMARY_ROLES: Record<ArticleKind, CardRole> = {
+  '수업 후기': { label: '오늘 놀이 한 장', guide: '이 글을 한 장에 — 오늘 어떤 놀이 · 활동을 했고, 아이들에게 무엇이 남았는지' },
+  '성장 이야기': { label: '변화 한 장', guide: '이 글을 한 장에 — 글에 적힌 이전 모습에서 지금 모습으로의 변화' },
+  '행사 안내': { label: '행사 한 장', guide: '이 글을 한 장에 — 언제 · 무엇을 하는 행사인지와 참여 안내 (글에 적힌 날짜 · 행사 이름 그대로)' },
+  '모집 안내': { label: '모집 한 장', guide: '이 글을 한 장에 — 어떤 유치원인지, 입학설명회 · 신청 방법 (글에 적힌 것만, 없으면 "유치원으로 문의")' },
+  '교육 정보': { label: '질문과 답 한 장', guide: '이 글을 한 장에 — 학부모 질문 하나와 유치원의 답' },
+};
+export const BRIEF_SUMMARY_ROLES: Record<BriefPurpose, CardRole> = {
+  '소식': { label: '소식 한 장', guide: '이 글을 한 장에 — 가장 큰 소식(날짜 · 행사 이름 그대로)과 아이들에게 어떤 자리였는지' },
+  '안내': { label: '안내 한 장', guide: '이 글을 한 장에 — 언제 · 무엇과 참여 안내 (적힌 것만)' },
+  '교육': { label: '배운 것 한 장', guide: '이 글을 한 장에 — 놀이 · 배운 내용과 실제 장면' },
+  '성장': { label: '변화 한 장', guide: '이 글을 한 장에 — 이전 모습에서 지금 모습으로의 변화' },
+  '모집': SUMMARY_ROLES['모집 안내'],
+};
+
+// 글 종류에 맞게: 행사 · 모집 안내는 알릴 사실이 정해진 짧은 글이라 1장, 나머지는 3장
+export const defaultCardCount = (kind?: string): 1 | 3 => (kind === '행사 안내' || kind === '모집 안내' ? 1 : 3);
+export const resolveCardCount = (setting: CardCountSetting | undefined, kind?: string): 1 | 2 | 3 => (setting === 1 || setting === 2 || setting === 3 ? setting : defaultCardCount(kind));
+// 글에 정한 장수 (예전 글은 cardCount 가 없음 → 카드를 골랐으면 3장)
+export const cardCountOf = (input: { cardCount?: CardCount; withCards: boolean }): CardCount => input.cardCount ?? (input.withCards ? 3 : 0);
+export const cardSlots = (count: number): number[] => (count >= 3 ? [0, 1, 2] : count === 2 ? [0, 2] : count === 1 ? [0] : []);
+
+// 카드 묶음 크기(size)와 자리(slot)로 역할 — 1장 묶음이면 요약 카드
+export function roleAt(kind: string | undefined, purpose: BriefPurpose | undefined, size: number, slot: number): CardRole {
+  if (size === 1) return purpose ? BRIEF_SUMMARY_ROLES[purpose] : SUMMARY_ROLES[(kind as ArticleKind) in SUMMARY_ROLES ? (kind as ArticleKind) : '수업 후기'];
+  return cardRoles(kind, purpose)[slot] ?? cardRoles(kind, purpose)[0];
+}
+// 보여 주는 카드 번호 (2장 묶음의 자리 0 · 2 → 카드 1 · 2). "카드 3번이 빠졌어요"처럼 헷갈리지 않게
+export const cardNo = (indices: number[], index: number) => [...indices].sort((a, b) => a - b).indexOf(index) + 1;

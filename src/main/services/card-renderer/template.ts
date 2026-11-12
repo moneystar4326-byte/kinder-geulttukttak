@@ -7,6 +7,7 @@ import { APP } from '../../../shared/kinder';
 export interface CardLayerInput {
   copy: CardCopy;
   index: number; // 0..2
+  no?: number; total?: number; // 카드에 찍는 "1 / 2" (장수 고르기). 없으면 index + 1 / 3
   style: CardStyle;
   size: CardSize;
   brand: { main: string; accent: string };
@@ -83,7 +84,7 @@ html,body{width:${w}px;height:${h}px;overflow:hidden;background:${paper}}
 #logo{height:${logoH}px;max-width:${Math.round(w / 2)}px;object-fit:contain;object-position:left center}
 </style></head><body><div id="c">
 <img id="img" src="${furl(c.backgroundFile!)}">
-<div id="band"></div><div id="num">${c.index + 1} / 3</div>
+<div id="band"></div><div id="num">${c.no ?? c.index + 1} / ${c.total ?? 3}</div>
 <div id="box"><div id="title">${esc(c.copy.title)}</div><div id="rule"></div><div id="sub">${esc(c.copy.sub)}</div></div>
 <div id="foot">${c.logoFile ? `<img id="logo" src="${furl(c.logoFile)}">` : `<div id="name">${esc(c.dojoName)}</div>`}</div>
 </div></body></html>`;
@@ -130,7 +131,7 @@ html,body{width:${w}px;height:${h}px;overflow:hidden;background:#fff}
 #page{font:700 26px NotoKR;color:${onImage ? '#fff' : '#888'}}
 </style></head><body><div id="c">
 ${onImage ? `<img id="img" src="${furl(c.backgroundFile!)}">` : templateBg(c.style, main, accent, c.index)}
-<div id="box"><div id="num">${c.index + 1} / 3</div><div id="title">${esc(c.copy.title)}</div><div id="rule"></div><div id="sub">${esc(c.copy.sub)}</div></div>
+<div id="box"><div id="num">${c.no ?? c.index + 1} / ${c.total ?? 3}</div><div id="title">${esc(c.copy.title)}</div><div id="rule"></div><div id="sub">${esc(c.copy.sub)}</div></div>
 <div id="foot">${c.logoFile ? `<img id="logo" src="${furl(c.logoFile)}">` : `<div id="name">${esc(c.dojoName)}</div>`}</div>
 </div></body></html>`;
 }

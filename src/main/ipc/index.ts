@@ -11,6 +11,7 @@ import { generateArticle, reviseArticle, titleWithPrefix } from '../article';
 import { ArticleInputSchema, DocSchema, ProfileInput } from '../../shared/schemas';
 import { countDoc } from '../../shared/count';
 import { headingLines } from '../../shared/format';
+import { cardCountOf, cardNo, resolveCardCount } from '../../shared/cardRoles';
 import { childNames, hideChildNames, memoText, plainBody, thinFacts, withKeywordFallback } from '../../shared/validation';
 import { planCandidates } from '../../shared/keywords';
 import type { ArticleDoc, ArticleInput, CardSet, KeywordRow } from '../../shared/types';
@@ -124,7 +125,7 @@ export function registerIpc(ctx: AppCtx) {
   });
   handle('settings:save', z.object({
     setupDone: z.boolean(), textModel: S, imageModel: S, saveDir: S, typingSpeed: z.number(), imageAutoRetry: z.number(),
-    monthlyImageLimit: z.number(), browserPath: S, keywordCacheHours: z.number(),
+    monthlyImageLimit: z.number(), browserPath: S, keywordCacheHours: z.number(), cardCount: z.union([z.literal('auto'), z.literal(1), z.literal(2), z.literal(3)]),
   }).partial(), (p) => saveSettings(db, p as Partial<AppSettings>));
   handle('settings:pickDir', z.undefined(), async () => {
     const r = await dialog.showOpenDialog(ctx.win()!, { properties: ['openDirectory', 'createDirectory'], defaultPath: settings().saveDir });
@@ -323,15 +324,17 @@ export function registerIpc(ctx: AppCtx) {
   const noCardJob = (articleId: string) => { if (runner.runningOf(['cards', 'card'], articleId)) throw new Error('카드를 만드는 중이에요. 끝난 뒤 다시 눌러 주세요.'); };
   const articleOfCard = (cardId: string) => { const c = db.getCard(cardId); const cs = c && db.getCardSet(c.cardSetId); const v = cs && db.getVersion(cs.articleVersionId); if (!v) throw new Error('카드를 찾지 못했어요'); return v.articleId; };
   const StyleSchema = z.object({ style: z.enum(CARD_STYLES), size: z.enum(['1080x1350', '1080x1080']), mode: z.enum(['ai', 'template']) });
-  handle('cards:plan', z.object({ articleId: Id, style: StyleSchema }), ({ articleId, style }) => {
+  // 장수: 화면에서 고른 것 → 글 설정 → 설정의 기본 장수 (태권 글뚝딱 2.4.0에서 옮김). 글만으로 만든 글도 카드 칸에서 만들 수 있게
+  handle('cards:plan', z.object({ articleId: Id, style: StyleSchema, count: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional() }), ({ articleId, style, count }) => {
     const a = ai();
     const art = db.getArticle(articleId)!;
     if (!art.currentVersionId) throw new Error('글을 먼저 만들어 주세요');
     const mode = style.mode;
     noCardJob(articleId);
+    const n = (count ?? (cardCountOf(art.input) || resolveCardCount(settings().cardCount, art.input.kind))) as 1 | 2 | 3;
     return runner.start('cards', articleId, '카드 문구 만드는 중', async ({ signal, step, jobId }) => {
       const v = db.getVersion(art.currentVersionId!)!;
-      const copies = safeCopies(await a.text.cardCopies(v.doc, v.title, art.input, { signal, onUsage: onUsage(jobId) }, art.input.writer, thinFacts(art.input)), art.input);
+      const copies = safeCopies(await a.text.cardCopies(v.doc, v.title, art.input, { signal, onUsage: onUsage(jobId) }, art.input.writer, thinFacts(art.input), n), art.input);
       const cs = db.createCardSet(v.id, { ...style, mode }, copies);
       await cardService(a.image, jobId).renderSet(cs.id, { signal, onStep: step });
     }).job;
@@ -345,8 +348,9 @@ export function registerIpc(ctx: AppCtx) {
     const a = ai({ gate: newBackground }); // 배경을 그대로 두고 문구만 다시 합성하면 AI를 안 씀
     const articleId = articleOfCard(cardId);
     noCardJob(articleId);
-    const n = (db.getCard(cardId)?.index ?? 0) + 1;
-    return runner.start('cards', articleId, `카드 ${n}/3 다시 만드는 중`, async ({ signal, jobId }) => { await cardService(a.image, jobId).renderOne(cardId, { newBackground, signal }); }).job;
+    const card = db.getCard(cardId);
+    const set = card ? db.getCardSet(card.cardSetId)!.cards.map((x) => x.index) : [0];
+    return runner.start('cards', articleId, `카드 ${cardNo(set, card?.index ?? 0)}/${set.length} 다시 만드는 중`, async ({ signal, jobId }) => { await cardService(a.image, jobId).renderOne(cardId, { newBackground, signal }); }).job;
   });
   // 카드 한 장 문구만 AI로 새로 제안 (저장하지 않음 — 칸에 넣어 주고 [문구 적용]으로 저장, 그림 비용 없음)
   handle('cards:suggestCopy', z.object({ cardId: Id }), async ({ cardId }) => {
@@ -357,7 +361,7 @@ export function registerIpc(ctx: AppCtx) {
     const v = db.getVersion(cs.articleVersionId)!;
     const others = cs.cards.filter((x) => x.id !== cardId).map((x) => x.copy.title);
     const input = db.getArticle(articleId)?.input;
-    return safeCopies([await ai().text.cardOne(v.doc, v.title, c.index, c.copy, others, input, { onUsage: onUsage() }, input?.writer, !!input && thinFacts(input))], input)[0];
+    return safeCopies([await ai().text.cardOne(v.doc, v.title, c.index, c.copy, others, input, { onUsage: onUsage() }, input?.writer, !!input && thinFacts(input), cs.cards.length, cardNo(cs.cards.map((x) => x.index), c.index))], input)[0];
   });
   handle('cards:updateCopy', z.object({ cardId: Id, copy: z.object({ title: z.string().max(80), sub: z.string().max(200), scene: z.string().max(500) }) }), ({ cardId, copy }) => { noCardJob(articleOfCard(cardId)); return cardService(null).updateCopy(cardId, copy); });
   // 스타일 · 크기만 바꿈 (템플릿 모드면 API 없이 다시 합성, AI 배경은 있던 그림을 새 비율로 다시 자름)
@@ -370,9 +374,10 @@ export function registerIpc(ctx: AppCtx) {
     return runner.start('cards', articleId, '카드 다시 그리는 중', async ({ signal, step, jobId }) => {
       db.setCardSetStyle(cardSetId, { ...style, mode }); // 작업이 실제로 시작된 뒤에만 스타일을 바꿈
       const svc = cardService(a.image, jobId);
-      for (const c of db.getCardSet(cardSetId)!.cards) {
+      const all = db.getCardSet(cardSetId)!.cards;
+      for (const c of all) {
         if (signal.aborted) break;
-        step(`카드 ${c.index + 1}/3 생성 중`);
+        step(`카드 ${cardNo(all.map((x) => x.index), c.index)}/${all.length} 생성 중`);
         await svc.renderOne(c.id, { newBackground: needNew, signal });
       }
     }).job;
@@ -419,7 +424,8 @@ export function registerIpc(ctx: AppCtx) {
     const cards = (cs?.cards ?? []).filter((c) => c.status === 'done' && c.outputPath);
     if (cs && cards.some((c) => c.overflow)) throw new Error('글자가 넘친 카드가 있어요. 카드 문구를 줄인 뒤 넣어 주세요.');
     // 사진이 빠지는 이유를 끝 안내에 같이 알려 줌: 카드가 아예 없거나, 만들기에 실패한 카드
-    const missing = (cs?.cards ?? []).filter((c) => !(c.status === 'done' && c.outputPath)).map((c) => c.index + 1);
+    const slots = (cs?.cards ?? []).map((c) => c.index); // 보여 주는 번호는 묶음 안 순서 (2장 묶음이면 카드 1 · 2)
+    const missing = (cs?.cards ?? []).filter((c) => !(c.status === 'done' && c.outputPath)).map((c) => cardNo(slots, c.index));
     const cardNote = !cs ? '카드를 아직 만들지 않아 사진 없이 넣었어요 (카드를 만든 뒤 넣으면 사진도 같이 들어가요)' : missing.length ? `카드 ${missing.join(', ')}번은 만들어지지 않아 빠졌어요 (카드 화면에서 다시 만들기)` : '';
     const blocks = buildBlocks(v.doc.sections, cards.map((c) => ({ title: c.copy.title, afterSectionId: c.afterSectionId, index: c.index })), v.doc.tags);
     return runner.start('naver', articleId, STEP_LABEL.open, async ({ signal, step }) => {
@@ -431,7 +437,8 @@ export function registerIpc(ctx: AppCtx) {
       if (r.state === 'existing-draft') throw Object.assign(new Error('네이버 편집기에 작성 중인 글이 있어 덮어쓰지 않았어요. 새 글로 시작할지 골라 주세요.'), { code: 'existing-draft' });
       if (r.state === 'not-owner') throw new Error(`글쓰기 화면을 열지 못했어요. 로그인한 네이버 아이디가 blog.naver.com/${r.blogId} 의 주인인지 확인해 주세요.`);
       const c = r.check;
-      const msg = [`제목 ${c.titleOk ? '확인' : '다름 — 직접 확인 필요'}`, `이미지 ${c.images}장`, cardNote, r.map ? placeNote(r.map) : '', c.leftMarks.length ? `카드 ${c.leftMarks.join(', ')}번은 올리지 못해 자리 글자가 남아 있어요 (네이버 창에서 그 자리에 직접 올려 주세요 · 저장 폴더에 카드 파일이 있어요)` : '', '발행 · 저장은 직접 눌러 주세요'].filter(Boolean).join(' · ');
+      const leftCards = c.leftMarks.map((n) => cardNo(slots, n - 1));
+      const msg = [`제목 ${c.titleOk ? '확인' : '다름 — 직접 확인 필요'}`, `이미지 ${c.images}장`, cardNote, r.map ? placeNote(r.map) : '', leftCards.length ? `카드 ${leftCards.join(', ')}번은 올리지 못해 자리 글자가 남아 있어요 (네이버 창에서 그 자리에 직접 올려 주세요 · 저장 폴더에 카드 파일이 있어요)` : '', '발행 · 저장은 직접 눌러 주세요'].filter(Boolean).join(' · ');
       return `입력 끝: ${msg}`;
     }).job;
   });

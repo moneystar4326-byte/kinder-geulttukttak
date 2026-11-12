@@ -4,7 +4,7 @@ import { bodyText, MIN_CHARS, minCharsForInput, TARGET_RANGE, targetRangeForInpu
 import { overusedLine } from '../../../shared/overused';
 import { nearbyLine } from '../../../shared/areas';
 import { spacedKeyword } from '../../../shared/validation';
-import { cardRoles, storyBrief } from '../../../shared/cardRoles';
+import { cardSlots, roleAt, storyBrief } from '../../../shared/cardRoles';
 import { APP, kindLabel, writerLabel, type Writer } from '../../../shared/kinder';
 
 // 글 말투 기준 (2026-11-05 사용자: 문장 품질은 태권 글뚝딱처럼 + 앞서 고른 질문형)
@@ -438,22 +438,24 @@ const MATCH_RULE = `제목과 답 맞추기 (꼭 지킬 것):
 - 질문 title 은 이 글에 적힌 내용으로 바로 답할 수 있는 구체적인 질문만 쓴다. 글에 그 답이 될 놀이 · 장면 · 방법이 없으면 질문 대신 문장 title 로 쓴다.
 - sub 첫 문장은 title 이 묻는 그것으로 답한다: "무엇을" → 한 일 · 놀이 이름, "어떻게" → 방법, "왜" → 이유, "언제 · 어디서" → 날짜 · 장소. "풍경을 만나요" · "경험을 해요" · "시간을 보내요"처럼 무엇인지 알 수 없는 답 금지.
 - 둘째 문장은 첫 문장과 다른 구체 내용이다. title 이나 첫 문장을 다른 말로 되풀이하지 않는다.
-- 세 장의 title · sub 에 같은 문장 · 같은 내용을 두 번 쓰지 않는다. title 을 글 제목 그대로 옮기지 않는다.
+- 여러 장이면 카드끼리 title · sub 에 같은 문장 · 같은 내용을 두 번 쓰지 않는다. title 을 글 제목 그대로 옮기지 않는다.
 - scene 은 그 카드 문구와 같은 장소 · 같은 활동이다 (문구가 공원 소풍이면 그림도 공원, 교실 놀이면 교실).`;
 
 // 카드 점검 (글의 흐름 확인처럼 만든 뒤 한 번 더): 고칠 곳만 고치고 나머지는 글자 그대로
 // 재료가 주제 한 줄뿐이면 질문 제목 금지 (글에 답이 없음)
-const NO_QUESTION = '이 글은 재료가 적어 질문에 답할 구체 내용이 없다. 세 장 모두 title 을 물음표 없는 문장으로 쓴다 (카드1도).';
+const NO_QUESTION = '이 글은 재료가 적어 질문에 답할 구체 내용이 없다. 모든 카드의 title 을 물음표 없는 문장으로 쓴다 (카드1도).';
 
+// 장수 고르기(태권 글뚝딱 2.4.0): cards 길이가 곧 장수 (1 · 2 · 3장)
 export function cardCheckPrompt(doc: ArticleDoc, title: string, cards: { title: string; sub: string; scene: string; afterSectionId: string }[], input?: CardInput, writer?: Writer, noQuestion = false) {
   const brief = storyBrief(input);
-  const r = cardRoles(input?.kind, brief?.purpose);
-  return `아래 [카드] 3장을 [글]과 비교해 점검하고, 틀린 곳만 고쳐 같은 JSON 형식으로 3장 모두 출력하라. 맞는 카드는 글자 그대로 둔다.
-카드 역할: 카드1 = ${r[0].guide}, 카드2 = ${r[1].guide}, 카드3 = ${r[2].guide}.${cardWriter(writer)}${noQuestion ? `\n${NO_QUESTION}` : ''}
+  const n = (Math.min(3, cards.length) || 3) as 1 | 2 | 3; // 비어 있으면 예전처럼 3장 기준
+  const r = cardSlots(n).map((s) => roleAt(input?.kind, brief?.purpose, n, s));
+  return `아래 [카드] ${n}장을 [글]과 비교해 점검하고, 틀린 곳만 고쳐 같은 JSON 형식으로 ${n}장 모두 출력하라 (cards 는 정확히 ${n}개). 맞는 카드는 글자 그대로 둔다.
+카드 역할: ${r.map((x, i) => `카드${i + 1} = ${x.guide}`).join(', ')}.${cardWriter(writer)}${noQuestion ? `\n${NO_QUESTION}` : ''}
 점검할 것:
 1. sub 첫 문장이 title 이 묻는 것(무엇을 · 어떻게 · 왜 · 언제 · 어디서)에 글에 적힌 구체 내용으로 답하는가. 아니면 첫 문장을 고치고, 글에 그 답이 없으면 title 을 답할 수 있는 질문이나 문장으로 바꾼다.
 2. 둘째 문장이 첫 문장 · title 을 되풀이하지 않고 글 속 다른 구체 내용인가.
-3. 세 장끼리 같은 문장 · 같은 내용이 되풀이되지 않는가. title 이 글 제목을 그대로 옮긴 말이 아닌가.
+3. 카드끼리 같은 문장 · 같은 내용이 되풀이되지 않는가. title 이 글 제목을 그대로 옮긴 말이 아닌가.
 4. scene 이 그 카드 문구와 같은 장소 · 같은 활동인가 (영어 한 문장, 글자 · 간판 · 숫자 없는 장면, 위험한 장면 금지).
 5. 글에 없는 사실 · 아이 이름 · 금액 · 입학 약속 · 진단하는 말이 없는가. 어린이집 말(입소 · 보육 · 영아)이 없는가 (있으면 유치원 말로).
 ${CARD_TITLE_RULE}
@@ -472,17 +474,18 @@ ${sectionsFull(doc)}`;
 const cardWriter = (w?: Writer) =>
   w ? `\n카드 문구 시점: ${w.role === '교사' ? `"${w.className?.trim() || '우리 반'} 친구들"처럼 반 시점` : '유치원 전체 시점'}.` : '';
 
-export function cardCopyPrompt(doc: ArticleDoc, title: string, input?: CardInput, writer?: Writer, noQuestion = false) {
+// count = 장수 (1장 = 글 전체를 담은 요약 카드, 2장 = 첫 카드 + 마지막 카드, 3장 = 지금 그대로)
+export function cardCopyPrompt(doc: ArticleDoc, title: string, input?: CardInput, writer?: Writer, noQuestion = false, count: 1 | 2 | 3 = 3) {
   const brief = storyBrief(input);
-  const r = cardRoles(input?.kind, brief?.purpose);
-  return `아래 블로그 글로 카드뉴스 3장 문구를 만들어라. 글에 있는 사실과 메시지만 쓴다.
-카드1 = ${r[0].guide}, 카드2 = ${r[1].guide}, 카드3 = ${r[2].guide}.
-세 장이 이 글 주제 하나로 이어지게 쓴다. 글 주제와 상관없는 유치원 정보(다른 서비스 · 활동)는 카드에 쓰지 않는다. 날짜 · 행사 이름은 글에 적힌 그대로.${cardWriter(writer)}
+  const r = cardSlots(count).map((s) => roleAt(input?.kind, brief?.purpose, count, s));
+  return `아래 블로그 글로 카드뉴스 ${count}장 문구를 만들어라 (cards 는 정확히 ${count}개). 글에 있는 사실과 메시지만 쓴다.
+${r.map((x, i) => `카드${i + 1} = ${x.guide}`).join(', ')}.
+${count === 1 ? '이 한 장만 봐도 글 내용을 알 수 있게 쓴다.' : `${count === 2 ? '두' : '세'} 장이 이 글 주제 하나로 이어지게 쓴다.`} 글 주제와 상관없는 유치원 정보(다른 서비스 · 활동)는 카드에 쓰지 않는다. 날짜 · 행사 이름은 글에 적힌 그대로.${cardWriter(writer)}
 ${CARD_TITLE_RULE}
 ${CARD_SUB_RULE}\n${MATCH_RULE}${noQuestion ? `\n${NO_QUESTION}` : ''}${brief ? `
 ${cardBriefRule(brief)}` : ''}
 ${SCENE_RULES}
-afterSectionId 는 그 카드를 넣기 좋은 섹션 id (카드1은 도입 뒤, 카드2 · 카드3은 내용이 가장 가까운 섹션 뒤).
+afterSectionId 는 그 카드를 넣기 좋은 섹션 id (카드1은 도입 뒤${count > 1 ? ', 나머지 카드는 내용이 가장 가까운 섹션 뒤' : ''}).
 
 [제목] ${title}${input?.topic ? `
 [주제] ${input.topic}` : ''}
@@ -491,10 +494,11 @@ ${sectionsFull(doc)}`;
 }
 
 // 카드 한 장 문구만 새로 (그림 · 장면은 그대로라 장면과 어울리게)
-export function cardOnePrompt(doc: ArticleDoc, title: string, index: number, current: { title: string; sub: string; scene: string }, others: string[], input?: CardInput, writer?: Writer, noQuestion = false) {
+// size = 이 카드가 든 묶음의 장수 (1장 묶음이면 요약 카드), index = 카드 자리 (0 · 1 · 2), no = 보여 주는 번호
+export function cardOnePrompt(doc: ArticleDoc, title: string, index: number, current: { title: string; sub: string; scene: string }, others: string[], input?: CardInput, writer?: Writer, noQuestion = false, size = 3, no = index + 1) {
   const brief = storyBrief(input);
-  return `아래 블로그 글로 카드뉴스 ${index + 1}번 카드(${cardRoles(input?.kind, brief?.purpose)[index]?.guide ?? '이 글의 메시지'})의 문구를 새로 만들어라. 글에 있는 사실과 메시지만 쓴다. 글 주제와 상관없는 ${APP.place} 정보는 쓰지 않는다.${cardWriter(writer)}
-지금 문구와 다른 표현으로 쓰고, 다른 카드 제목과 겹치지 않게. 이 카드는 카드${index + 1}이다. 아이 이름 · 금액 · 입학 약속 · 진단하는 말 금지.
+  return `아래 블로그 글로 카드뉴스 ${no}번 카드(${roleAt(input?.kind, brief?.purpose, size, index).guide})의 문구를 새로 만들어라. 글에 있는 사실과 메시지만 쓴다. 글 주제와 상관없는 ${APP.place} 정보는 쓰지 않는다.${cardWriter(writer)}
+지금 문구와 다른 표현으로 쓰고, 다른 카드 제목과 겹치지 않게. 이 카드는 카드${no}이다. 아이 이름 · 금액 · 입학 약속 · 진단하는 말 금지.
 ${CARD_TITLE_RULE}
 ${CARD_SUB_RULE}\n${MATCH_RULE}${noQuestion ? `\n${NO_QUESTION}` : ''}${brief ? `
 ${cardBriefRule(brief)}` : ''}

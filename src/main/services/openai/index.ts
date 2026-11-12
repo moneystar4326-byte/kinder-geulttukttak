@@ -6,13 +6,14 @@ import OpenAI, { toFile } from 'openai';
 import { z } from 'zod';
 import { ApiError, toApiError } from '../errors';
 import { ARTICLE_META_JSON, ArticleMetaSchema,
-  BRIEF_JSON, BriefSchema, VERIFY_JSON, VerifySchema, CARD_COPY_JSON, CardCopySchema, CARD_ONE_JSON, CardOneSchema, MEMO_SPLIT_JSON, MemoSplitSchema, GENERATED_ARTICLE_JSON, GeneratedArticleSchema, KEYWORD_IDEAS_JSON, KeywordIdeasSchema, KEYWORD_PLAN_JSON, KeywordPlanSchema,
+  BRIEF_JSON, BriefSchema, VERIFY_JSON, VerifySchema, CARD_COPY_JSON, cardCopySchema, CARD_ONE_JSON, CardOneSchema, MEMO_SPLIT_JSON, MemoSplitSchema, GENERATED_ARTICLE_JSON, GeneratedArticleSchema, KEYWORD_IDEAS_JSON, KeywordIdeasSchema, KEYWORD_PLAN_JSON, KeywordPlanSchema,
   PARAGRAPH_JSON, ParagraphSchema, PROOFREAD_JSON, ProofreadSchema, REVIEW_JSON, ReviewSchema, TITLES_JSON, TitlesSchema,
 } from '../../../shared/schemas';
 import { parsePlainDoc } from '../../../shared/plainDoc';
 import type { ArticleBrief, ArticleDoc, ArticleInput, DojoProfile, ReviewFlag, RevisionKind } from '../../../shared/types';
 import { APP, type Writer } from '../../../shared/kinder';
 import * as P from './prompts';
+import { cardSlots } from '../../../shared/cardRoles';
 
 export interface Usage { model: string; kind: string; reported: unknown }
 export interface CallOpts { signal?: AbortSignal; onUsage?: (u: Usage) => void }
@@ -29,8 +30,9 @@ export interface TextAI {
   revise(kind: Exclude<RevisionKind, 'titles' | 'paragraph'>, doc: ArticleDoc, o?: CallOpts, min?: number): Promise<ArticleDoc>;
   titles(doc: ArticleDoc, input: ArticleInput, o?: CallOpts): Promise<string[]>;
   paragraph(doc: ArticleDoc, sectionId: string, index: number, instruction: string, o?: CallOpts): Promise<string>;
-  cardOne(doc: ArticleDoc, title: string, index: number, current: { title: string; sub: string; scene: string }, others: string[], input?: P.CardInput, o?: CallOpts, writer?: Writer, noQuestion?: boolean): Promise<{ title: string; sub: string }>;
-  cardCopies(doc: ArticleDoc, title: string, input?: P.CardInput, o?: CallOpts, writer?: Writer, noQuestion?: boolean): Promise<{ title: string; sub: string; scene: string; afterSectionId: string }[]>;
+  // size = 이 카드가 든 묶음의 장수, no = 보여 주는 번호 / count = 만들 장수 (태권 글뚝딱 2.4.0 장수 고르기)
+  cardOne(doc: ArticleDoc, title: string, index: number, current: { title: string; sub: string; scene: string }, others: string[], input?: P.CardInput, o?: CallOpts, writer?: Writer, noQuestion?: boolean, size?: number, no?: number): Promise<{ title: string; sub: string }>;
+  cardCopies(doc: ArticleDoc, title: string, input?: P.CardInput, o?: CallOpts, writer?: Writer, noQuestion?: boolean, count?: 1 | 2 | 3): Promise<{ title: string; sub: string; scene: string; afterSectionId: string; index: number }[]>;
   keywordIdeas(region: string, topic: string, kind: string, o?: CallOpts): Promise<string[]>;
   keywordPlan(q: { region: string; kind: string; topic: string; story: string; candidates: { keyword: string; volume: number | null }[] }, o?: CallOpts): Promise<KeywordPlanResult>;
   splitMemo(memo: string, kind: string, topic: string, o?: CallOpts): Promise<Record<string, string>>;
@@ -111,7 +113,7 @@ export function createOpenAI(opts: { apiKey: string; textModel: string; imageMod
   type CardCopyRow = { title: string; sub: string; scene: string; afterSectionId: string };
   async function checkCards(doc: ArticleDoc, title: string, cards: CardCopyRow[], input?: P.CardInput, o?: CallOpts, writer?: Writer, noQuestion = false): Promise<CardCopyRow[]> {
     try {
-      const r = (await json('cards', 'text', P.SYSTEM_RULES, P.cardCheckPrompt(doc, title, cards, input, writer, noQuestion), CARD_COPY_JSON, CardCopySchema, o)).cards;
+      const r = (await json('cards', 'text', P.SYSTEM_RULES, P.cardCheckPrompt(doc, title, cards, input, writer, noQuestion), CARD_COPY_JSON, cardCopySchema(cards.length as 1 | 2 | 3), o)).cards;
       if (r.length !== cards.length) return cards;
       // 카드를 넣을 자리는 처음 것 그대로, 답 없이 끝나는 글이 새로 생기면 그 카드는 처음 것
       return r.map((c, i) => (P.VAGUE_SUB.test(c.sub) && !P.VAGUE_SUB.test(cards[i].sub) ? cards[i] : { ...c, afterSectionId: cards[i].afterSectionId }));
@@ -157,21 +159,22 @@ export function createOpenAI(opts: { apiKey: string; textModel: string; imageMod
       return (await json('paragraph', 'text', P.SYSTEM_RULES, P.paragraphPrompt(doc, sectionId, index, instruction), PARAGRAPH_JSON, ParagraphSchema, o)).paragraph.trim();
     },
     // 카드 글이 답 없이 끝나면(P.VAGUE_SUB) 한 번만 더 만들어 덜 막연한 쪽을 씀 (비용: 그때만 2번)
-    async cardOne(doc, title, index, current, others, input, o, writer, noQuestion) {
-      const make = () => json('card_one', 'text', P.SYSTEM_RULES, P.cardOnePrompt(doc, title, index, current, others, input, writer, noQuestion), CARD_ONE_JSON, CardOneSchema, o);
+    async cardOne(doc, title, index, current, others, input, o, writer, noQuestion, size = 3, no = index + 1) {
+      const make = () => json('card_one', 'text', P.SYSTEM_RULES, P.cardOnePrompt(doc, title, index, current, others, input, writer, noQuestion, size, no), CARD_ONE_JSON, CardOneSchema, o);
       let r = await make();
       if (P.VAGUE_SUB.test(r.sub)) { const again = await make(); if (!P.VAGUE_SUB.test(again.sub)) r = again; }
       return { title: r.title.trim(), sub: r.sub.trim() };
     },
-    async cardCopies(doc, title, input, o, writer, noQuestion) {
-      const make = async () => (await json('cards', 'text', P.SYSTEM_RULES, P.cardCopyPrompt(doc, title, input, writer, noQuestion), CARD_COPY_JSON, CardCopySchema, o)).cards;
+    async cardCopies(doc, title, input, o, writer, noQuestion, count = 3) {
+      const make = async () => (await json('cards', 'text', P.SYSTEM_RULES, P.cardCopyPrompt(doc, title, input, writer, noQuestion, count), CARD_COPY_JSON, cardCopySchema(count), o)).cards;
       const vague = (cards: { sub: string }[]) => cards.filter((c) => P.VAGUE_SUB.test(c.sub)).length;
       let cards = await make();
       if (vague(cards)) { const again = await make(); if (vague(again) < vague(cards)) cards = again; }
       cards = await checkCards(doc, title, cards, input, o, writer, noQuestion);
       // 재료가 적은 글인데 아직 질문 제목이 남았으면 한 번만 더 (글에 그 답이 없음)
       if (noQuestion && cards.some((c) => /[?？]/.test(c.title))) cards = await checkCards(doc, title, cards, input, o, writer, true);
-      return cards;
+      const slots = cardSlots(count); // 카드 자리 (1장 [0] · 2장 [0, 2] · 3장 [0, 1, 2])
+      return cards.map((c, i) => ({ ...c, index: slots[i] }));
     },
     async splitMemo(memo, kind, topic, o) {
       const r = await json('memo', 'text', P.MEMO_RULES, P.memoPrompt(memo, kind, topic), MEMO_SPLIT_JSON, MemoSplitSchema, o);

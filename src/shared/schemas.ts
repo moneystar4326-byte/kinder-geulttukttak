@@ -55,9 +55,11 @@ export const REVIEW_JSON = {
   },
 } as const;
 
-export const CardCopySchema = z.object({
-  cards: z.array(z.object({ title: z.string().min(1), sub: z.string().min(1), scene: z.string().min(1), afterSectionId: z.string() })).length(3),
+// 카드 장수(1 · 2 · 3)만큼 (태권 글뚝딱 2.4.0 장수 고르기)
+export const cardCopySchema = (n: 1 | 2 | 3 = 3) => z.object({
+  cards: z.array(z.object({ title: z.string().min(1), sub: z.string().min(1), scene: z.string().min(1), afterSectionId: z.string() })).length(n),
 });
+export const CardCopySchema = cardCopySchema(3);
 export const CARD_COPY_JSON = {
   type: 'object', additionalProperties: false, required: ['cards'],
   properties: {
@@ -200,6 +202,7 @@ export const ArticleInputSchema = z.object({
   ending: s(60),
   includeProfile: z.object({ philosophy: z.boolean(), classFeatures: z.boolean(), credentials: z.boolean(), contact: z.boolean(), address: z.boolean() }),
   withCards: z.boolean(),
+  cardCount: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]).optional(),
   keywordPlan: z.array(z.object({ role: z.enum(['주요', '보조']), keyword: s(60), sentence: s(300), why: s(100).optional() })).max(3).optional(),
   greetings: z.boolean().optional(),
   titlePrefix: s(60).optional(),

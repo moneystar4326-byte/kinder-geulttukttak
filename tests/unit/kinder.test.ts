@@ -160,7 +160,7 @@ test('재료가 주제 한 줄뿐이면 카드 제목을 질문으로 쓰지 않
   const thin = input({ topic: memo, facts: { ...QI.emptyInput().facts, activities: memo } });
   assert.equal(V.thinFacts(thin), true);
   assert.equal(V.thinFacts(input({ topic: '소풍', facts: { ...QI.emptyInput().facts, activities: '보라매공원에서 낙엽을 모아 왕관을 만들고, 돗자리에 앉아 도시락을 먹었어요' } })), false);
-  assert.match(P.cardCopyPrompt(doc('x'), 't', { kind: '수업 후기' }, undefined, true), /세 장 모두 title 을 물음표 없는 문장으로/);
+  assert.match(P.cardCopyPrompt(doc('x'), 't', { kind: '수업 후기' }, undefined, true), /모든 카드의 title 을 물음표 없는 문장으로/);
   assert.doesNotMatch(P.cardCopyPrompt(doc('x'), 't', { kind: '수업 후기' }), /물음표 없는 문장으로 쓴다 \(카드1도\)/);
   assert.match(P.cardCheckPrompt(doc('x'), 't', [], { kind: '수업 후기' }, undefined, true), /카드1도/);
   assert.match(P.cardOnePrompt(doc('x'), 't', 0, { title: 'a', sub: 'b', scene: 'c' }, [], { kind: '수업 후기' }, undefined, true), /카드1도/);

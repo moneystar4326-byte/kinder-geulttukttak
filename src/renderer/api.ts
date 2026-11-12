@@ -18,7 +18,7 @@ export const onJarvis = (fn: () => void) => window.gtd.onJarvis(fn);
 
 export interface AppInfo {
   version: string; dataDir: string; hasProfile: boolean; browser: string | null;
-  settings: { setupDone: boolean; textModel: string; imageModel: string; saveDir: string; typingSpeed: number; imageAutoRetry: number; monthlyImageLimit: number; browserPath: string; keywordCacheHours: number };
+  settings: { setupDone: boolean; textModel: string; imageModel: string; saveDir: string; typingSpeed: number; imageAutoRetry: number; monthlyImageLimit: number; browserPath: string; keywordCacheHours: number; cardCount: 'auto' | 1 | 2 | 3 };
   secrets: Record<'openai' | 'naverApiKey' | 'naverSecret' | 'naverCustomer' | 'kakao', string | null>;
 }
 export interface ArticleBundle {
