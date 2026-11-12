@@ -8,7 +8,7 @@ const CHANNELS = [
   'keywords:naver', 'keywords:ai', 'keywords:plan', 'article:brief', 'facts:fromMemo',
   'article:list', 'article:create', 'article:updateInput', 'article:get', 'article:delete', 'article:generate', 'article:revise',
   'article:saveEdit', 'article:setCurrent', 'article:getVersion', 'article:markReady', 'article:copy', 'article:applyPrefix',
-  'cards:plan', 'cards:renderFailed', 'cards:renderOne', 'cards:updateCopy', 'cards:suggestCopy', 'cards:restyle', 'cards:saveAs',
+  'cards:plan', 'cards:renderFailed', 'cards:renderOne', 'cards:updateCopy', 'cards:suggestCopy', 'cards:restyle', 'cards:saveAs', 'cards:pickPhoto', 'cards:clearPhoto', 'cards:setPhotoFit', 'cards:photoBytes', 'cards:maskPhoto',
   'export:run', 'backup:create', 'backup:restore',
   'naver:status', 'naver:openLogin', 'naver:close', 'naver:clearSession', 'naver:fill',
   'paste:plan', 'paste:copy', 'paste:show', 'paste:openWrite', 'paste:finish',

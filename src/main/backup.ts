@@ -78,7 +78,7 @@ export function relocatePaths(dbFile: string, fromDir: string, toDir: string) {
   const db = openDb(dbFile);
   try {
     const from = path.join(fromDir, 'assets'), to = path.join(toDir, 'assets');
-    db.raw.prepare('UPDATE cards SET background_path = replace(background_path, ?, ?), output_path = replace(output_path, ?, ?)').run(from, to, from, to);
+    db.raw.prepare('UPDATE cards SET background_path = replace(background_path, ?, ?), photo_path = replace(photo_path, ?, ?), output_path = replace(output_path, ?, ?)').run(from, to, from, to, from, to);
     db.raw.prepare('UPDATE dojo_profiles SET facts_json = replace(facts_json, ?, ?)').run(JSON.stringify(from).slice(1, -1), JSON.stringify(to).slice(1, -1));
   } finally { db.close(); }
 }
@@ -106,7 +106,7 @@ export function restoreBackup(file: string, dataDir: string) {
   try {
     const from = path.join(m.dataDir, 'assets'), to = path.join(dataDir, 'assets');
     if (from !== to) {
-      db.raw.prepare('UPDATE cards SET background_path = replace(background_path, ?, ?), output_path = replace(output_path, ?, ?)').run(from, to, from, to);
+      db.raw.prepare('UPDATE cards SET background_path = replace(background_path, ?, ?), photo_path = replace(photo_path, ?, ?), output_path = replace(output_path, ?, ?)').run(from, to, from, to, from, to);
       db.raw.prepare("UPDATE dojo_profiles SET facts_json = replace(facts_json, ?, ?)").run(JSON.stringify(from).slice(1, -1), JSON.stringify(to).slice(1, -1));
     }
   } finally { db.close(); }

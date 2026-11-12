@@ -536,7 +536,7 @@ export function cardOnePrompt(doc: ArticleDoc, title: string, index: number, cur
 ${CARD_TITLE_RULE}
 ${CARD_SUB_RULE}\n${MATCH_RULE}${noQuestion ? `\n${NO_QUESTION}` : ''}${brief ? `
 ${cardBriefRule(brief)}` : ''}
-그림은 바꾸지 않으므로 그림 장면과 어긋나지 않게 쓴다. 그림 장면: ${current.scene}
+${current.scene ? `그림은 바꾸지 않으므로 그림 장면과 어긋나지 않게 쓴다. 그림 장면: ${current.scene}` : `카드 그림은 ${APP.place}에서 찍은 실제 사진이고 내용을 알 수 없다. 사진 속 장면 · 아이 모습을 말하지 말고 글 내용으로만 쓴다.`}
 
 [지금 문구] ${current.title} / ${current.sub}
 [다른 카드 제목] ${others.join(' / ') || '없음'}

@@ -11,6 +11,7 @@ import { kinderBackgroundPrompt, kinderRefLead } from '../openai/image-prompt';
 import { APP } from '../../../shared/kinder';
 import { cardHtml, copyHints, sizeOf, type Measure } from './template';
 import { cardNo } from '../../../shared/cardRoles';
+import type { PhotoFit } from '../../../shared/cardPhotoFit';
 
 export interface Shooter { shoot(html: string, w: number, h: number, outFile: string): Promise<Measure> }
 
@@ -33,6 +34,35 @@ export function cardDir(assetsDir: string, cs: Pick<CardSet, 'id'>, idx: number)
   fs.mkdirSync(d, { recursive: true });
   return d;
 }
+
+// 글을 지울 때 그 글의 카드 파일 · 넣은 사진까지 지움 (태권 글뚝딱 2.6.x에서 옮김) (아이 사진이 PC에 남지 않게)
+// 파일이 잠겨 있으면 목록에 적어 두고 다음에 앱을 켤 때 다시 지움. 못 지운 묶음 수를 돌려줌
+const pendingFile = (assetsDir: string) => path.join(assetsDir, 'cards', '.delete-pending.json');
+const SET_ID = /^[0-9a-f-]{36}$/i;
+const readPending = (assetsDir: string): string[] => {
+  try { const v = JSON.parse(fs.readFileSync(pendingFile(assetsDir), 'utf-8')); return Array.isArray(v) ? v.filter((x) => typeof x === 'string' && SET_ID.test(x)) : []; } catch { return []; }
+};
+function removeSets(assetsDir: string, ids: string[]) {
+  return ids.filter((id) => {
+    try { fs.rmSync(path.join(assetsDir, 'cards', id), { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }); return false; } catch { return true; }
+  });
+}
+function writePending(assetsDir: string, ids: string[]) {
+  try {
+    if (ids.length) { fs.mkdirSync(path.dirname(pendingFile(assetsDir)), { recursive: true }); fs.writeFileSync(pendingFile(assetsDir), JSON.stringify(ids)); } else fs.rmSync(pendingFile(assetsDir), { force: true });
+  } catch { /* 목록을 못 적어도 글 지우기는 계속 */ }
+}
+export function removeCardFiles(assetsDir: string, cardSetIds: string[]) {
+  const left = removeSets(assetsDir, cardSetIds);
+  if (left.length) writePending(assetsDir, [...new Set([...readPending(assetsDir), ...left])]);
+  return left.length;
+}
+export function retryPendingCardFiles(assetsDir: string) {
+  const ids = readPending(assetsDir);
+  if (ids.length) writePending(assetsDir, removeSets(assetsDir, ids));
+}
+
+const usable = (f?: string): f is string => !!f && fs.existsSync(f);
 
 export function createCardService(deps: CardDeps) {
   const { db } = deps;
@@ -77,12 +107,13 @@ export function createCardService(deps: CardDeps) {
       copy: card.copy, index: card.index, no: cardNo(cs.cards.map((x) => x.index), card.index), total: cs.cards.length, style: cs.style.style, size: cs.style.size,
       brand: prof?.brand ?? APP.brand, dojoName: prof?.name ?? '',
       logoFile: prof?.logoPath && fs.existsSync(prof.logoPath) ? prof.logoPath : undefined, logoScale: prof?.logoScale,
-      backgroundFile: card.backgroundPath && fs.existsSync(card.backgroundPath) ? card.backgroundPath : undefined,
+      backgroundFile: usable(card.photoPath) ? card.photoPath : usable(card.backgroundPath) ? card.backgroundPath : undefined,
+      photoFit: usable(card.photoPath) ? card.photoFit : undefined,
       fontDir: deps.fontDir,
     });
     const m = await deps.shooter.shoot(html, w, h, out);
     // 재편집용 층 정보 (배경 · 문구 · 로고 따로)
-    fs.writeFileSync(path.join(dir, 'layers.json'), JSON.stringify({ copy: card.copy, style: cs.style, background: card.backgroundPath ?? 'template', logo: prof?.logoPath ?? null, measure: m }, null, 2), 'utf-8');
+    fs.writeFileSync(path.join(dir, 'layers.json'), JSON.stringify({ copy: card.copy, style: cs.style, background: card.photoPath ?? card.backgroundPath ?? 'template', logo: prof?.logoPath ?? null, measure: m }, null, 2), 'utf-8');
     if (m.broken.length) throw new ApiError('unknown', '카드 그림 파일을 읽지 못했어요. 이 카드만 다시 만들어 주세요.', '카드');
     if (!m.fontsOk) throw new ApiError('unknown', '카드 폰트를 불러오지 못했어요. 프로그램을 다시 설치해 주세요.', '카드');
     return { out, overflow: m.overflow };
@@ -95,7 +126,15 @@ export function createCardService(deps: CardDeps) {
     db.updateCard(card.id, { status: 'running' });
     db.refreshCardSetStatus(cs.id);
     try {
-      if (cs.style.mode === 'ai' && (opts.newBackground || !card.backgroundPath || !fs.existsSync(card.backgroundPath))) {
+      // 넣어 둔 사진 파일이 사라졌으면 알리고 그림을 그리지 않음 (확인 없이 비용이 나가지 않게)
+      if (card.photoPath && !usable(card.photoPath)) {
+        card = db.updateCard(card.id, { photoPath: undefined, photoFit: undefined });
+        throw new ApiError('unknown', '넣어 둔 사진 파일을 찾지 못했어요. 사진을 다시 넣어 주세요.', '카드');
+      }
+      // 스타일이 바뀌어 새 그림이 필요한 묶음: 사진 카드의 옛 그림은 다른 카드와 안 맞으므로 돌아갈 그림에서 뺌
+      if (usable(card.photoPath) && opts.newBackground && card.backgroundPath) card = db.updateCard(card.id, { backgroundPath: undefined });
+      // 사진을 넣은 카드는 그림을 그리지 않음 (비용 없음 · 사진을 덮지 않음)
+      if (cs.style.mode === 'ai' && !usable(card.photoPath) && (opts.newBackground || !usable(card.backgroundPath))) {
         const bg = await makeBackground(cs, card, opts.signal);
         card = db.updateCard(card.id, { backgroundPath: bg });
       }
@@ -108,6 +147,84 @@ export function createCardService(deps: CardDeps) {
     }
     db.refreshCardSetStatus(cs.id);
     return card;
+  }
+
+  // 그림 칸을 사진으로 바꾸거나(src) 사진을 뺌(null). 사진은 이 PC에서 합치기만 하고 AI로 보내지 않음
+  // 원본을 지워도 되게 복사해 둠. 합치기에 실패하면 전 카드로 되돌림
+  async function setPhoto(cardId: string, src: string | null) {
+    const before = db.getCard(cardId)!;
+    const cs = db.getCardSet(before.cardSetId)!;
+    const dest = src ? path.join(cardDir(deps.assetsDir, cs, before.index), `photo-${Date.now()}${path.extname(src).toLowerCase()}`) : undefined;
+    if (src && dest) fs.copyFileSync(src, dest);
+    try {
+      const r = await compose(cs, db.updateCard(cardId, { photoPath: dest, photoFit: undefined }));
+      if (before.photoPath) fs.rmSync(before.photoPath, { force: true });
+      return db.updateCard(cardId, { outputPath: r.out, overflow: r.overflow, status: 'done' });
+    } catch (e) {
+      if (dest) fs.rmSync(dest, { force: true });
+      await compose(cs, db.updateCard(cardId, { photoPath: before.photoPath, photoFit: before.photoFit })).catch(() => {});
+      throw toApiError('카드', e);
+    } finally { db.refreshCardSetStatus(cs.id); }
+  }
+
+  // 얼굴을 가린 사진으로 바꿈. 가리기 전 복사본은 지움 (되돌리려면 사진을 다시 넣음). 그사이 사진이 바뀌었으면 하지 않음
+  // 유치원판: 가린 곳이 없어도("얼굴 없는 사진이 맞아요") 확인한 것으로 남김 (masked). 확인 전 사진 카드는 네이버 넣기를 막음
+  async function setMaskedPhoto(cardId: string, photoPath: string, jpeg: Uint8Array, size?: { w: number; h: number }) {
+    const before = db.getCard(cardId)!;
+    if (before.photoPath !== photoPath) return before;
+    const cs = db.getCardSet(before.cardSetId)!;
+    const dest = path.join(cardDir(deps.assetsDir, cs, before.index), `photo-${Date.now()}.jpg`);
+    fs.writeFileSync(dest, jpeg);
+    try {
+      const r = await compose(cs, db.updateCard(cardId, { photoPath: dest, photoFit: before.photoFit ? { ...before.photoFit, masked: true } : size ? { ...size, faces: [], masked: true } : undefined }));
+      fs.rmSync(photoPath, { force: true });
+      return db.updateCard(cardId, { outputPath: r.out, overflow: r.overflow, status: 'done' });
+    } catch (e) {
+      fs.rmSync(dest, { force: true });
+      await compose(cs, db.updateCard(cardId, { photoPath: before.photoPath, photoFit: before.photoFit })).catch(() => {});
+      throw toApiError('카드', e);
+    } finally { db.refreshCardSetStatus(cs.id); }
+  }
+
+  // 사진 크기 · 얼굴 위치가 나오면 칸에 맞춰 다시 합침. 그사이 사진이 바뀌었으면 하지 않음
+  async function setPhotoFit(cardId: string, photoPath: string, fit: PhotoFit) {
+    const before = db.getCard(cardId)!;
+    if (before.photoPath !== photoPath) return before;
+    const cs = db.getCardSet(before.cardSetId)!;
+    try {
+      const r = await compose(cs, db.updateCard(cardId, { photoFit: fit }));
+      return db.updateCard(cardId, { outputPath: r.out, overflow: r.overflow, status: 'done' });
+    } catch (e) {
+      await compose(cs, db.updateCard(cardId, { photoFit: before.photoFit })).catch(() => {});
+      throw toApiError('카드', e);
+    } finally { db.refreshCardSetStatus(cs.id); }
+  }
+
+  // 문구부터 새로 만들 때 같은 자리 카드의 사진을 새 묶음으로 옮김 (그 카드는 그림을 그리지 않음)
+  // 옛 묶음은 화면에서 볼 수 없으므로 사진 · 사진이 찍힌 카드 그림을 남기지 않음 (장수가 줄어 빠진 사진 포함)
+  function carryPhotos(from: CardSet | null, toSetId: string) {
+    if (!from) return;
+    const to = db.getCardSet(toSetId)!;
+    for (const prev of from.cards) {
+      if (!prev.photoPath) continue;
+      const c = to.cards.find((x) => x.index === prev.index);
+      let moved = false;
+      if (c && usable(prev.photoPath)) {
+        const dest = path.join(cardDir(deps.assetsDir, to, c.index), path.basename(prev.photoPath));
+        try {
+          fs.renameSync(prev.photoPath, dest);
+          db.updateCard(c.id, { photoPath: dest, photoFit: prev.photoFit });
+          moved = true;
+        } catch {
+          // 옮기지 못하면 옛 자리의 사진을 그대로 씀 (글을 지울 때 함께 지워짐)
+          db.updateCard(c.id, { photoPath: prev.photoPath, photoFit: prev.photoFit });
+          continue;
+        }
+      } else if (c) db.updateCard(c.id, { photoPath: prev.photoPath }); // 파일이 사라짐: 그림을 그리지 않고 만들 때 알림
+      if (!moved) { try { fs.rmSync(prev.photoPath, { force: true }); } catch { /* 글을 지울 때 함께 지워짐 */ } }
+      if (prev.outputPath) { try { fs.rmSync(prev.outputPath, { force: true }); } catch { /* 글을 지울 때 함께 지워짐 */ } }
+      db.updateCard(prev.id, { photoPath: undefined, photoFit: undefined, outputPath: undefined });
+    }
   }
 
   // 묶음 장수(1~3장)만큼 차례로. 성공한 장은 건너뜀 (실패한 장만 다시)
@@ -135,5 +252,5 @@ export function createCardService(deps: CardDeps) {
     } finally { db.refreshCardSetStatus(cs.id); }
   }
 
-  return { renderOne, renderSet, updateCopy, compose, hints: copyHints };
+  return { renderOne, renderSet, updateCopy, setPhoto, setMaskedPhoto, setPhotoFit, carryPhotos, compose, hints: copyHints };
 }

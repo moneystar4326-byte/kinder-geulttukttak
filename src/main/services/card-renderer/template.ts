@@ -3,6 +3,8 @@
 import { pathToFileURL } from 'node:url';
 import type { CardCopy, CardSize, CardStyle } from '../../../shared/types';
 import { APP } from '../../../shared/kinder';
+import { fitPhoto, type PhotoFit } from '../../../shared/cardPhotoFit';
+import { SPLIT_IMAGE_RATIO } from '../../../shared/cardRoles';
 
 export interface CardLayerInput {
   copy: CardCopy;
@@ -15,6 +17,7 @@ export interface CardLayerInput {
   logoFile?: string;
   logoScale?: number; // % (60~200, 기본 120)
   backgroundFile?: string; // 없으면 템플릿 배경 (CSS)
+  photoFit?: PhotoFit; // 사진 카드: 칸에 자동으로 맞춤 (태권 글뚝딱 2.6.x에서 옮김)
   fontDir: string;
 }
 
@@ -51,11 +54,12 @@ function templateBg(style: CardStyle, main: string, accent: string, index: numbe
 }
 
 // AI 그림 카드: 위 = 그림만, 아래 = 글만 (겹치지 않게). 2026-10-18 실사용: 글 상자가 아이 얼굴을 가림
-export const SPLIT_IMAGE_RATIO = { '1080x1350': 0.6, '1080x1080': 0.56 } as const; // 정사각형은 가로 그림이 덜 잘리게 조금 더 크게
 function splitHtml(c: CardLayerInput) {
   const { w, h } = sizeOf(c.size);
   const main = color(c.brand.main, APP.brand.main), accent = color(c.brand.accent, APP.brand.accent);
   const imgH = Math.round(h * SPLIT_IMAGE_RATIO[c.size]);
+  const fit = c.photoFit ? fitPhoto(c.photoFit, w, imgH, c.size === '1080x1080' ? 30 : 40) : null;
+  const whole = fit?.whole === true;
   const logoH = logoHeight(c.logoScale);
   const foot = c.logoFile ? logoH + 40 : 104; // 로고가 커지면 글 상자가 그만큼 비켜 줌
   const boxTop = imgH + 40;
@@ -72,7 +76,9 @@ function splitHtml(c: CardLayerInput) {
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:${w}px;height:${h}px;overflow:hidden;background:${paper}}
 #c{position:relative;width:${w}px;height:${h}px;overflow:hidden;font-family:NotoKR,sans-serif;color:#1A1A1A;background:${paper}}
-#img{position:absolute;left:0;top:0;width:${w}px;height:${imgH}px;object-fit:cover;object-position:center ${sq ? '30%' : '40%'}}
+#slot{position:absolute;left:0;top:0;width:${w}px;height:${imgH}px;overflow:hidden}
+#imgbg{position:absolute;left:-60px;top:-60px;width:${w + 120}px;height:${imgH + 120}px;object-fit:cover;filter:blur(30px) brightness(.82)}
+#img{position:absolute;left:0;top:0;width:${w}px;height:${imgH}px;object-fit:${whole ? 'contain' : 'cover'};object-position:${fit && !fit.whole ? `${fit.x}% ${fit.y}%` : whole ? 'center' : `center ${sq ? '30%' : '40%'}`}}
 #band{position:absolute;left:0;right:0;top:${imgH}px;height:10px;background:linear-gradient(90deg,${main} 0 50%,${accent} 50% 100%)}
 #num{position:absolute;left:${SAFE}px;top:${imgH - 30}px;font:700 28px NotoKR;color:#fff;background:${accent};border-radius:999px;padding:8px 22px;box-shadow:0 4px 14px rgba(0,0,0,.2)}
 #box{position:absolute;left:${SAFE}px;right:${SAFE}px;top:${boxTop}px;max-height:${boxH}px;overflow:hidden}
@@ -83,7 +89,7 @@ html,body{width:${w}px;height:${h}px;overflow:hidden;background:${paper}}
 #name{font:700 30px NotoKR;color:${main}}
 #logo{height:${logoH}px;max-width:${Math.round(w / 2)}px;object-fit:contain;object-position:left center}
 </style></head><body><div id="c">
-<img id="img" src="${furl(c.backgroundFile!)}">
+<div id="slot">${whole ? `<img id="imgbg" src="${furl(c.backgroundFile!)}">` : ''}<img id="img" src="${furl(c.backgroundFile!)}"></div>
 <div id="band"></div><div id="num">${c.no ?? c.index + 1} / ${c.total ?? 3}</div>
 <div id="box"><div id="title">${esc(c.copy.title)}</div><div id="rule"></div><div id="sub">${esc(c.copy.sub)}</div></div>
 <div id="foot">${c.logoFile ? `<img id="logo" src="${furl(c.logoFile)}">` : `<div id="name">${esc(c.dojoName)}</div>`}</div>

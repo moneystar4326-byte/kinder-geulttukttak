@@ -100,3 +100,6 @@ export function roleAt(kind: string | undefined, purpose: BriefPurpose | undefin
 }
 // 보여 주는 카드 번호 (2장 묶음의 자리 0 · 2 → 카드 1 · 2). "카드 3번이 빠졌어요"처럼 헷갈리지 않게
 export const cardNo = (indices: number[], index: number) => [...indices].sort((a, b) => a - b).indexOf(index) + 1;
+
+// 그림 카드에서 그림 칸이 차지하는 높이 (화면의 카드 사진 맞춤도 같이 씀). 정사각형은 가로 그림이 덜 잘리게 조금 더 크게
+export const SPLIT_IMAGE_RATIO = { '1080x1350': 0.6, '1080x1080': 0.56 } as const;

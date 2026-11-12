@@ -25,7 +25,8 @@ import { createOpenAI, listenHint, type ImageAI, type Listen, type TextAI } from
 import { hintOf, lookupKeywords } from '../services/naver-keywords';
 import { collectNearby, lookupAddress, prefixOptions } from '../services/nearby';
 import type { PlaceResult } from '../services/browser-draft/editor';
-import { createCardService, type Shooter } from '../services/card-renderer';
+import { createCardService, removeCardFiles, retryPendingCardFiles, type Shooter } from '../services/card-renderer';
+import { isJpeg } from '../../shared/photos';
 import { blogIdOf, buildBlocks, STEP_LABEL, type BrowserDraft } from '../services/browser-draft';
 import { GIF_CARD, PHOTO_BASE } from '../services/browser-draft/editor';
 import { pasteSteps } from '../services/paste-helper';
@@ -80,6 +81,7 @@ const placeNote = (m: PlaceResult) => m.ok ? `${APP.place} 지도 넣음: ${m.ti
 export function registerIpc(ctx: AppCtx) {
   const { db, vault, runner } = ctx;
   const settings = () => loadSettings(db);
+  retryPendingCardFiles(ctx.assetsDir); // 지난번에 파일이 잠겨 못 지운 카드 · 사진
   const onUsage = (jobId?: string) => (u: { model: string; kind: string; reported: unknown }) =>
     db.addUsage({ jobId, provider: 'openai', model: u.model, kind: u.kind, reported: u.reported, estimate: { note: '실제 청구액 아님. 단가는 OpenAI 가격표 확인 필요', basis: null } });
 
@@ -110,9 +112,10 @@ export function registerIpc(ctx: AppCtx) {
   // 카드 글자가 넘치면 작은 글씨만 AI로 줄여 다시 얹어요 (그림은 그대로 · 그림 비용 없음). 한 장에 최대 2번, 그래도 넘치면 지금처럼 안내
   // 태권 글뚝딱 2.4.1에서 옮김. 만들기 · 실패 다시 · 스타일 바꾸기 뒤에만 (원장님 · 선생님이 [문구 적용]한 직후는 그대로 두고 안내만)
   // 줄인 글도 아이 이름 가리기(safeCopies)를 한 번 더 거침
-  async function fixOverflow(text: TextAI, cardSetId: string, input: ArticleInput | undefined, o: { signal: AbortSignal; step: (s: string) => void; jobId: string }) {
+  async function fixOverflow(text: TextAI, cardSetId: string, input: ArticleInput | undefined, o: { signal: AbortSignal; step: (s: string) => void; jobId?: string; onlyCardId?: string }) {
     const svc = cardService(null);
     for (const first of db.getCardSet(cardSetId)?.cards ?? []) {
+      if (o.onlyCardId && first.id !== o.onlyCardId) continue;
       let c = first;
       for (let k = 0; k < 2 && c.overflow && c.status === 'done'; k++) {
         if (o.signal.aborted) return;
@@ -313,7 +316,8 @@ export function registerIpc(ctx: AppCtx) {
     const version = article.currentVersionId ? db.getVersion(article.currentVersionId) : null;
     return { article, version, versions: db.listVersions(id).map((v) => ({ id: v.id, note: v.note, createdAt: v.createdAt, title: v.title, counts: v.counts })), cardSet: db.latestCardSet(id), jobs: db.recentJobs(id) };
   });
-  handle('article:delete', Id, (id) => { db.deleteArticle(id); removePhotoWork(ctx, id); });
+  // 글을 지우면 카드 파일 · 카드에 넣은 사진 · 사진 글 처리본도 지움 (아이 사진이 PC에 남지 않게). 잠겨서 못 지운 카드 묶음 수를 돌려줌
+  handle('article:delete', Id, (id) => { const sets = db.cardSetIdsOf(id); db.deleteArticle(id); const filesLeft = removeCardFiles(ctx.assetsDir, sets); removePhotoWork(ctx, id); return { filesLeft }; });
   handle('article:generate', Id, (id) => {
     const a = ai();
     const profile = profileOrThrow();
@@ -359,8 +363,11 @@ export function registerIpc(ctx: AppCtx) {
     return runner.start('cards', articleId, '카드 문구 만드는 중', async ({ signal, step, jobId }) => {
       const v = db.getVersion(art.currentVersionId!)!;
       const copies = safeCopies(await a.text.cardCopies(v.doc, v.title, art.input, { signal, onUsage: onUsage(jobId) }, art.input.writer, thinFacts(art.input), n), art.input);
+      const prev = db.latestCardSet(articleId);
       const cs = db.createCardSet(v.id, { ...style, mode }, copies);
-      await cardService(a.image, jobId).renderSet(cs.id, { signal, onStep: step });
+      const svc = cardService(a.image, jobId);
+      svc.carryPhotos(prev, cs.id); // 같은 자리 카드에 넣어 둔 사진은 새 묶음으로 옮김 (얼굴 가림 확인 표시도 같이)
+      await svc.renderSet(cs.id, { signal, onStep: step });
       await fixOverflow(a.text, cs.id, art.input, { signal, step, jobId });
     }).job;
   });
@@ -389,15 +396,58 @@ export function registerIpc(ctx: AppCtx) {
     const v = db.getVersion(cs.articleVersionId)!;
     const others = cs.cards.filter((x) => x.id !== cardId).map((x) => x.copy.title);
     const input = db.getArticle(articleId)?.input;
-    return safeCopies([await ai().text.cardOne(v.doc, v.title, c.index, c.copy, others, input, { onUsage: onUsage() }, input?.writer, !!input && thinFacts(input), cs.cards.length, cardNo(cs.cards.map((x) => x.index), c.index))], input)[0];
+    // 사진 카드는 그림 장면을 넘기지 않음 (사진 내용은 AI가 모름 — 사진은 보내지 않음)
+    return safeCopies([await ai().text.cardOne(v.doc, v.title, c.index, c.photoPath ? { ...c.copy, scene: '' } : c.copy, others, input, { onUsage: onUsage() }, input?.writer, !!input && thinFacts(input), cs.cards.length, cardNo(cs.cards.map((x) => x.index), c.index))], input)[0];
   });
   handle('cards:updateCopy', z.object({ cardId: Id, copy: z.object({ title: z.string().max(80), sub: z.string().max(200), scene: z.string().max(500) }) }), ({ cardId, copy }) => { noCardJob(articleOfCard(cardId)); return cardService(null).updateCopy(cardId, copy); });
+  // 카드 그림 칸을 사진으로 (태권 글뚝딱 2.6.x에서 옮김). 파일 경로는 화면에서 받지 않고 여기서 고름. AI를 쓰지 않아 키 · 이용권 확인 없음
+  // 유치원판: 넣은 뒤 화면이 바로 얼굴 가리기 창을 열고, 확인하기 전에는 네이버 넣기 · 붙여넣기 도우미를 막음 (draftInputs)
+  handle('cards:pickPhoto', z.object({ cardId: Id }), async ({ cardId }) => {
+    const articleId = articleOfCard(cardId);
+    noCardJob(articleId);
+    const r = await dialog.showOpenDialog(ctx.win()!, { title: '카드에 넣을 사진', filters: [{ name: '사진 (JPG · PNG)', extensions: ['jpg', 'jpeg', 'png'] }], properties: ['openFile'] });
+    if (r.canceled || !r.filePaths[0]) return null;
+    const src = r.filePaths[0];
+    if (fs.statSync(src).size > 20 * 1024 * 1024) throw new Error('사진이 너무 커요 (20MB 이하)');
+    const img = nativeImage.createFromPath(src);
+    if (img.isEmpty()) throw new Error('이 사진을 열지 못했어요. JPG · PNG 사진인지 확인해 주세요. 아이폰 사진(HEIC)은 JPG로 바꾼 뒤 넣어 주세요.');
+    noCardJob(articleId); // 고르는 동안 다른 카드 작업이 시작됐을 수 있음
+    let card = await cardService(null).setPhoto(cardId, src);
+    // 사진을 넣으면 글 칸이 작은 틀로 바뀌어 넘칠 수 있음 (넘치면 네이버 넣기가 막힘) → 이 카드 작은 글씨만 줄임. 글자만 보내고 사진은 보내지 않음. 키가 없으면 안내만
+    let shortened = false;
+    if (card.overflow && vault.get('openai')) {
+      const sub = card.copy.sub;
+      await fixOverflow(ai({ gate: false }).text, card.cardSetId, db.getArticle(articleId)?.input, { signal: new AbortController().signal, step: () => {}, onlyCardId: cardId }).catch(() => {});
+      card = db.getCard(cardId)!;
+      shortened = card.copy.sub !== sub;
+    }
+    // 화면에서 얼굴 위치를 찾도록 사진을 돌려줌 (PC 안에서만, AI로 보내지 않음)
+    return { card, shortened, small: img.getSize().width < 1080, bytes: card.photoPath ? new Uint8Array(fs.readFileSync(card.photoPath)) : null };
+  });
+  const FitBox = z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), w: z.number().min(0).max(1), h: z.number().min(0).max(1), score: z.number().min(0).max(1).optional() });
+  handle('cards:setPhotoFit', z.object({ cardId: Id, photoPath: z.string().max(600), fit: z.object({ w: z.number().int().min(1), h: z.number().int().min(1), faces: z.array(FitBox).max(200) }) }), ({ cardId, photoPath, fit }) => {
+    noCardJob(articleOfCard(cardId));
+    return cardService(null).setPhotoFit(cardId, photoPath, fit);
+  });
+  // 얼굴 가리기: 화면에서 가린 JPEG 를 받아 사진을 바꿈 (PC 안에서만)
+  handle('cards:photoBytes', z.object({ cardId: Id }), ({ cardId }) => {
+    const c = db.getCard(cardId);
+    if (!c?.photoPath || !fs.existsSync(c.photoPath)) throw new Error('넣어 둔 사진 파일을 찾지 못했어요. 사진을 다시 넣어 주세요.');
+    return { photoPath: c.photoPath, bytes: new Uint8Array(fs.readFileSync(c.photoPath)) };
+  });
+  handle('cards:maskPhoto', z.object({ cardId: Id, photoPath: z.string().max(600), jpeg: z.instanceof(Uint8Array), w: z.number().int().min(1).max(20000).optional(), h: z.number().int().min(1).max(20000).optional() }), ({ cardId, photoPath, jpeg, w, h }) => {
+    noCardJob(articleOfCard(cardId));
+    if (jpeg.length > 40 * 1024 * 1024 || !isJpeg(jpeg)) throw new Error('얼굴을 가린 사진을 저장하지 못했어요');
+    return cardService(null).setMaskedPhoto(cardId, photoPath, jpeg, w && h ? { w, h } : undefined);
+  });
+  handle('cards:clearPhoto', z.object({ cardId: Id }), ({ cardId }) => { noCardJob(articleOfCard(cardId)); return cardService(null).setPhoto(cardId, null); });
   // 스타일 · 크기만 바꿈 (템플릿 모드면 API 없이 다시 합성, AI 배경은 있던 그림을 새 비율로 다시 자름)
   handle('cards:restyle', z.object({ articleId: Id, cardSetId: Id, style: StyleSchema }), ({ articleId, cardSetId, style }) => {
     const cs = db.getCardSet(cardSetId)!;
     const mode = style.mode;
     const needNew = mode === 'ai' && (cs.style.mode !== 'ai' || cs.style.style !== style.style);
-    const a = ai({ gate: needNew }); // 새 배경을 안 그리면 AI를 안 씀
+    const draws = mode === 'ai' && cs.cards.some((c) => !c.photoPath && (needNew || !c.backgroundPath)); // 사진 카드는 그리지 않음
+    const a = ai({ gate: draws }); // 새 배경을 안 그리면 AI를 안 씀
     noCardJob(articleId);
     return runner.start('cards', articleId, '카드 다시 그리는 중', async ({ signal, step, jobId }) => {
       db.setCardSetStyle(cardSetId, { ...style, mode }); // 작업이 실제로 시작된 뒤에만 스타일을 바꿈
@@ -471,6 +521,9 @@ export function registerIpc(ctx: AppCtx) {
     const cs = db.latestCardSet(articleId);
     const cards = (cs?.cards ?? []).filter((c) => c.status === 'done' && c.outputPath);
     if (cs && cards.some((c) => c.overflow)) throw new Error('글자가 넘친 카드가 있어요. 카드 문구를 줄인 뒤 넣어 주세요.');
+    // 유치원판: 카드에 넣은 사진은 얼굴 가림을 확인해야 넣을 수 있음 (가린 곳이 없으면 "얼굴 없는 사진이 맞아요")
+    const unmasked = cards.filter((c) => c.photoPath && !c.photoFit?.masked).map((c) => cardNo((cs?.cards ?? []).map((x) => x.index), c.index));
+    if (unmasked.length) throw new Error(`카드 ${unmasked.join(', ')}번 사진의 얼굴 가림을 아직 확인하지 않았어요. 카드 칸에서 [얼굴 가리기]로 확인해 주세요.`);
     // 사진이 빠지는 이유를 끝 안내에 같이 알려 줌: 카드가 아예 없거나, 만들기에 실패한 카드
     const slots = (cs?.cards ?? []).map((c) => c.index); // 보여 주는 번호는 묶음 안 순서 (2장 묶음이면 카드 1 · 2)
     const missing = (cs?.cards ?? []).filter((c) => !(c.status === 'done' && c.outputPath)).map((c) => cardNo(slots, c.index));

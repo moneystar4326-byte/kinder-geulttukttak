@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import type { Article, ArticleInput, ArticleStatus, ArticleSummary, ArticleVersion, Card, CardSet, DojoProfile, Job, JobState, KeywordRow, PhotoItem } from '../../shared/types';
 import { APP } from '../../shared/kinder';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 4;
 
 const MIGRATIONS: string[] = [
   // 1
@@ -24,6 +24,10 @@ const MIGRATIONS: string[] = [
   // 2: 사진 폴더로 글쓰기 (태권 글뚝딱 2.5.0에서 옮김). processed_file 은 assets 기준 상대 경로 (자료 폴더를 옮겨도 그대로)
   `CREATE TABLE article_photos (article_id TEXT NOT NULL, photo_id TEXT NOT NULL, hash TEXT NOT NULL, source_path TEXT NOT NULL, title TEXT NOT NULL, idx INTEGER NOT NULL, status TEXT NOT NULL, regions_json TEXT NOT NULL DEFAULT '[]', faces INTEGER NOT NULL DEFAULT 0, processed_file TEXT, processed_hash TEXT, confirmed INTEGER NOT NULL DEFAULT 0, excluded INTEGER NOT NULL DEFAULT 0, error TEXT, PRIMARY KEY (article_id, photo_id));
    CREATE TABLE photo_usage (hash TEXT PRIMARY KEY, article_id TEXT NOT NULL, used_at TEXT NOT NULL);`,
+  // 3: 카드 그림 칸에 넣은 사진 (태권 글뚝딱 2.6.0에서 옮김)
+  `ALTER TABLE cards ADD COLUMN photo_path TEXT;`,
+  // 4: 카드 사진 자동 맞춤에 쓸 사진 크기 · 얼굴 위치 · 얼굴 가림 확인
+  `ALTER TABLE cards ADD COLUMN photo_fit TEXT;`,
 ];
 
 const now = () => new Date().toISOString();
@@ -137,7 +141,7 @@ export function openDb(file: string) {
   }
 
   // ---------- 카드 ----------
-  const rowToCard = (r: any): Card => ({ id: r.id, cardSetId: r.card_set_id, index: r.idx, copy: p(r.copy_json, { title: '', sub: '', scene: '' }), backgroundPath: r.background_path ?? undefined, outputPath: r.output_path ?? undefined, status: r.status, error: r.error ?? undefined, overflow: !!r.overflow, afterSectionId: r.after_section_id ?? undefined });
+  const rowToCard = (r: any): Card => ({ id: r.id, cardSetId: r.card_set_id, index: r.idx, copy: p(r.copy_json, { title: '', sub: '', scene: '' }), backgroundPath: r.background_path ?? undefined, photoPath: r.photo_path ?? undefined, photoFit: r.photo_fit ? p(r.photo_fit, undefined) : undefined, outputPath: r.output_path ?? undefined, status: r.status, error: r.error ?? undefined, overflow: !!r.overflow, afterSectionId: r.after_section_id ?? undefined });
   function createCardSet(articleVersionId: string, style: CardSet['style'], copies: (Card['copy'] & { afterSectionId?: string; index?: number })[]): CardSet {
     const id = randomUUID();
     db.exec('BEGIN');
@@ -153,16 +157,18 @@ export function openDb(file: string) {
     if (!r) return null;
     return { id: r.id, articleVersionId: r.article_version_id, status: r.status, style: p(r.style_json, { style: '따뜻한 일러스트', size: '1080x1350', mode: 'template' }), cards: all('SELECT * FROM cards WHERE card_set_id=? ORDER BY idx', id).map(rowToCard) };
   }
+  // 글의 모든 카드 세트 id (글을 지울 때 카드 파일 · 사진도 지우려고)
+  const cardSetIdsOf = (articleId: string): string[] => all('SELECT cs.id FROM card_sets cs JOIN article_versions v ON v.id = cs.article_version_id WHERE v.article_id=?', articleId).map((r) => r.id);
   // 글의 가장 최근 카드 세트 (버전이 바뀌어도 카드는 이어서 씀)
   function latestCardSet(articleId: string): CardSet | null {
     const r = get('SELECT cs.id FROM card_sets cs JOIN article_versions v ON v.id = cs.article_version_id WHERE v.article_id=? ORDER BY cs.created_at DESC, cs.rowid DESC LIMIT 1', articleId);
     return r ? getCardSet(r.id) : null;
   }
-  function updateCard(id: string, patch: Partial<Pick<Card, 'copy' | 'backgroundPath' | 'outputPath' | 'status' | 'error' | 'overflow' | 'afterSectionId'>>) {
+  function updateCard(id: string, patch: Partial<Pick<Card, 'copy' | 'backgroundPath' | 'photoPath' | 'photoFit' | 'outputPath' | 'status' | 'error' | 'overflow' | 'afterSectionId'>>) {
     const c = rowToCard(get('SELECT * FROM cards WHERE id=?', id));
     const n = { ...c, ...patch };
-    run('UPDATE cards SET copy_json=?, background_path=?, output_path=?, status=?, error=?, overflow=?, after_section_id=? WHERE id=?',
-      j(n.copy), n.backgroundPath ?? null, n.outputPath ?? null, n.status, patch.status === 'done' ? null : (n.error ?? null), n.overflow ? 1 : 0, n.afterSectionId ?? null, id);
+    run('UPDATE cards SET copy_json=?, background_path=?, photo_path=?, photo_fit=?, output_path=?, status=?, error=?, overflow=?, after_section_id=? WHERE id=?',
+      j(n.copy), n.backgroundPath ?? null, n.photoPath ?? null, n.photoFit ? j(n.photoFit) : null, n.outputPath ?? null, n.status, patch.status === 'done' ? null : (n.error ?? null), n.overflow ? 1 : 0, n.afterSectionId ?? null, id);
     return rowToCard(get('SELECT * FROM cards WHERE id=?', id));
   }
   const getCard = (id: string): Card | null => { const r = get('SELECT * FROM cards WHERE id=?', id); return r ? rowToCard(r) : null; };
@@ -238,7 +244,7 @@ export function openDb(file: string) {
     createArticle, getArticle, updateArticleInput, setArticleStatus, listArticles, deleteArticle,
     addVersion, getVersion, listVersions, setCurrentVersion, saveUserEdit,
     saveLookup, cachedLookup,
-    createCardSet, getCardSet, latestCardSet, updateCard, getCard, refreshCardSetStatus, setCardSetStyle,
+    createCardSet, getCardSet, latestCardSet, cardSetIdsOf, updateCard, getCard, refreshCardSetStatus, setCardSetStyle,
     addPhotos, listPhotos, getPhoto, updatePhoto, usedHashes, markPhotosUsed,
     createJob, getJob, updateJob, activeJob, recentJobs, recoverInterrupted,
     addUsage, usageSummary, countUsage,

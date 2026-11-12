@@ -86,6 +86,7 @@ docs/음성안내-대본.json           안내 음성 녹음용 대본 (녹음 �
 - 확인하지 않은 사진 · 바뀐 처리본 · 본문에 남은 아이 이름이 있으면 네이버 입력과 붙여넣기 도우미가 막혀요. 장면 칸에 적힌 이름이 글에 들어가면 코드가 "한 친구"로 바꿔요.
 - 글은 유치원판 목소리(해요체 · 질문 2~3개 · 40자 안팎 · 있었던 일 뒤 설명)로, 장면 칸에 적은 만큼만 짧게 써요. 장면 소제목 줄 앞의 `[p01]` 표시로 사진 자리를 맞춰요 (`src/shared/photos.ts` takePhotoMarks).
 - 얼굴 찾기: @vladmandic/face-api SSD MobileNet V1 (`resources/face-models`, 위치만 찾고 누구인지는 알아보지 않음).
+- **카드 사진** (태권 글뚝딱 2.6.x에서 옮김): 카드 그림 칸을 내 사진으로 바꾸기 · 얼굴이 잘리지 않게 칸에 자동 맞춤. 유치원판은 사진을 넣으면 얼굴 가리기 창이 바로 열리고(찾은 얼굴은 모두 가린 채), 확인하기 전에는 붙여넣기 도우미 · 네이버 입력이 막혀요. 글을 지우면 카드 파일 · 넣은 사진도 지워요 (백업 파일에는 카드 사진이 남아요). 시험: `tests/unit/card-photo*.test.ts`, 앱 시험 `tests/e2e/card-photo-mask.e2e.mts`.
 - 시험: `tests/unit/photo-folder.test.ts`, `tests/integration/browser-draft.test.ts`, 앱 시험 `tests/e2e/photo-flow.e2e.mts` · `photo-keep.e2e.mts` (그림은 `tests/e2e/make-test-photos.py` 로 만든 도형 그림만 — 진짜 아이 사진을 쓰지 않음). **미검증:** 실제 유치원 사진의 얼굴 감지율, 실제 네이버 입력.
 
 ## 남은 일

@@ -1,4 +1,5 @@
 // 앱 전체가 같이 쓰는 데이터 모양
+import type { PhotoFit } from './cardPhotoFit';
 import type { Writer } from './kinder';
 
 export const ARTICLE_KINDS = ['수업 후기', '성장 이야기', '행사 안내', '모집 안내', '교육 정보'] as const;
@@ -170,6 +171,8 @@ export interface Card {
   index: number; // 0..2
   copy: CardCopy;
   backgroundPath?: string;
+  photoPath?: string; // 원장님 · 선생님이 넣은 사진. AI 그림(backgroundPath)과 따로 둬서 사진을 빼면 비용 없이 돌아감
+  photoFit?: PhotoFit; // 사진 크기 · 얼굴 위치 (칸에 자동으로 맞출 때 씀), masked = 얼굴 가림을 확인함
   outputPath?: string;
   status: 'pending' | 'running' | 'done' | 'failed';
   error?: string;

@@ -25,7 +25,7 @@ export function History() {
               {a.demo && <span className="badge demo">데모</span>}
               <span className={`badge ${cls}`}>{label}</span>
               <button className="btn small" onClick={() => go({ page: 'article', id: a.id })}>열기</button>
-              <button className="btn small danger" onClick={async () => { if (confirm('이 글과 카드를 지울까요? 되돌릴 수 없어요.')) { await call('article:delete', a.id); load(); } }}>삭제</button>
+              <button className="btn small danger" onClick={async () => { if (confirm('이 글과 카드를 지울까요? 되돌릴 수 없어요.')) { const r = await call<{ filesLeft: number }>('article:delete', a.id); load(); if (r?.filesLeft) alert('글은 지웠어요. 다른 프로그램이 쓰고 있는 카드 · 사진 파일은 지우지 못해서 다음에 앱을 켤 때 다시 지울게요.'); } }}>삭제</button>
             </div>
           );
         })}
