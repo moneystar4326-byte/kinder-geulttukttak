@@ -46,11 +46,13 @@
   document.querySelector('.se-map-toolbar-button').onclick = () => { document.getElementById('mapPopup').style.display = 'block'; };
   document.querySelector('.se-popup-close-button').onclick = () => { document.getElementById('mapPopup').style.display = 'none'; };
   let picked = '';
+  // window.__places 가 있으면 그 결과 (이름 · 주소), 없으면 찾은 말 그대로 한 줄
   document.querySelector('.se-place-search-button').onclick = () => {
     const q = document.querySelector('.react-autosuggest__input').value;
-    document.getElementById('results').innerHTML = q === '없는도장' ? '' : `<li class="se-place-map-search-result-item"><span class="se-place-map-search-result-title">${q}</span><button class="se-place-add-button">추가</button></li>`;
-    const add = document.querySelector('.se-place-add-button');
-    if (add) add.onclick = () => { picked = q; };
+    window.__searches = [...(window.__searches || []), q];
+    const rows = q.startsWith('없는도장') ? [] : window.__places || [{ title: q, addr: '경기 용인시 처인구 명지로 12' }];
+    document.getElementById('results').innerHTML = rows.map((r) => `<li class="se-place-map-search-result-item"><span class="se-place-map-search-result-title">${r.title}</span><span>${r.addr}</span><button class="se-place-add-button">추가</button></li>`).join('');
+    document.querySelectorAll('.se-place-add-button').forEach((add, i) => { add.onclick = () => { picked = rows[i].title + '|' + rows[i].addr; }; });
   };
   document.getElementById('mapOk').onclick = () => {
     if (!picked) return;

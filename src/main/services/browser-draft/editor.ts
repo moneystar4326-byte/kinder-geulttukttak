@@ -2,6 +2,7 @@
 // 1버전(태권 글뚝딱 naver.ts, 2026-09~10 실사용)에서 확인한 선택자. 2버전에서 실계정 재확인 전까지는 "미검증"으로 기록 (README)
 // 자동으로 하지 않는 것: 발행 버튼 · 예약 · 저장 버튼 클릭, 로그인 · 추가 인증 입력, 캡차
 import type { Frame, Page } from 'playwright-core';
+import { hasPlaceBasis, pickPlace, placeQueries, placeTarget } from '../../../shared/placeMatch';
 
 export const SEL = {
   title: '.se-documentTitle .se-text-paragraph',
@@ -207,8 +208,12 @@ export async function insertCardsAtMarks(page: Page, f: Frame, cards: { index: n
 }
 
 // 글 맨 끝에 도장 지도 (편집기 [장소] → 네이버 지도 카드). 1버전 naver.ts 에서 옮김 (2026-09~10 실사용)
-// 검색 결과가 없거나 실패하면 창을 닫고 false (글 입력 전체는 멈추지 않음)
-export async function addPlaceAtEnd(page: Page, f: Frame, name: string) {
+// 검색 결과 중 주소와 맞는 곳만 넣음. 맞는 곳이 없거나 실패하면 창을 닫고 이유를 돌려줌 (글 입력 전체는 멈추지 않음)
+export type PlaceResult = { ok: true; title: string } | { ok: false; why: 'no-basis' | 'no-results' | 'no-match' | 'failed'; seen?: string };
+export async function addPlaceAtEnd(page: Page, f: Frame, place: { name: string; address?: string; region?: string; known?: { road?: string; jibun?: string } }): Promise<PlaceResult> {
+  const { name } = place;
+  const target = placeTarget(place.address, place.region, place.known);
+  if (!hasPlaceBasis(target)) return { ok: false, why: 'no-basis' };
   const close = () => f.locator('.se-popup-close-button').filter({ visible: true }).first().click({ timeout: 2000 }).catch(() => page.keyboard.press('Escape'));
   try {
     const last = f.locator(SEL.bodyParagraph).last();
@@ -219,24 +224,34 @@ export async function addPlaceAtEnd(page: Page, f: Frame, name: string) {
     const input = f.locator('input.react-autosuggest__input');
     await input.waitFor({ timeout: 5000 });
     const items = f.locator('li.se-place-map-search-result-item');
-    let found = false;
-    for (let i = 0; i < 3 && !found; i++) { // 검색 결과가 가끔 안 뜸 → 최대 3번. Enter 는 한글 끝 글자를 바꿔서 버튼으로
-      await input.fill('');
-      await input.fill(name);
-      await page.waitForTimeout(500);
-      await f.click('button.se-place-search-button');
-      found = await items.first().waitFor({ timeout: 5000 }).then(() => true, () => false);
+    let found = false, pick = -1, seen = '';
+    for (const q of placeQueries(name, target)) {
+      let shown = false;
+      for (let i = 0; i < (q === name ? 3 : 1) && !shown; i++) { // 검색 결과가 가끔 안 뜸 → 처음 검색은 최대 3번. Enter 는 한글 끝 글자를 바꿔서 버튼으로
+        await input.fill('');
+        await input.fill(q);
+        await page.waitForTimeout(500);
+        await f.click('button.se-place-search-button');
+        await page.waitForTimeout(1000); // 앞 검색 결과가 남아 있을 수 있어 새 결과를 기다림
+        shown = await items.first().waitFor({ timeout: 5000 }).then(() => true, () => false);
+      }
+      if (!shown) continue;
+      found = true;
+      const rows = await items.evaluateAll((els) => els.map((e) => ({ title: e.querySelector('.se-place-map-search-result-title')?.textContent?.trim() ?? '', text: (e as HTMLElement).innerText || e.textContent || '' })));
+      seen = rows.slice(0, 3).map((r) => r.text.replace(/\s+/g, ' ').slice(0, 80)).join(' | ');
+      pick = pickPlace(rows, name, target);
+      if (pick >= 0) break;
     }
-    if (!found) { await close(); return false; }
-    const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const exact = items.filter({ has: f.locator('.se-place-map-search-result-title', { hasText: new RegExp(`^${esc}$`) }) });
-    const item = (await exact.count()) ? exact.first() : items.first();
+    if (!found) { await close(); return { ok: false, why: 'no-results' }; }
+    if (pick < 0) { await close(); return { ok: false, why: 'no-match', seen }; }
+    const item = items.nth(pick);
+    const title = (await item.locator('.se-place-map-search-result-title').first().innerText().catch(() => name)).trim();
     await item.hover();
     await item.locator('button.se-place-add-button').click();
     await f.getByRole('button', { name: '확인' }).filter({ visible: true }).last().click({ timeout: 5000 });
     await f.locator('.se-component.se-placesMap, .se-component[class*="place"]').last().waitFor({ timeout: 5000 });
-    return true;
-  } catch { await close(); return false; }
+    return { ok: true, title };
+  } catch { await close(); return { ok: false, why: 'failed' }; }
 }
 
 // 입력 결과 확인 (가능한 범위)

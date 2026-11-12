@@ -110,16 +110,43 @@ test('촬영용 타이핑 입력: 완성형 글자 · 줄바꿈 · 이모지 그
 });
 
 test('글 끝에 도장 지도 카드 넣기 · 못 찾으면 창 닫고 건너뜀', { skip: !exe && '크롬 · 엣지 없음' }, async () => {
+  const here = { address: '경기 용인시 처인구 명지로 12 2층', region: '경기 용인시 처인구' };
   const { page } = await open();
   const f = (await E.findEditor(page, 5000))!;
   await page.evaluate((t) => (window as any).__paste(t), '본문 한 줄\n\n마지막 줄');
-  assert.equal(await E.addPlaceAtEnd(page, f, '용인대석사강담태권도'), true);
-  assert.equal(await page.locator('.se-placesMap').getAttribute('data-place'), '용인대석사강담태권도');
+  assert.deepEqual(await E.addPlaceAtEnd(page, f, { name: '용인대석사강담태권도', ...here }), { ok: true, title: '용인대석사강담태권도' });
+  assert.equal(await page.locator('.se-placesMap').getAttribute('data-place'), '용인대석사강담태권도|경기 용인시 처인구 명지로 12');
   const { page: p2 } = await open();
   const f2 = (await E.findEditor(p2, 5000))!;
   await p2.evaluate((t) => (window as any).__paste(t), '본문');
-  assert.equal(await E.addPlaceAtEnd(p2, f2, '없는도장'), false);
+  assert.deepEqual(await E.addPlaceAtEnd(p2, f2, { name: '없는도장', ...here }), { ok: false, why: 'no-results' });
   assert.equal(await p2.locator('#mapPopup').isVisible(), false);
+});
+
+test('도장 지도: 같은 이름이 여러 곳이면 주소가 맞는 곳을 넣고, 없으면 넣지 않음', { skip: !exe && '크롬 · 엣지 없음' }, async () => {
+  const place = { name: '한국체대석사태권도장', address: '강원 춘천시 석사동 123-4', region: '강원 춘천시 석사동' };
+  const start = async (rows: unknown) => {
+    const { page } = await open();
+    const f = (await E.findEditor(page, 5000))!;
+    await page.evaluate((t) => (window as any).__paste(t), '본문');
+    await page.evaluate((r) => { (window as any).__places = r; }, rows);
+    return { page, f };
+  };
+  const other = { title: place.name, addr: '서울 송파구 잠실동 10-1' };
+  const a = await start([other, { title: place.name, addr: '강원 춘천시 석사동 123-4' }]);
+  assert.equal((await E.addPlaceAtEnd(a.page, a.f, place)).ok, true);
+  assert.equal(await a.page.locator('.se-placesMap').getAttribute('data-place'), `${place.name}|강원 춘천시 석사동 123-4`); // 맨 위가 아니라 주소가 맞는 곳
+
+  const b = await start([other]);
+  const r = await E.addPlaceAtEnd(b.page, b.f, place);
+  assert.equal(r.ok === false && r.why, 'no-match');
+  assert.equal(await b.page.locator('.se-placesMap').count(), 0); // 다른 도장 지도가 들어가지 않음
+  assert.equal(await b.page.locator('#mapPopup').isVisible(), false);
+  assert.deepEqual(await b.page.evaluate(() => (window as any).__searches), [place.name, `${place.name} 석사동`]); // 동네를 붙여 한 번 더 찾음
+
+  const c = await start([other]);
+  assert.deepEqual(await E.addPlaceAtEnd(c.page, c.f, { name: place.name }), { ok: false, why: 'no-basis' }); // 주소 · 지역이 모두 없으면 아예 찾지 않음
+  assert.equal(await c.page.locator('#mapPopup').isVisible(), false);
 });
 
 test('사진 버튼이 처음 한 번 안 먹어도(팝업이 가림) 다시 눌러 사진이 들어가고, 실패 이유를 알려 줌', { skip: !exe && '크롬 · 엣지 없음' }, async () => {

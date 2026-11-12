@@ -24,14 +24,14 @@ export interface DraftRequest {
   cardFiles: { index: number; file: string }[]; // 카드 원래 번호(0..2)와 파일
   onExisting: 'stop' | 'new'; // 네이버 "작성 중인 글" 창: 멈추고 묻기 / 새 글로 시작 (쓰던 글은 임시저장에 남음)
   typing?: number; // 있으면 촬영용 타이핑 입력 (초당 글자 수), 없으면 붙여넣기
-  place?: string; // 있으면 글 끝에 이 이름으로 네이버 지도 카드
+  place?: { name: string; address?: string; region?: string; known?: { road?: string; jibun?: string } }; // 있으면 글 끝에 네이버 지도 카드 (이름으로 찾고 주소로 대조)
 }
 
 export type DraftResult =
   | { state: 'need-login' }
   | { state: 'existing-draft' }
   | { state: 'not-owner'; blogId: string }
-  | { state: 'filled'; check: Awaited<ReturnType<typeof E.verify>>; placed: boolean[]; bolded: number; steps: DraftStep[]; map: boolean | null };
+  | { state: 'filled'; check: Awaited<ReturnType<typeof E.verify>>; placed: boolean[]; bolded: number; steps: DraftStep[]; map: E.PlaceResult | null };
 
 export function blogIdOf(url: string) {
   return url.match(/blog\.naver\.com\/([A-Za-z0-9_-]+)/)?.[1] ?? null;
@@ -130,8 +130,12 @@ export function createBrowserDraft(opts: { profileDir: string; browserPath?: () 
       const bolded = await E.styleHeadings(p, f, req.headings).catch(() => 0); // 굵게 + 크게
       step('cards');
       const placed = req.cardFiles.length ? await E.insertCardsAtMarks(p, f, req.cardFiles, (i, ok, why) => { if (!ok) opts.log?.('naver-card-failed', `카드 ${i + 1}: ${why}`); }) : [];
-      let map: boolean | null = null;
-      if (req.place) { step('map'); map = await E.addPlaceAtEnd(p, f, req.place); }
+      let map: E.PlaceResult | null = null;
+      if (req.place) {
+        step('map');
+        map = await E.addPlaceAtEnd(p, f, req.place);
+        if (!map.ok) opts.log?.('naver-map-skipped', `${map.why} ${map.seen ?? ''}`);
+      }
       step('verify');
       const check = await E.verify(f, req.title, req.cardFiles.map((c) => c.index));
       await f.click(E.SEL.title).catch(() => {}); // 맨 위로

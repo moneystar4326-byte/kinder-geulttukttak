@@ -38,6 +38,14 @@ export function shortName(name: string, kind: string, regionWords: string[] = []
   return n.trim();
 }
 
+// 상세 주소의 도로명 · 지번을 함께 받음 (글 끝 지도 대조용). 못 찾으면 null
+export async function lookupAddress(key: string, address: string, signal?: AbortSignal): Promise<{ road?: string; jibun?: string } | null> {
+  const timeout = AbortSignal.timeout(10_000);
+  const street = address.replace(/\s*(상가|\d+층).*$/, '');
+  const doc = (await get(`https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(street)}`, key, signal ? AbortSignal.any([signal, timeout]) : timeout)).documents?.[0];
+  return doc ? { road: doc.road_address?.address_name, jibun: doc.address?.address_name } : null;
+}
+
 export async function collectNearby(key: string, address: string, regionWords: string[], signal?: AbortSignal): Promise<NearbyArea[]> {
   if (!address.trim()) throw new ApiError('bad-request', `${APP.place} 정보에 상세 주소를 먼저 적어 주세요 (주변 장소를 찾을 때만 써요)`, '카카오');
   const addr = address.replace(/\s*(상가|\d+층).*$/, '');

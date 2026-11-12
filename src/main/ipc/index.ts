@@ -20,7 +20,8 @@ import { loadSettings, saveSettings, type AppSettings } from '../settings';
 import { composeClassFeatures } from '../../shared/strengths';
 import { createOpenAI, listenHint, type ImageAI, type Listen, type TextAI } from '../services/openai';
 import { hintOf, lookupKeywords } from '../services/naver-keywords';
-import { collectNearby, prefixOptions } from '../services/nearby';
+import { collectNearby, lookupAddress, prefixOptions } from '../services/nearby';
+import type { PlaceResult } from '../services/browser-draft/editor';
 import { createCardService, type Shooter } from '../services/card-renderer';
 import { buildBlocks, STEP_LABEL, type BrowserDraft } from '../services/browser-draft';
 import { findBrowser } from '../services/browser-draft/browser';
@@ -62,6 +63,11 @@ function handle<A extends z.ZodTypeAny>(channel: string, schema: A, fn: (arg: z.
     }
   });
 }
+
+const placeNote = (m: PlaceResult) => m.ok ? `${APP.place} 지도 넣음: ${m.title} (맞는 곳인지 확인해 주세요)`
+  : m.why === 'no-basis' ? `${APP.place} 지도를 넣지 않았어요: ${APP.place} 정보에 상세 주소를 적으면 주소가 맞는 곳을 찾아 넣어요`
+  : m.why === 'no-match' ? `주소가 맞는 ${APP.place} 지도를 찾지 못해 넣지 않았어요 (${APP.place} 정보의 지도 검색 이름 · 상세 주소를 확인하거나, 네이버 창의 [장소]에서 직접 넣어 주세요)`
+  : `${APP.place} 지도를 넣지 못했어요 (${APP.place} 정보의 지도 검색 이름을 확인하거나, 네이버 창의 [장소]에서 직접 넣어 주세요)`;
 
 export function registerIpc(ctx: AppCtx) {
   const { db, vault, runner } = ctx;
@@ -416,12 +422,15 @@ export function registerIpc(ctx: AppCtx) {
     const cardNote = !cs ? '카드를 아직 만들지 않아 사진 없이 넣었어요 (카드를 만든 뒤 넣으면 사진도 같이 들어가요)' : missing.length ? `카드 ${missing.join(', ')}번은 만들어지지 않아 빠졌어요 (카드 화면에서 다시 만들기)` : '';
     const blocks = buildBlocks(v.doc.sections, cards.map((c) => ({ title: c.copy.title, afterSectionId: c.afterSectionId, index: c.index })), v.doc.tags);
     return runner.start('naver', articleId, STEP_LABEL.open, async ({ signal, step }) => {
-      const r = await ctx.browser.fill({ blogUrl: p.blogUrl!, title: v.title, blocks, headings: v.doc.sections.map((s) => s.heading).filter(Boolean) as string[], cardFiles: cards.map((c) => ({ index: c.index, file: c.outputPath! })), onExisting, typing: typing ? settings().typingSpeed : undefined, place: map ? (p.mapName?.trim() || p.name) : undefined }, (s) => step(STEP_LABEL[s]), signal);
+      // 카카오 키가 있으면 주소의 도로명 · 지번을 받아 지도 대조에 씀. 실패해도 입력은 그대로
+      const kakao = map && p.address?.trim() ? vault.get('kakao') : null;
+      const known = kakao ? await lookupAddress(kakao, p.address!, signal).catch(() => null) : null;
+      const r = await ctx.browser.fill({ blogUrl: p.blogUrl!, title: v.title, blocks, headings: v.doc.sections.map((s) => s.heading).filter(Boolean) as string[], cardFiles: cards.map((c) => ({ index: c.index, file: c.outputPath! })), onExisting, typing: typing ? settings().typingSpeed : undefined, place: map ? { name: p.mapName?.trim() || p.name, address: p.address, region: p.region, known: known ?? undefined } : undefined }, (s) => step(STEP_LABEL[s]), signal);
       if (r.state === 'need-login') throw new Error('네이버 로그인이 끝나지 않았어요. 열린 창에서 직접 로그인한 뒤 다시 눌러 주세요.');
       if (r.state === 'existing-draft') throw Object.assign(new Error('네이버 편집기에 작성 중인 글이 있어 덮어쓰지 않았어요. 새 글로 시작할지 골라 주세요.'), { code: 'existing-draft' });
       if (r.state === 'not-owner') throw new Error(`글쓰기 화면을 열지 못했어요. 로그인한 네이버 아이디가 blog.naver.com/${r.blogId} 의 주인인지 확인해 주세요.`);
       const c = r.check;
-      const msg = [`제목 ${c.titleOk ? '확인' : '다름 — 직접 확인 필요'}`, `이미지 ${c.images}장`, cardNote, r.map === true ? `${APP.place} 지도 넣음` : r.map === false ? `${APP.place} 지도는 못 찾아서 빠짐 (${APP.place} 정보의 지도 검색 이름 확인)` : '', c.leftMarks.length ? `카드 ${c.leftMarks.join(', ')}번은 올리지 못해 자리 글자가 남아 있어요 (네이버 창에서 그 자리에 직접 올려 주세요 · 저장 폴더에 카드 파일이 있어요)` : '', '발행 · 저장은 직접 눌러 주세요'].filter(Boolean).join(' · ');
+      const msg = [`제목 ${c.titleOk ? '확인' : '다름 — 직접 확인 필요'}`, `이미지 ${c.images}장`, cardNote, r.map ? placeNote(r.map) : '', c.leftMarks.length ? `카드 ${c.leftMarks.join(', ')}번은 올리지 못해 자리 글자가 남아 있어요 (네이버 창에서 그 자리에 직접 올려 주세요 · 저장 폴더에 카드 파일이 있어요)` : '', '발행 · 저장은 직접 눌러 주세요'].filter(Boolean).join(' · ');
       return `입력 끝: ${msg}`;
     }).job;
   });
