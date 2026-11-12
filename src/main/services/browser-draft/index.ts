@@ -7,7 +7,7 @@ import path from 'node:path';
 import { chromium, type BrowserContext, type Page } from 'playwright-core';
 import { findBrowser, NO_BROWSER } from './browser';
 import * as E from './editor';
-import { shortLines, tagLine } from '../../../shared/format';
+import { headingLines, mobileParagraphs, tagLine } from '../../../shared/format';
 import { APP } from '../../../shared/kinder';
 
 export type DraftStep = 'open' | 'login' | 'editor' | 'title' | 'body' | 'headings' | 'cards' | 'map' | 'verify' | 'done';
@@ -160,8 +160,8 @@ export function buildBlocks(sections: { id: string; heading?: string; paragraphs
   });
   const out: E.DraftBlock[] = [];
   for (const s of sections) {
-    if (s.heading) out.push({ kind: 'heading', text: s.heading });
-    for (const para of s.paragraphs) out.push({ kind: 'paragraph', text: shortLines(para) });
+    if (s.heading) out.push({ kind: 'heading', text: headingLines(s.heading).join('\n') });
+    for (const para of s.paragraphs) for (const chunk of mobileParagraphs(para)) out.push({ kind: 'paragraph', text: chunk });
     for (const i of after.get(s.id) ?? []) { const n = cards[i].index ?? i; out.push({ kind: 'card', text: E.cardMark(n, cards[i].title), cardIndex: n }); }
   }
   if (tags.length) out.push({ kind: 'paragraph', text: tagLine(tags) });

@@ -12,7 +12,7 @@ test('소제목마다 이모지 하나 (AI가 붙인 것은 떼고 같은 모양
   assert.equal(stripLeadEmoji('🗓️ 일정'), '일정');
 });
 
-test('긴 줄은 28자 안팎으로 고르게 끊고, 소제목 · 태그 · 카드 자리는 그대로', () => {
+test('긴 줄은 20자 안팎으로 고르게 끊고, 소제목 · 태그 · 카드 자리는 그대로', () => {
   const long = '정규 수업 안에서는 매일 줄넘기를 하고, 따로 신청하거나 준비할 것은 없어요. 화요일과 목요일에는 전문 줄넘기반도 있어요.';
   const lines = shortLines(long).split('\n');
   assert.ok(lines.length >= 3 && lines.every((l) => [...l].length <= 34), lines.join(' | '));

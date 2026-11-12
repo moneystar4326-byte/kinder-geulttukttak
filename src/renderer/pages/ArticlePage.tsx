@@ -5,6 +5,7 @@ import { fmtDate, JobBar, Msg, useMsg } from '../components/ui';
 import { DocEditor, type Draft, type ParaSel } from '../editor/DocEditor';
 import { TypingStage } from '../editor/TypingStage';
 import { CardsPanel, type CardPref } from '../components/CardsPanel';
+import { MobilePreview } from '../components/MobilePreview';
 import { FirstTip } from '../guide/voice';
 import { localFlags } from '../../shared/validation';
 import { minCharsForInput } from '../../shared/count';
@@ -227,6 +228,8 @@ export function ArticlePage({ id }: { id: string }) {
               </div>
               <p className="hint">저장 위치: {info.settings.saveDir} (같은 이름이 있으면 덮어쓰지 않고 번호를 붙여요)</p>
             </div>
+
+            <MobilePreview title={draft.title} doc={draft.doc} />
 
             <div className="panel">
               <h2>네이버 블로그에 초안 입력</h2>

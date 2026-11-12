@@ -10,6 +10,7 @@ import type { JobRunner } from '../jobs';
 import { generateArticle, reviseArticle, titleWithPrefix } from '../article';
 import { ArticleInputSchema, DocSchema, ProfileInput } from '../../shared/schemas';
 import { countDoc } from '../../shared/count';
+import { headingLines } from '../../shared/format';
 import { childNames, hideChildNames, memoText, plainBody, thinFacts, withKeywordFallback } from '../../shared/validation';
 import { planCandidates } from '../../shared/keywords';
 import type { ArticleDoc, ArticleInput, CardSet, KeywordRow } from '../../shared/types';
@@ -425,7 +426,7 @@ export function registerIpc(ctx: AppCtx) {
       // 카카오 키가 있으면 주소의 도로명 · 지번을 받아 지도 대조에 씀. 실패해도 입력은 그대로
       const kakao = map && p.address?.trim() ? vault.get('kakao') : null;
       const known = kakao ? await lookupAddress(kakao, p.address!, signal).catch(() => null) : null;
-      const r = await ctx.browser.fill({ blogUrl: p.blogUrl!, title: v.title, blocks, headings: v.doc.sections.map((s) => s.heading).filter(Boolean) as string[], cardFiles: cards.map((c) => ({ index: c.index, file: c.outputPath! })), onExisting, typing: typing ? settings().typingSpeed : undefined, place: map ? { name: p.mapName?.trim() || p.name, address: p.address, region: p.region, known: known ?? undefined } : undefined }, (s) => step(STEP_LABEL[s]), signal);
+      const r = await ctx.browser.fill({ blogUrl: p.blogUrl!, title: v.title, blocks, headings: v.doc.sections.flatMap((s) => (s.heading ? headingLines(s.heading) : [])), cardFiles: cards.map((c) => ({ index: c.index, file: c.outputPath! })), onExisting, typing: typing ? settings().typingSpeed : undefined, place: map ? { name: p.mapName?.trim() || p.name, address: p.address, region: p.region, known: known ?? undefined } : undefined }, (s) => step(STEP_LABEL[s]), signal);
       if (r.state === 'need-login') throw new Error('네이버 로그인이 끝나지 않았어요. 열린 창에서 직접 로그인한 뒤 다시 눌러 주세요.');
       if (r.state === 'existing-draft') throw Object.assign(new Error('네이버 편집기에 작성 중인 글이 있어 덮어쓰지 않았어요. 새 글로 시작할지 골라 주세요.'), { code: 'existing-draft' });
       if (r.state === 'not-owner') throw new Error(`글쓰기 화면을 열지 못했어요. 로그인한 네이버 아이디가 blog.naver.com/${r.blogId} 의 주인인지 확인해 주세요.`);
