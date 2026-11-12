@@ -11,6 +11,8 @@ const CHANNELS = [
   'cards:plan', 'cards:renderFailed', 'cards:renderOne', 'cards:updateCopy', 'cards:suggestCopy', 'cards:restyle', 'cards:saveAs',
   'export:run', 'backup:create', 'backup:restore',
   'naver:status', 'naver:openLogin', 'naver:close', 'naver:clearSession', 'naver:fill',
+  'paste:plan', 'paste:copy', 'paste:show', 'paste:openWrite',
+  'naverAuto:consent', 'naverAuto:off',
   'job:cancel', 'job:get', 'usage:summary', 'shell:open', 'shell:showFile', 'jarvis:take',
 ] as const;
 

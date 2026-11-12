@@ -1,7 +1,8 @@
 // 화면(Renderer) ↔ 메인 통로. 모든 입력은 zod 로 검사. API 키 원문은 화면으로 돌려주지 않음
 import fs from 'node:fs';
 import path from 'node:path';
-import { app, clipboard, dialog, ipcMain, nativeImage, shell, type BrowserWindow } from 'electron';
+import { createHash } from 'node:crypto';
+import { app, clipboard, ClipboardItem, dialog, ipcMain, nativeImage, shell, type BrowserWindow } from 'electron';
 import { z } from 'zod';
 import type { Db } from '../db';
 import type { Vault, SecretName } from '../credentials';
@@ -25,7 +26,10 @@ import { hintOf, lookupKeywords } from '../services/naver-keywords';
 import { collectNearby, lookupAddress, prefixOptions } from '../services/nearby';
 import type { PlaceResult } from '../services/browser-draft/editor';
 import { createCardService, type Shooter } from '../services/card-renderer';
-import { buildBlocks, STEP_LABEL, type BrowserDraft } from '../services/browser-draft';
+import { blogIdOf, buildBlocks, STEP_LABEL, type BrowserDraft } from '../services/browser-draft';
+import { pasteSteps } from '../services/paste-helper';
+import { PASTE_STALE } from '../../shared/paste';
+import { NAVER_AUTO_OFF_MSG, NAVER_AUTO_TERMS_VERSION, naverAutoOn } from '../../shared/naverAuto';
 import { findBrowser } from '../services/browser-draft/browser';
 import { exportFiles, makeBackup, readBackupManifest } from '../backup';
 import { ApiError, toApiError } from '../services/errors';
@@ -432,17 +436,33 @@ export function registerIpc(ctx: AppCtx) {
   // ---------- 네이버 ----------
   handle('naver:status', z.undefined(), async () => ({ open: ctx.browser.isOpen(), loggedIn: await ctx.browser.loggedIn(), browser: findBrowser(settings().browserPath)?.name ?? null }));
   const noNaverJob = () => { if (runner.runningOf(['naver'])) throw new Error('지금 네이버에 글을 넣는 중이에요. 끝난 뒤 다시 눌러 주세요.'); };
-  handle('naver:openLogin', z.undefined(), () => { noNaverJob(); return ctx.browser.openLogin(); });
+  // 자동 입력 (예전 방식): 지금 문구에 동의해 켠 경우만. 화면에서 숨기는 것과 별개로 여기서도 막음 (태권 글뚝딱 2.8.0에서 옮김)
+  const needAuto = () => { if (!naverAutoOn(settings().naverAuto)) throw new Error(NAVER_AUTO_OFF_MSG); };
+  handle('naverAuto:consent', z.object({ version: z.literal(NAVER_AUTO_TERMS_VERSION), checks: z.tuple([z.literal(true), z.literal(true), z.literal(true)]) }), ({ version }) => {
+    const consent = { version, at: new Date().toISOString(), appVersion: app.getVersion() };
+    log('naver-auto-on', `${version} · 앱 ${consent.appVersion}`); // 동의 기록 (이 PC의 로그에만)
+    return saveSettings(db, { naverAuto: consent });
+  });
+  handle('naverAuto:off', z.undefined(), async () => {
+    if (runner.runningOf(['naver'])) throw new Error('지금 네이버에 글을 넣는 중이에요. 끝난 뒤 꺼 주세요.');
+    log('naver-auto-off', '');
+    await ctx.browser.close().catch(() => {});
+    return saveSettings(db, { naverAuto: null });
+  });
+  handle('naver:openLogin', z.undefined(), () => { needAuto(); noNaverJob(); return ctx.browser.openLogin(); });
   handle('naver:close', z.undefined(), () => ctx.browser.close());
   handle('naver:clearSession', z.undefined(), () => ctx.browser.clearSession());
-  handle('naver:fill', z.object({ articleId: Id, onExisting: z.enum(['stop', 'new']), typing: z.boolean().optional(), map: z.boolean().optional() }), ({ articleId, onExisting, typing, map }) => {
-    noNaverJob();
-    noCardJob(articleId); // 카드를 만드는 중에 넣으면 사진 없이 들어감 (2026-10-23 사진 빠짐 점검)
-    const art = db.getArticle(articleId)!;
+  // 초안 재료: 네이버 초안 입력과 붙여넣기 도우미가 같은 순서 · 같은 파일을 쓰게 한 곳에서 만듦
+  function draftInputs(articleId: string, forPaste = false) {
+    // 카드를 만드는 중에 넣으면 사진 없이 들어감 (2026-10-23 사진 빠짐 점검)
+    if (forPaste && runner.runningOf(['cards', 'card'], articleId)) throw new Error('카드를 만드는 중이에요. 다 만들어지면 붙여넣기 도우미를 다시 시작해 주세요.');
+    noCardJob(articleId);
+    const art = db.getArticle(articleId);
+    if (!art) throw new Error('글을 찾지 못했어요');
     const v = art.currentVersionId ? db.getVersion(art.currentVersionId) : null;
     if (!v) throw new Error('글을 먼저 만들어 주세요');
     const p = db.getProfile();
-    if (!p?.blogUrl) throw new Error(`${APP.place} 정보에 네이버 블로그 주소를 적어 주세요 (예: https://blog.naver.com/아이디)`);
+    if (!p) throw new Error(`${APP.place} 정보를 먼저 저장해 주세요`);
     const cs = db.latestCardSet(articleId);
     const cards = (cs?.cards ?? []).filter((c) => c.status === 'done' && c.outputPath);
     if (cs && cards.some((c) => c.overflow)) throw new Error('글자가 넘친 카드가 있어요. 카드 문구를 줄인 뒤 넣어 주세요.');
@@ -450,12 +470,21 @@ export function registerIpc(ctx: AppCtx) {
     const slots = (cs?.cards ?? []).map((c) => c.index); // 보여 주는 번호는 묶음 안 순서 (2장 묶음이면 카드 1 · 2)
     const missing = (cs?.cards ?? []).filter((c) => !(c.status === 'done' && c.outputPath)).map((c) => cardNo(slots, c.index));
     const cardNote = !cs ? '카드를 아직 만들지 않아 사진 없이 넣었어요 (카드를 만든 뒤 넣으면 사진도 같이 들어가요)' : missing.length ? `카드 ${missing.join(', ')}번은 만들어지지 않아 빠졌어요 (카드 화면에서 다시 만들기)` : '';
+    // 글쓴이 줄("○○반 담임 선생님 드림")은 본문 끝 문단에 이미 들어 있어서 따로 넣지 않음
     const blocks = buildBlocks(v.doc.sections, cards.map((c) => ({ title: c.copy.title, afterSectionId: c.afterSectionId, index: c.index })), v.doc.tags);
+    const cardFiles = cards.map((c) => ({ index: c.index, file: c.outputPath! }));
+    return { v, p, slots, cardNote, blocks, cardFiles, noCards: !cs, missingCards: missing };
+  }
+  handle('naver:fill', z.object({ articleId: Id, onExisting: z.enum(['stop', 'new']), typing: z.boolean().optional(), map: z.boolean().optional() }), ({ articleId, onExisting, typing, map }) => {
+    needAuto();
+    noNaverJob();
+    const { v, p, slots, cardNote, blocks, cardFiles } = draftInputs(articleId);
+    if (!p.blogUrl) throw new Error(`${APP.place} 정보에 네이버 블로그 주소를 적어 주세요 (예: https://blog.naver.com/아이디)`);
     return runner.start('naver', articleId, STEP_LABEL.open, async ({ signal, step }) => {
       // 카카오 키가 있으면 주소의 도로명 · 지번을 받아 지도 대조에 씀. 실패해도 입력은 그대로
       const kakao = map && p.address?.trim() ? vault.get('kakao') : null;
       const known = kakao ? await lookupAddress(kakao, p.address!, signal).catch(() => null) : null;
-      const r = await ctx.browser.fill({ blogUrl: p.blogUrl!, title: v.title, blocks, headings: v.doc.sections.flatMap((s) => (s.heading ? headingLines(s.heading) : [])), cardFiles: cards.map((c) => ({ index: c.index, file: c.outputPath! })), onExisting, typing: typing ? settings().typingSpeed : undefined, place: map ? { name: p.mapName?.trim() || p.name, address: p.address, region: p.region, known: known ?? undefined } : undefined }, (s) => step(STEP_LABEL[s]), signal);
+      const r = await ctx.browser.fill({ blogUrl: p.blogUrl!, title: v.title, blocks, headings: v.doc.sections.flatMap((s) => (s.heading ? headingLines(s.heading) : [])), cardFiles, onExisting, typing: typing ? settings().typingSpeed : undefined, place: map ? { name: p.mapName?.trim() || p.name, address: p.address, region: p.region, known: known ?? undefined } : undefined }, (s) => step(STEP_LABEL[s]), signal);
       if (r.state === 'need-login') throw new Error('네이버 로그인이 끝나지 않았어요. 열린 창에서 직접 로그인한 뒤 다시 눌러 주세요.');
       if (r.state === 'existing-draft') throw Object.assign(new Error('네이버 편집기에 작성 중인 글이 있어 덮어쓰지 않았어요. 새 글로 시작할지 골라 주세요.'), { code: 'existing-draft' });
       if (r.state === 'not-owner') throw new Error(`글쓰기 화면을 열지 못했어요. 로그인한 네이버 아이디가 blog.naver.com/${r.blogId} 의 주인인지 확인해 주세요.`);
@@ -464,6 +493,61 @@ export function registerIpc(ctx: AppCtx) {
       const msg = [`제목 ${c.titleOk ? '확인' : '다름 — 직접 확인 필요'}`, `이미지 ${c.images}장`, cardNote, r.map ? placeNote(r.map) : '', leftCards.length ? `카드 ${leftCards.join(', ')}번은 올리지 못해 자리 글자가 남아 있어요 (네이버 창에서 그 자리에 직접 올려 주세요 · 저장 폴더에 카드 파일이 있어요)` : '', '발행 · 저장은 직접 눌러 주세요'].filter(Boolean).join(' · ');
       return `입력 끝: ${msg}`;
     }).job;
+  });
+
+  // ---------- 붙여넣기 도우미 (태권 글뚝딱 2.8.0에서 옮김) ----------
+  // 앱은 클립보드에 담고 파일 위치를 열기만 함. 네이버 창을 조작하거나 대신 붙여 넣지 않음 (Ctrl+V는 원장님 · 선생님이)
+  const PasteOpts = z.object({ articleId: Id, map: z.boolean().optional() });
+  // stamp: 준비할 때의 단계 · 파일을 요약한 값. 복사할 때 다시 계산해 다르면 복사하지 않음
+  // (도중에 글을 고치거나 카드를 다시 만들면 '5번'이 다른 내용을 가리킬 수 있어서)
+  function pastePlan({ articleId, map }: z.infer<typeof PasteOpts>) {
+    const d = draftInputs(articleId, true);
+    const plan = pasteSteps({ title: d.v.title, blocks: d.blocks, files: d.cardFiles, place: map ? { name: d.p.mapName?.trim() || d.p.name, address: d.p.address?.trim() } : undefined });
+    const stamp = createHash('sha1').update(JSON.stringify(plan)).digest('hex');
+    return { ...plan, stamp, d };
+  }
+  const fresh = (o: z.infer<typeof PasteOpts> & { stamp: string }) => {
+    const { stamp, ...rest } = o;
+    const p = pastePlan(rest);
+    if (p.stamp !== stamp) throw new Error(PASTE_STALE);
+    return p;
+  };
+  handle('paste:plan', PasteOpts, (o) => {
+    const { steps, stamp, d } = pastePlan(o);
+    const notes = [
+      d.noCards ? '카드를 아직 만들지 않아 그림 단계가 없어요. 카드를 만든 뒤 [다시 준비]를 눌러 주세요.' : '',
+      d.missingCards.length ? `카드 ${d.missingCards.join(', ')}번은 만들어지지 않아 빠져요 (카드 화면에서 다시 만들기)` : '',
+    ].filter(Boolean);
+    return { steps, stamp, notes, canOpen: !!d.p.blogUrl && !!blogIdOf(d.p.blogUrl) };
+  });
+  const PasteAt = PasteOpts.extend({ stamp: z.string().max(64), step: z.number().int().min(0).max(500), item: z.number().int().min(0).max(100).optional() });
+  // rich: 소제목을 꾸며서 (글자 + HTML 을 함께 담음 → 네이버는 HTML, 메모장 등은 글자를 씀). 끄면 글자만 (자동 입력과 같은 방식)
+  handle('paste:copy', PasteAt.extend({ rich: z.boolean().optional() }), async ({ step, item, rich, ...o }) => {
+    const { steps, files } = fresh(o);
+    const s = steps[step];
+    if (!s) throw new Error(PASTE_STALE);
+    if (s.kind === 'text' && rich) { await clipboard.write([new ClipboardItem({ 'text/plain': s.text, 'text/html': `<meta charset="utf-8">${s.html}` })]); return true; }
+    if (s.kind === 'title' || s.kind === 'text') { await clipboard.writeText(s.text); return true; }
+    if (s.kind === 'place') { await clipboard.writeText(s.name); return true; }
+    const f = files[step][item ?? 0];
+    if (s.kind !== 'media' || !f || !s.items[item ?? 0]?.image) throw new Error('이 파일은 그림으로 복사할 수 없어요. [파일 위치 열기]로 올려 주세요.');
+    if (!fs.existsSync(f)) throw new Error('그림 파일이 없어졌어요. 카드를 다시 만들어 주세요.');
+    const buf = /\.png$/i.test(f) ? fs.readFileSync(f) : nativeImage.createFromPath(f).toPNG();
+    if (!buf.length) throw new Error('그림을 읽지 못했어요. [파일 위치 열기]로 올려 주세요.');
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(buf)], { type: 'image/png' }) })]);
+    return true;
+  });
+  handle('paste:show', PasteAt, ({ step, item, ...o }) => {
+    const f = fresh(o).files[step]?.[item ?? 0];
+    if (!f || !fs.existsSync(f)) throw new Error('파일을 찾지 못했어요. 다시 만들어 주세요.');
+    shell.showItemInFolder(f);
+    return true;
+  });
+  // 평소 쓰는 브라우저로 글쓰기 주소만 엶 (로그인 · 입력은 원장님 · 선생님이)
+  handle('paste:openWrite', z.undefined(), () => {
+    const id = blogIdOf(db.getProfile()?.blogUrl ?? '');
+    if (!id) throw new Error(`${APP.place} 정보에 네이버 블로그 주소를 적어 주세요 (예: https://blog.naver.com/아이디)`);
+    return shell.openExternal(`https://blog.naver.com/${encodeURIComponent(id)}?Redirect=Write&`);
   });
 
   // ---------- 공통 ----------

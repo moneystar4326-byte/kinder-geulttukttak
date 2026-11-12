@@ -6,6 +6,8 @@ import { DocEditor, type Draft, type ParaSel } from '../editor/DocEditor';
 import { TypingStage } from '../editor/TypingStage';
 import { CardsPanel, type CardPref } from '../components/CardsPanel';
 import { MobilePreview } from '../components/MobilePreview';
+import { PasteHelper } from '../components/PasteHelper';
+import { naverAutoOn } from '../../shared/naverAuto';
 import { FirstTip } from '../guide/voice';
 import { localFlags } from '../../shared/validation';
 import { minCharsForInput } from '../../shared/count';
@@ -161,6 +163,9 @@ export function ArticlePage({ id }: { id: string }) {
   if (!b) return <p className="muted">불러오는 중…</p>;
   const flags = draft && profile ? [...draft.doc.reviewFlags.filter((f) => !/^(too-short|banned|avoid-word|repeat|keyword-heavy|fee|child-name)$/.test(f.code)), ...localFlags(draft.doc, profile, b.article.input)] : draft?.doc.reviewFlags ?? [];
   const cardsDone = b.cardSet?.cards.filter((c) => c.status === 'done').length ?? 0;
+  const autoOn = naverAutoOn(info.settings.naverAuto);
+  // 지도: 붙여넣기 도우미와 '네이버에 초안 입력'이 같은 값을 씀 (두 곳에 같은 칸을 보여 줌)
+  const mapBox = <label className="row" style={{ marginTop: 8 }}><input type="checkbox" checked={naverMap} onChange={(e) => setNaverMap(e.target.checked)} /> 글 끝에 {APP.place} 지도 넣기 (네이버 지도 카드)</label>;
   // 가장 최근 버전이 AI 결과인데 현재 버전이 아니면 (고치는 동안 도착) 알려 줌
   const newest = b.versions[0];
   // 방금 끝난 AI 작업이 만든 버전일 때만 (되돌리기로 옛 버전을 고른 경우에는 띄우지 않음)
@@ -231,8 +236,17 @@ export function ArticlePage({ id }: { id: string }) {
 
             <MobilePreview title={draft.title} doc={draft.doc} />
 
-            <div className="panel">
-              <h2>네이버 블로그에 초안 입력</h2>
+            {/* 붙여넣기 도우미 (태권 글뚝딱 2.8.0에서 옮김): 기본 방법. 지도 칸은 '네이버에 초안 입력'과 같은 값을 씀 */}
+            <PasteHelper articleId={id} opts={{ map: naverMap }} beforeStart={async () => { if (dirty) await save(); }}
+              blocked={!b.version ? '글을 먼저 만들어 주세요' : undefined}
+              refreshKey={b.cardSet?.id ?? ''}>
+              {mapBox}
+            </PasteHelper>
+
+            {/* 자동 입력 (예전 방식): 설정 → 고급에서 위험 안내에 동의해 켠 경우만 보임 */}
+            {autoOn && (
+            <div className="panel" data-testid="naver-auto-panel">
+              <h2>네이버 블로그에 초안 입력 <span className="badge warn">선택한 기능 · 계정 제한 위험 있음</span></h2>
               <FirstTip id="F01" />
               <p>제목 · 본문 · 카드를 네이버 편집기에 넣고 멈춰요. <b>저장 · 발행은 {APP.owner}이 직접</b> 눌러 주세요.</p>
               <p className="hint">처음이면 열린 창에서 직접 로그인해 주세요 (최대 5분 기다려요). 편집기에 쓰던 글이 있으면 덮어쓰지 않아요.</p>
@@ -248,14 +262,15 @@ export function ArticlePage({ id }: { id: string }) {
                 <button className="btn primary" disabled={running(naverJob) || !b.version} onClick={() => naverFill('new')}>네이버에 초안 입력</button>
                 <button className="btn small" onClick={() => call('naver:openLogin').catch((e) => naverMsg.err(e))}>네이버 창 열기 · 로그인</button>
               </div>
-              <label className="row" style={{ marginTop: 8 }}><input type="checkbox" checked={naverMap} onChange={(e) => setNaverMap(e.target.checked)} /> 글 끝에 {APP.place} 지도 넣기 (네이버 지도 카드)</label>
+              {mapBox}
               <label className="row"><input type="checkbox" checked={naverTyping} onChange={(e) => setNaverTyping(e.target.checked)} /> 타이핑처럼 넣기 (촬영용 · 초당 {info.settings.typingSpeed}자, 설정에서 속도 변경)</label>
               {naverTyping && draft && <p className="hint">본문 {draft.doc.sections.reduce((n, s) => n + (s.heading?.length ?? 0) + s.paragraphs.join('').length, 0).toLocaleString()}자 → 약 {Math.ceil(draft.doc.sections.reduce((n, s) => n + (s.heading?.length ?? 0) + s.paragraphs.join('').length, 0) / info.settings.typingSpeed / 60)}분 걸려요. 입력 중에는 네이버 창을 누르지 마세요.</p>}
               <p className="hint">네이버가 "작성 중인 글"을 물으면 새 글로 시작해요 (쓰던 글은 네이버 임시저장에 남아요). 편집기에 이미 글자가 있으면 덮어쓰지 않고 멈춰요.</p>
               {b.cardSet && cardsDone < b.cardSet.cards.length && <p className="hint">완성된 카드 {cardsDone}장만 넣어요.</p>}
               <Msg m={naverMsg.m} />
-              <p className="hint" style={{ marginTop: 8 }}>자동 입력이 안 되면: [전체 복사]로 붙여넣고, 카드는 [PNG 저장]으로 받아 직접 올리면 돼요.</p>
+              <p className="hint" style={{ marginTop: 8 }}>자동 입력이 안 되면: 위 붙여넣기 도우미를 쓰거나, [전체 복사]로 붙여넣고 카드는 [PNG 저장]으로 받아 직접 올리면 돼요.</p>
             </div>
+            )}
 
             <div className="panel">
               <h2>버전 이력</h2>

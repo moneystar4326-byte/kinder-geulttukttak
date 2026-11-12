@@ -7,6 +7,7 @@ import { SetupGuide } from '../guide/SetupGuide';
 import { KeyGuide } from '../guide/KeyGuide';
 import { Speak } from '../guide/voice';
 import { APP } from '../../shared/kinder';
+import { NAVER_AUTO_TERMS, NAVER_AUTO_TERMS_VERSION, naverAutoOn, type NaverAutoConsent } from '../../shared/naverAuto';
 
 type SecretName = 'openai' | 'naverApiKey' | 'naverSecret' | 'naverCustomer' | 'kakao';
 
@@ -35,6 +36,53 @@ function SecretRow({ name, label, hint }: { name: SecretName; label: string; hin
       <small>{hint}</small>
       <Msg m={msg.m} />
     </div>
+  );
+}
+
+// 네이버 자동 입력 (예전 방식) 켜기 · 끄기 (태권 글뚝딱 2.8.0에서 옮김): 기본 꺼짐. 켜려면 위험 안내를 읽고 3개를 모두 체크
+function NaverAutoPanel({ on, consent, reload }: { on: boolean; consent: NaverAutoConsent | null; reload: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [checks, setChecks] = useState<boolean[]>(NAVER_AUTO_TERMS.checks.map(() => false));
+  const msg = useMsg();
+  const all = checks.every(Boolean);
+  const agree = async () => {
+    try { await call('naverAuto:consent', { version: NAVER_AUTO_TERMS_VERSION, checks }); setOpen(false); setChecks(checks.map(() => false)); await reload(); msg.ok('네이버 자동 입력을 켰어요. 글 화면 아래에 [네이버에 초안 입력] 칸이 보여요.'); } catch (e) { msg.err(e); }
+  };
+  const off = async () => {
+    if (!confirm('네이버 자동 입력을 끌까요? 붙여넣기 도우미는 그대로 쓸 수 있어요.')) return;
+    try { await call('naverAuto:off'); await reload(); msg.ok('껐어요. 붙여넣기 도우미를 써 주세요.'); } catch (e) { msg.err(e); }
+  };
+  return (
+    <details className="optional-group" data-testid="naver-auto" open={on || open || undefined}>
+      <summary>고급 · 네이버 자동 입력 (예전 방식) <span className={`badge ${on ? 'warn' : ''}`}>{on ? '켜짐 · 계정 제한 위험 있음' : '꺼짐'}</span></summary>
+      <div className="panel">
+        <p>지금은 <b>붙여넣기 도우미</b>가 기본이에요. 프로그램이 네이버 창을 건드리지 않아서 가장 안전해요.</p>
+        <p className="hint">예전 방식은 프로그램이 네이버 편집기에 글 · 카드를 대신 넣어 줘요. 편하지만 네이버 계정이 제한될 위험이 있어서, 꼭 필요할 때만 켜 주세요.</p>
+        {on && consent && <p className="hint">동의한 날: {consent.at.slice(0, 10)} · 안내문 {consent.version} · 앱 {consent.appVersion}</p>}
+        {on ? (
+          <button className="btn danger" data-testid="naver-auto-off" onClick={off}>자동 입력 끄기</button>
+        ) : !open ? (
+          <button className="btn" data-testid="naver-auto-open" onClick={() => setOpen(true)}>켜기 전에 안내 읽기</button>
+        ) : (
+          <div className="note warn" data-testid="naver-auto-terms">
+            <b>{NAVER_AUTO_TERMS.title}</b>
+            <p style={{ margin: '6px 0' }}>{NAVER_AUTO_TERMS.intro}</p>
+            {NAVER_AUTO_TERMS.checks.map((c, i) => (
+              <label key={i} className="row" style={{ alignItems: 'flex-start', flexWrap: 'nowrap', margin: '6px 0' }}>
+                <input type="checkbox" style={{ flex: 'none', marginTop: 3 }} data-testid={`naver-auto-check-${i}`} checked={checks[i]} onChange={(e) => setChecks(checks.map((x, j) => (j === i ? e.target.checked : x)))} />
+                <span style={{ flex: 1, minWidth: 0 }}>{c}</span>
+              </label>
+            ))}
+            <div className="row" style={{ marginTop: 8 }}>
+              <button className="btn" onClick={() => { setOpen(false); setChecks(checks.map(() => false)); }}>취소</button>
+              <button className="btn primary" data-testid="naver-auto-agree" disabled={!all} onClick={agree}>동의하고 켜기</button>
+            </div>
+            {!all && <p className="hint">세 가지를 모두 체크해야 켤 수 있어요.</p>}
+          </div>
+        )}
+        <Msg m={msg.m} />
+      </div>
+    </details>
   );
 }
 
@@ -123,6 +171,9 @@ export function SettingsPage() {
       </div>
       </details>
 
+      <NaverAutoPanel on={naverAutoOn(s.naverAuto)} consent={s.naverAuto} reload={reload} />
+
+      {naverAutoOn(s.naverAuto) && (
       <div className="panel">
         <h2 className="h2-row">네이버 블로그 로그인 (초안 입력용) <Speak ids={['P09', 'P10']} /></h2>
         <p>네이버 전용 브라우저 창에서 {APP.owner}이 직접 로그인해요. 프로그램은 비밀번호를 받지 않고, 평소 크롬 로그인 정보도 가져오지 않아요.</p>
@@ -134,6 +185,7 @@ export function SettingsPage() {
         </div>
         <Field label="브라우저 위치 (보통 비워 둠)" hint="크롬 · 엣지가 기본 위치에 없을 때만 .exe 경로"><input type="text" value={form.browserPath} onChange={(e) => set({ browserPath: e.target.value })} /></Field>
       </div>
+      )}
 
       <div className="panel">
         <h2 className="h2-row">저장 · 화면 <Speak ids={['P11a', 'P11b', 'P11c']} /></h2>

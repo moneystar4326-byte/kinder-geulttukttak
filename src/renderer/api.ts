@@ -1,5 +1,6 @@
 // 메인 통로 호출 (preload 의 window.gtd). 실패하면 사용자 문장 오류를 던짐
 import type { Article, ArticleInput, ArticleSummary, ArticleVersion, Card, CardSet, DojoProfile, Job, KeywordRow } from '../shared/types';
+import type { NaverAutoConsent } from '../shared/naverAuto';
 
 declare global {
   interface Window { gtd: { call: (ch: string, arg?: unknown) => Promise<{ ok: boolean; data?: any; error?: string; code?: string }>; onJob: (fn: (j: Job) => void) => () => void; onJarvis: (fn: () => void) => () => void } }
@@ -18,7 +19,7 @@ export const onJarvis = (fn: () => void) => window.gtd.onJarvis(fn);
 
 export interface AppInfo {
   version: string; dataDir: string; hasProfile: boolean; browser: string | null;
-  settings: { setupDone: boolean; textModel: string; imageModel: string; saveDir: string; typingSpeed: number; imageAutoRetry: number; monthlyImageLimit: number; browserPath: string; keywordCacheHours: number; cardCount: 'auto' | 1 | 2 | 3 };
+  settings: { setupDone: boolean; textModel: string; imageModel: string; saveDir: string; typingSpeed: number; imageAutoRetry: number; monthlyImageLimit: number; browserPath: string; keywordCacheHours: number; cardCount: 'auto' | 1 | 2 | 3; naverAuto: NaverAutoConsent | null };
   secrets: Record<'openai' | 'naverApiKey' | 'naverSecret' | 'naverCustomer' | 'kakao', string | null>;
 }
 export interface ArticleBundle {

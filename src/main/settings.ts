@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { Db } from './db';
 import { APP } from '../shared/kinder';
 import type { CardCountSetting } from '../shared/cardRoles';
+import type { NaverAutoConsent } from '../shared/naverAuto';
 
 export interface AppSettings {
   setupDone: boolean;
@@ -18,6 +19,8 @@ export interface AppSettings {
   browserPath: string;
   keywordCacheHours: number; // 같은 검색어 재조회 간격 (약관 · 한도 확인 전까지 짧게)
   cardCount: CardCountSetting; // 카드뉴스 기본 장수 (그림 비용 아끼기). 'auto' = 글 종류에 맞게
+  // 네이버 자동 입력 켜기 동의 (태권 글뚝딱 2.8.0에서 옮김). 없으면 꺼짐. 화면의 settings:save 로는 바꿀 수 없고 naverAuto:consent / naverAuto:off 로만
+  naverAuto: NaverAutoConsent | null;
 }
 
 export const DEFAULTS: AppSettings = {
@@ -31,6 +34,7 @@ export const DEFAULTS: AppSettings = {
   browserPath: '',
   keywordCacheHours: 24,
   cardCount: 'auto',
+  naverAuto: null,
 };
 
 export function loadSettings(db: Db): AppSettings {
