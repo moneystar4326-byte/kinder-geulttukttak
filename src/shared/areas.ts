@@ -47,6 +47,13 @@ export function areaTags(region: string, areas: NearbyArea[]) {
   return [...new Set(names.map((n) => `${n.replace(/\s/g, '')}${APP.term}`))];
 }
 
+// 노출 순위 좁은 검색어 추천에 붙일 동네 이름 (태권 글뚝딱 2.8.0 노출 순위에서 옮김): 소재 동 + 가까운 아파트 4곳 + 직접 적은 아파트 · 단지 이름
+// 학교 · 다른 유치원 이름은 넣지 않음 (다른 유치원을 찾는 말이 되어서)
+export function searchPlaces(region: string, areas: NearbyArea[]) {
+  const manual = areas.filter((a) => a.source === 'manual' && /(아파트|단지)$/.test(a.name.trim())).map((a) => a.name.trim());
+  return [...new Set([dongOf(region), ...near(areas, '아파트').slice(0, 4).map((a) => aptName(a.name)), ...manual].filter(Boolean))];
+}
+
 // AI에 주는 주변 사실 (거리 숫자는 주지 않음 — 글에 숫자를 쓰지 않게)
 export function nearbyLine(areas: NearbyArea[]) {
   const names = [...near(areas, '아파트').slice(0, 3).map((a) => aptName(a.name)), ...near(areas, '학교').slice(0, 2).map((a) => a.name), ...near(areas, '지하철역').slice(0, 1).map((a) => a.name)];

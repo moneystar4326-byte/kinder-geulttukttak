@@ -3,10 +3,12 @@
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
+import type { RankHit, RankSearch, RssPost } from '../../shared/rank';
+import type { Diagnosis } from '../../shared/diagnose';
 import type { Article, ArticleInput, ArticleStatus, ArticleSummary, ArticleVersion, Card, CardSet, DojoProfile, Job, JobState, KeywordRow, PhotoItem } from '../../shared/types';
 import { APP } from '../../shared/kinder';
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 const MIGRATIONS: string[] = [
   // 1
@@ -28,6 +30,15 @@ const MIGRATIONS: string[] = [
   `ALTER TABLE cards ADD COLUMN photo_path TEXT;`,
   // 4: 카드 사진 자동 맞춤에 쓸 사진 크기 · 얼굴 위치 · 얼굴 가림 확인
   `ALTER TABLE cards ADD COLUMN photo_fit TEXT;`,
+  // 5: 블로그 노출 순위 (태권 글뚝딱 2.8.0에서 옮김). 블로그 글(RSS) · 검색 한 번의 기록(그 블로그 글 전부의 자리) · 원인 분석
+  `CREATE TABLE IF NOT EXISTS blog_posts (post_url TEXT PRIMARY KEY, blog_id TEXT NOT NULL, title TEXT NOT NULL, published_at TEXT, tags_json TEXT NOT NULL DEFAULT '[]', keywords_json TEXT, seen_at TEXT NOT NULL);
+   CREATE INDEX IF NOT EXISTS blog_posts_blog ON blog_posts(blog_id, published_at);
+   CREATE TABLE IF NOT EXISTS rank_searches (id INTEGER PRIMARY KEY AUTOINCREMENT, blog_id TEXT NOT NULL, keyword TEXT NOT NULL, hits_json TEXT NOT NULL, total_blogs INTEGER, checked_at TEXT NOT NULL);
+   CREATE INDEX IF NOT EXISTS rank_searches_kw ON rank_searches(blog_id, keyword, checked_at);
+   CREATE INDEX IF NOT EXISTS rank_searches_time ON rank_searches(checked_at);
+   CREATE TABLE IF NOT EXISTS post_diagnoses (id INTEGER PRIMARY KEY AUTOINCREMENT, post_url TEXT NOT NULL, keyword TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL);
+   CREATE INDEX IF NOT EXISTS post_diagnoses_post ON post_diagnoses(post_url, keyword, created_at);
+   CREATE INDEX IF NOT EXISTS post_diagnoses_time ON post_diagnoses(created_at);`,
 ];
 
 const now = () => new Date().toISOString();
@@ -234,6 +245,46 @@ export function openDb(file: string) {
   }
   const countUsage = (kind: string, sinceIso: string) => Number(get('SELECT COUNT(*) AS n FROM usage_records WHERE kind=? AND created_at >= ?', kind, sinceIso).n);
 
+  // ---------- 블로그 노출 순위 ----------
+  type BlogPost = { url: string; blogId: string; title: string; publishedAt: string | null; tags: string[]; keywords: string[] | null };
+  const rowToBlogPost = (r: any): BlogPost => ({ url: r.post_url, blogId: r.blog_id, title: r.title, publishedAt: r.published_at ?? null, tags: p(r.tags_json, [] as string[]), keywords: r.keywords_json ? p(r.keywords_json, null as string[] | null) : null });
+  // RSS 로 받은 글: 제목 · 날짜 · 태그만 새로 (직접 정한 검색어는 그대로)
+  function saveBlogPosts(blogId: string, posts: Pick<RssPost, 'url' | 'title' | 'publishedAt' | 'tags'>[]) {
+    // 한 번에 받은 글은 같은 시각 → 목록은 가장 최근에 받은 묶음만 (RSS 에서 빠진 옛 글은 안 보임)
+    // 같은 1/1000초 안에 두 번 받아도 앞 묶음과 구분되게 늘 더 늦은 시각으로 (태권 글뚝딱 2026-11-11 시험에서 드러남)
+    const prev = get('SELECT MAX(seen_at) AS m FROM blog_posts WHERE blog_id=?', blogId)?.m as string | null;
+    let at = now();
+    if (prev && at <= prev) at = new Date(Date.parse(prev) + 1).toISOString();
+    db.exec('BEGIN');
+    try {
+      for (const x of posts) run(`INSERT INTO blog_posts (post_url,blog_id,title,published_at,tags_json,keywords_json,seen_at) VALUES (?,?,?,?,?,NULL,?)
+        ON CONFLICT(post_url) DO UPDATE SET title=excluded.title, published_at=excluded.published_at, tags_json=excluded.tags_json, seen_at=excluded.seen_at`, x.url, blogId, x.title, x.publishedAt, j(x.tags), at);
+      db.exec('COMMIT');
+    } catch (e) { db.exec('ROLLBACK'); throw e; }
+  }
+  const listBlogPosts = (blogId: string, limit = 50): BlogPost[] => all('SELECT * FROM blog_posts WHERE blog_id=? AND seen_at = (SELECT MAX(seen_at) FROM blog_posts WHERE blog_id=?) ORDER BY published_at DESC, post_url DESC LIMIT ?', blogId, blogId, limit).map(rowToBlogPost);
+  const getBlogPost = (url: string): BlogPost | null => { const r = get('SELECT * FROM blog_posts WHERE post_url=?', url); return r ? rowToBlogPost(r) : null; };
+  const setPostKeywords = (url: string, keywords: string[] | null) => run('UPDATE blog_posts SET keywords_json=? WHERE post_url=?', keywords?.length ? j(keywords) : null, url);
+  // hits_json = { hits, seen } (seen: 블로그 탭에서 실제로 본 자리 수)
+  function addRankSearch(blogId: string, keyword: string, hits: RankHit[], totalBlogs: number | null, seen: number | null = null): RankSearch {
+    const checkedAt = now();
+    run('INSERT INTO rank_searches (blog_id,keyword,hits_json,total_blogs,checked_at) VALUES (?,?,?,?,?)', blogId, keyword, j({ hits, seen }), totalBlogs, checkedAt);
+    return { keyword, checkedAt, hits, totalBlogs, seen };
+  }
+  const hitsOf = (s: string): { hits: RankHit[]; seen: number | null } => { const v = p<any>(s, []); return Array.isArray(v) ? { hits: v, seen: null } : { hits: v?.hits ?? [], seen: v?.seen ?? null }; };
+  // 이 블로그의 검색 기록 (오래된 것 먼저). 최근 90일만
+  const rankSearches = (blogId: string): RankSearch[] => all("SELECT * FROM rank_searches WHERE blog_id=? AND checked_at >= ? ORDER BY checked_at, id", blogId, new Date(Date.now() - 90 * 86_400_000).toISOString())
+    .map((r) => ({ keyword: r.keyword, checkedAt: r.checked_at, ...hitsOf(r.hits_json), totalBlogs: r.total_blogs ?? null }));
+  const countRankSearches = (sinceIso: string) => Number(get('SELECT COUNT(*) AS n FROM rank_searches WHERE checked_at >= ?', sinceIso).n);
+  // 원인 분석: 다른 사람 글은 숫자 · 제목 · 주소만 담김 (본문은 저장하지 않음)
+  const addDiagnosis = (postUrl: string, d: Diagnosis) => run('INSERT INTO post_diagnoses (post_url,keyword,result_json,created_at) VALUES (?,?,?,?)', postUrl, d.keyword, j(d), d.createdAt);
+  function latestDiagnoses(postUrl: string): Record<string, Diagnosis> {
+    const out: Record<string, Diagnosis> = {};
+    for (const r of all('SELECT keyword, result_json FROM post_diagnoses WHERE post_url=? ORDER BY created_at, id', postUrl)) { const d = p<Diagnosis | null>(r.result_json, null); if (d) out[r.keyword] = d; }
+    return out;
+  }
+  const countDiagnoses = (sinceIso: string) => Number(get('SELECT COUNT(*) AS n FROM post_diagnoses WHERE created_at >= ?', sinceIso).n);
+
   // ---------- 일반 설정 (비밀 아님) ----------
   const getSetting = <T>(key: string, d: T): T => p(get('SELECT nonsecret_value FROM settings WHERE key=?', key)?.nonsecret_value, d);
   const setSetting = (key: string, v: unknown) => run('INSERT INTO settings (key, nonsecret_value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET nonsecret_value=excluded.nonsecret_value', key, j(v));
@@ -248,6 +299,7 @@ export function openDb(file: string) {
     addPhotos, listPhotos, getPhoto, updatePhoto, usedHashes, markPhotosUsed,
     createJob, getJob, updateJob, activeJob, recentJobs, recoverInterrupted,
     addUsage, usageSummary, countUsage,
+    saveBlogPosts, listBlogPosts, getBlogPost, setPostKeywords, addRankSearch, rankSearches, countRankSearches, addDiagnosis, latestDiagnoses, countDiagnoses,
     getSetting, setSetting,
   };
 }

@@ -7,11 +7,12 @@ import { NewArticle } from './pages/NewArticle';
 import { PhotoArticle } from './pages/PhotoArticle';
 import { PHOTO_MENU_ON } from '../shared/photos';
 import { History } from './pages/History';
+import { RankPage } from './pages/Rank';
 import { ArticlePage } from './pages/ArticlePage';
 import { AccountChip, UpdateBar, type Latest, type LicenseStatus } from './components/Account';
 import { APP } from '../shared/kinder';
 
-export type Route = { page: 'new' } | { page: 'photo' } | { page: 'history' } | { page: 'profile' } | { page: 'settings' } | { page: 'article'; id: string };
+export type Route = { page: 'new' } | { page: 'photo' } | { page: 'history' } | { page: 'rank' } | { page: 'profile' } | { page: 'settings' } | { page: 'article'; id: string };
 
 type CtxValue = { info: AppInfo; reload: () => Promise<void>; go: (r: Route) => void; license: LicenseStatus | null; setLicense: (l: LicenseStatus) => void };
 const Ctx = createContext<CtxValue>(null as any);
@@ -58,6 +59,7 @@ export function App() {
           {nav('new', '새 글 작성')}
           {PHOTO_MENU_ON && nav('photo', '사진으로 글쓰기')}
           {nav('history', '작성 이력')}
+          {nav('rank', '노출 순위')}
           {nav('profile', `${APP.place} 정보`)}
           {nav('settings', '설정')}
           <AccountChip />
@@ -71,6 +73,7 @@ export function App() {
             {route.page === 'new' && <NewArticle jarvis={jarvis} onJarvisDone={() => setJarvis(null)} />}
             {route.page === 'photo' && <PhotoArticle />}
             {route.page === 'history' && <History />}
+            {route.page === 'rank' && <RankPage />}
             {route.page === 'profile' && <ProfilePage />}
             {route.page === 'settings' && <SettingsPage />}
             {route.page === 'article' && <ArticlePage id={route.id} key={route.id} />}

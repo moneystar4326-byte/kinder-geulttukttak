@@ -38,6 +38,7 @@ import { ApiError, toApiError } from '../services/errors';
 import { log } from '../log';
 import { SERVER, type License } from '../license';
 import { photoDraft, registerPhotoIpc, removePhotoWork } from './photos';
+import { registerRankIpc } from './rank';
 
 // 1.0.2부터 유치원 전용 서버(kinder.growmoment.co.kr)가 유치원 글뚝딱 최신 버전만 알려 줌
 const LATEST_FOR_KINDER = true;
@@ -486,6 +487,7 @@ export function registerIpc(ctx: AppCtx) {
   });
 
   registerPhotoIpc(ctx);
+  registerRankIpc(ctx);
 
   // ---------- 네이버 ----------
   handle('naver:status', z.undefined(), async () => ({ open: ctx.browser.isOpen(), loggedIn: await ctx.browser.loggedIn(), browser: findBrowser(settings().browserPath)?.name ?? null }));

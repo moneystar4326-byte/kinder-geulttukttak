@@ -63,9 +63,12 @@ const NOT_PARENT = /매매|매물|임대|컨설팅|개원|창업|인수|양도|�
 // 우리 유치원과 맞지 않는 키워드인지: 어린이집 · 영어유치원 · 놀이학교 · 학원, 원장 · 창업자 쪽 말(매매 · 임대 · 채용), 다른 유형(병설유치원 — "유치원병설"처럼 뒤에 오는 건 보지 않음), "○○유치원"의 ○○이 우리 동네 · 주변 아파트 · 우리 유형 · 주제 낱말이 아님(다른 동네 · 다른 유치원 이름)
 type KeywordProfile = Pick<DojoProfile, 'facilityType' | 'nearbyAreas'> & { name?: string };
 
+// 유치원이 아닌 기관 · 원장님 쪽 말만 보기 (우리 동네를 모를 때 — 노출 순위에서 다른 블로그를 볼 때)
+export const notParentKeyword = (keyword: string) => { const k = keyword.replace(/\s/g, ''); return OTHER_PLACE.test(k) || NOT_PARENT.test(k); };
+
 export function foreignKeyword(keyword: string, region: string, profile?: KeywordProfile | null) {
   const k = keyword.replace(/\s/g, '');
-  if (OTHER_PLACE.test(k) || NOT_PARENT.test(k)) return true;
+  if (notParentKeyword(k)) return true;
   const own = TYPE_WORDS[profile?.facilityType ?? ''] ?? [];
   const at = k.indexOf(T);
   if (at <= 0) return false;

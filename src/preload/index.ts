@@ -12,6 +12,7 @@ const CHANNELS = [
   'export:run', 'backup:create', 'backup:restore',
   'naver:status', 'naver:openLogin', 'naver:close', 'naver:clearSession', 'naver:fill',
   'paste:plan', 'paste:copy', 'paste:show', 'paste:openWrite', 'paste:finish',
+  'rank:load', 'rank:overview', 'rank:setKeywords', 'rank:checkKeyword', 'rank:volumes', 'rank:diagnose', 'rank:showInSearch',
   'photos:folder', 'photos:pickFolder', 'photos:scan', 'photos:bytes', 'photos:create', 'photos:state', 'photos:faceModel', 'photos:source', 'photos:saveProcessed', 'photos:markFailed', 'photos:retry', 'photos:confirm', 'photos:exclude', 'photos:verify', 'photos:openWork', 'naver:resumePhotos', 'photos:gifFrame', 'photos:saveGif', 'photos:gifAt', 'photos:removeGif', 'photos:saveGifAs',
   'naverAuto:consent', 'naverAuto:off',
   'job:cancel', 'job:get', 'usage:summary', 'shell:open', 'shell:showFile', 'jarvis:take',
