@@ -9,7 +9,7 @@ import { openDb } from '../../src/main/db';
 import { NAVER_AUTO_TERMS_VERSION } from '../../src/shared/naverAuto';
 import type { PhotoState } from '../../src/shared/types';
 
-const [photoDir, topic, keyDir, outFile] = process.argv.slice(2);
+const [photoDir, topic, keyDir, outFile, extraArg] = process.argv.slice(2); // extraArg: 짧은 장면 물음에 적을 답 (| 로 나눔)
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gtd-photo-real-'));
 for (const f of ['secrets.bin', 'Local State']) fs.copyFileSync(path.join(keyDir, f), path.join(dataDir, f));
 const seed = openDb(path.join(dataDir, 'app.db'));
@@ -32,6 +32,16 @@ try {
   if (await page.locator('button:has-text("같이 쓰기")').count()) await page.click('button:has-text("같이 쓰기")');
   await page.locator('button:has-text("글 만들기")').click({ timeout: 15000 });
   await page.waitForTimeout(3000);
+  if (await page.locator('.ask-scenes').count()) {
+    result.asked = (await page.locator('.ask-scenes .field').allInnerTexts()).map((x) => x.trim().split(/\r?\n/)[0]);
+    const ans = (extraArg ?? '').split('|');
+    const inputs = page.locator('.ask-scenes input');
+    for (let i = 0; i < await inputs.count(); i++) await inputs.nth(i).fill(ans[i] ?? '');
+    const go = page.locator('button:has-text("이대로 글 만들기")');
+    if (await go.isDisabled()) throw new Error('짧은 장면 물음에 답이 모자라 만들 수 없음');
+    await go.click();
+    await page.waitForTimeout(3000);
+  }
   await page.waitForSelector('text=사진 확인', { timeout: 600000 });
   const id = (await call<any[]>('article:list'))[0].id as string;
   for (const t0 = Date.now(); ; ) {

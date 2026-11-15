@@ -210,7 +210,7 @@ export const ArticleInputSchema = z.object({
   keywordPlan: z.array(z.object({ role: z.enum(['주요', '보조']), keyword: s(60), sentence: s(300), why: s(100).optional() })).max(3).optional(),
   greetings: z.boolean().optional(),
   titlePrefix: s(60).optional(),
-  photoScenes: z.array(z.object({ id: s(10), title: s(100) })).max(10).optional(),
+  photoScenes: z.array(z.object({ id: s(10), title: s(200) })).max(10).optional(),
   photoNotNames: z.array(s(20)).max(30).optional(),
   writer: Writer.optional(),
   writerSign: z.boolean().optional(),

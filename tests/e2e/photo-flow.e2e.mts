@@ -82,6 +82,17 @@ try {
   assert.equal(await start.isDisabled(), false, '경고를 처리하면 시작 가능');
   await page.screenshot({ path: path.join(outDir, '2-ready.png'), fullPage: true });
   await start.click();
+  // 장면이 짧은 사진은 한 번 더 물어봄: 답을 적기 전에는 만들 수 없음 (2026-11-16)
+  if (await page.locator('.ask-scenes').count()) {
+    const extras = page.locator('.ask-scenes input');
+    assert.ok(await extras.count() > 0, '짧은 장면 물음');
+    const go = page.locator('button:has-text("이대로 글 만들기")');
+    assert.equal(await go.isDisabled(), true, '답을 적기 전에는 만들 수 없음');
+    for (let i = 0; i < await extras.count(); i++) await extras.nth(i).fill('아이들이 함께 놀이를 이어 갔어요');
+    await page.screenshot({ path: path.join(outDir, '2b-ask.png'), fullPage: true });
+    assert.equal(await go.isDisabled(), false, '답을 적으면 만들 수 있음');
+    await go.click();
+  }
   await page.waitForSelector('text=사진 확인', { timeout: 60000 });
   const id = (await call<any[]>('article:list'))[0].id as string;
   const t0 = Date.now();

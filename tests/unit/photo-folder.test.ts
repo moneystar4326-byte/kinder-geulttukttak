@@ -282,6 +282,30 @@ test('[이름 아님]을 누른 말은 "한 친구"로 바꾸지 않음 (2026-11
     assert.equal(hideSceneNames(doc, titles, guessed).sections[0].paragraphs[0], '배추잎 사이에 양념을 넣었어요.');
     assert.deepEqual(scenesNamesInBody('배추잎 사이에', titles, guessed), []);
   }
-  // 이름은 여전히 가림
-  assert.match(hideSceneNames({ sections: [{ heading: '', paragraphs: ['규희가 줄넘기를 했어요.'] }] }, ['6살 규희가 줄넘기 연습'], []).sections[0].paragraphs[0], /^한 친구가/);
+  // 이름일 수밖에 없는 모양은 [이름 아님]을 눌러도 계속 가림
+  assert.match(hideSceneNames({ sections: [{ heading: '', paragraphs: ['규희가 줄넘기를 했어요.'] }] }, ['6살 규희가 줄넘기 연습'], ['규희']).sections[0].paragraphs[0], /^한 친구가/);
+  assert.match(hideSceneNames({ sections: [{ heading: '', paragraphs: ['민준이가 모래성을 쌓았어요.'] }] }, ['민준이가 모래성 쌓기'], ['민준']).sections[0].paragraphs[0], /^한 친구가/);
+  assert.deepEqual(scenesNamesInBody('민준이가 모래성을', ['민준이가 모래성 쌓기'], ['민준']), ['민준']);
+});
+
+test('짧은 장면은 다시 묻고, 더 적은 내용을 장면에 붙임 (2026-11-16 사용자: "찰칵"처럼 짧으면 재료 부족)', async () => {
+  const { shortScene, sceneAnswered, sceneWithDetail, SCENE_MAX } = await import('../../src/shared/photos');
+  assert.equal(shortScene('수업시간에 찰칵'), true);
+  assert.equal(shortScene('너무 귀여워서 찰칵'), true);
+  assert.equal(shortScene('빼빼로를 받고 기분 좋아하는 모습에 사진을 찍어줬어요'), false);
+  assert.equal(sceneAnswered(''), false);
+  assert.equal(sceneAnswered('  응 '), false);
+  assert.equal(sceneAnswered('블록으로 탑을 쌓았어요'), true);
+  assert.equal(sceneWithDetail('수업시간에 찰칵', '블록으로 탑을 높이 쌓았어요'), '수업시간에 찰칵. 블록으로 탑을 높이 쌓았어요');
+  assert.equal(sceneWithDetail('낙엽 왕관!', '흘러내려서 테이프로 붙였어요'), '낙엽 왕관! 흘러내려서 테이프로 붙였어요');
+  assert.equal(sceneWithDetail(' 낙엽 왕관 ', ''), '낙엽 왕관');
+  assert.equal(sceneWithDetail('가'.repeat(100), '나'.repeat(150)).length, SCENE_MAX);
+});
+
+test('"하다가" · "자다가" · "친구보다"의 "~다"는 이름이 아님, "민준이가"는 이름 (2026-11-16 사진 글 시험)', async () => {
+  const { childNames } = await import('../../src/shared/validation');
+  assert.deepEqual(childNames('놀이터에서 술래잡기를 하다가 다 같이 모였어요'), []);
+  assert.deepEqual(childNames('낮잠을 자다가 깼어요. 책을 보다가 웃었어요'), []);
+  assert.deepEqual(childNames('민준이가 모래성을 쌓았어요'), ['민준']);
+  assert.deepEqual(suspectNames('밖에 나가서 놀다가 단체사진. 놀이터에서 술래잡기를 하다가 다 같이 모여 브이를 했어요'), []);
 });

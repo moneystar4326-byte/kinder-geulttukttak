@@ -6,7 +6,7 @@ import { call, local, type DojoProfile, type KeywordRow } from '../api';
 import { Field, Msg, useMsg } from '../components/ui';
 import { LockBanner } from '../components/Account';
 import { thumbnail } from '../photos/face';
-import { MAX_PHOTOS, suspectNames } from '../../shared/photos';
+import { MAX_PHOTOS, sceneAnswered, sceneWithDetail, shortScene, suspectNames } from '../../shared/photos';
 import { hintWords, pickKeywords } from '../../shared/keywords';
 import { autoPrefix } from '../../shared/areas';
 import { buildQuickInput } from '../../shared/quickInput';
@@ -41,6 +41,9 @@ export function PhotoArticle() {
   const [picked, setPicked] = useState<string[]>(() => local.get('photo-picked', [])); // 고른 사진 해시 (이 순서로 글을 씀)
   const [off, setOff] = useState<Set<string>>(() => new Set(local.get<string[]>('photo-off', []))); // 사용자가 직접 해제한 사진 (다시 읽어도 자동 선택하지 않음)
   const [namesOk, setNamesOk] = useState<string[]>(() => local.get('photo-names-ok', []));
+  // 장면이 짧은 사진에 더 적은 내용 (사진 해시 → 한 줄). [글 만들기]를 누르면 짧은 장면을 다시 물어봄 (2026-11-16 사용자)
+  const [extra, setExtra] = useState<Record<string, string>>(() => local.get('photo-extra', {}));
+  const [asking, setAsking] = useState(false);
   const [mixFor, setMixFor] = useState(() => local.get('photo-mix-for', '')); // [같이 쓰기]를 누른 날짜 묶음. 고른 날짜가 바뀌면 다시 물음
   const [busy, setBusy] = useState('');
   const [profile, setProfile] = useState<DojoProfile | null>(null);
@@ -87,6 +90,7 @@ export function PhotoArticle() {
   useEffect(() => { local.set('photo-picked', picked); }, [picked]);
   useEffect(() => { local.set('photo-off', [...off]); }, [off]);
   useEffect(() => { local.set('photo-names-ok', namesOk); }, [namesOk]);
+  useEffect(() => { local.set('photo-extra', extra); }, [extra]);
   useEffect(() => { local.set('photo-mix-for', mixFor); }, [mixFor]);
 
   const byHash = useMemo(() => new Map(photos.filter((p) => p.hash).map((p) => [p.hash, p])), [photos]);
@@ -101,8 +105,11 @@ export function PhotoArticle() {
   const setMixOk = (on: boolean) => setMixFor(on ? days.join(',') : '');
   const mixed = days.length > 1 && !mixOk;
   const noTitle = selected.filter((p) => !titleOf(p).trim());
-  const names = [...new Set([...suspectNames(topic), ...selected.flatMap((p) => suspectNames(titleOf(p)))])].filter((n) => !namesOk.includes(n));
-  const canStart = !busy && !!profile && !!info.secrets.openai && !!topic.trim() && selected.length > 0 && !mixed && !noTitle.length && !names.length;
+  const thin = selected.filter((p) => titleOf(p).trim() && shortScene(titleOf(p)));
+  const unanswered = asking ? thin.filter((p) => !sceneAnswered(extra[p.hash])) : [];
+  const sceneOf = (p: ScannedPhoto) => sceneWithDetail(titleOf(p), shortScene(titleOf(p)) ? extra[p.hash] : '');
+  const names = [...new Set([...suspectNames(topic), ...selected.flatMap((p) => suspectNames(sceneOf(p)))])].filter((n) => !namesOk.includes(n));
+  const canStart = !busy && !!profile && !!info.secrets.openai && !!topic.trim() && selected.length > 0 && !mixed && !noTitle.length && !names.length && !unanswered.length;
 
   const toggle = (h: string, on: boolean) => {
     setOff((s) => { const n = new Set(s); if (on) n.delete(h); else n.add(h); return n; });
@@ -112,6 +119,7 @@ export function PhotoArticle() {
   const onlyDay = (d: string) => { const drop = selected.filter((p) => dayOf(p) !== d).map((p) => p.hash); setOff((s) => new Set([...s, ...drop])); setPicked((c) => c.filter((h) => !drop.includes(h))); };
 
   async function start() {
+    if (!asking && thin.length) { setAsking(true); return; } // 짧은 장면이 있으면 먼저 물어봄
     setBusy('글을 준비하고 있어요'); msg.clear();
     try {
       const memo = topic.trim();
@@ -124,11 +132,11 @@ export function PhotoArticle() {
         } catch { /* 키워드 조회가 안 돼도 글은 만듦 */ }
       }
       const titlePrefix = autoPrefix(profile?.region ?? '', profile?.nearbyAreas ?? [], (await call<unknown[]>('article:list').catch(() => [])).length);
-      const said = [memo, ...selected.map((p) => titleOf(p))].join(' ');
+      const said = [memo, ...selected.map((p) => sceneOf(p))].join(' ');
       const input = { ...buildQuickInput({ memo, profile, main, subs, withCards: false, titlePrefix, writer, writerSign }), topic: memo.slice(0, 200), photoNotNames: namesOk.filter((n) => said.includes(n)).slice(0, 30) };
-      const art = await call<{ id: string }>('photos:create', { input, keywords: chosen, photos: selected.map((p) => ({ path: p.path, title: titleOf(p).trim() })) });
+      const art = await call<{ id: string }>('photos:create', { input, keywords: chosen, photos: selected.map((p) => ({ path: p.path, title: sceneOf(p) })) });
       try { await call('article:generate', art.id); } catch (e) { await call('article:delete', art.id).catch(() => {}); throw e; }
-      for (const k of ['photo-topic', 'photo-titles', 'photo-picked', 'photo-off', 'photo-names-ok', 'photo-mix-for']) local.del(k); // 글을 만들면 다음 글은 새로 시작 (이름 확인이 다음 글로 넘어가지 않게)
+      for (const k of ['photo-topic', 'photo-titles', 'photo-picked', 'photo-off', 'photo-names-ok', 'photo-mix-for', 'photo-extra']) local.del(k); // 글을 만들면 다음 글은 새로 시작 (이름 확인이 다음 글로 넘어가지 않게)
       go({ page: 'article', id: art.id });
     } catch (e) { msg.err(e); setBusy(''); }
   }
@@ -196,10 +204,25 @@ export function PhotoArticle() {
         </div>
       )}
       {noTitle.length > 0 && <div className="note warn">장면을 적지 않은 사진이 {noTitle.length}장 있어요. 한 줄 적거나 체크를 풀어 주세요.</div>}
+      {asking && thin.length > 0 && (
+        <div className="note info ask-scenes">
+          <b>장면이 짧은 사진이 {thin.length}장 있어요. 사진마다 있었던 일을 한 줄씩 더 알려 주세요.</b> AI는 사진을 볼 수 없어서, 적어 주신 만큼만 글에 써요.
+          {thin.map((p) => (
+            <Field key={p.hash} label={`"${titleOf(p).trim()}" 사진에서는 무슨 일이 있었나요?`}>
+              <div className="row" style={{ alignItems: 'center', gap: 10, flexWrap: 'nowrap' }}>
+                <Thumb p={p} />
+                <input className="grow" type="text" maxLength={150} value={extra[p.hash] ?? ''} onChange={(e) => setExtra({ ...extra, [p.hash]: e.target.value })} placeholder="예: 빼빼로를 친구와 하나씩 나눠 먹으며 고마워 했어요 (아이가 한 일 · 한 말 · 선생님이 도운 것)" />
+              </div>
+            </Field>
+          ))}
+          <p className="hint">아이가 한 일, 아이가 한 말, 선생님이 도운 것, 기억에 남는 모습 중 하나만 적어도 돼요. 사진을 빼려면 위에서 체크를 풀어 주세요.</p>
+        </div>
+      )}
       <Msg m={msg.m} />
       <div className="row" style={{ justifyContent: 'flex-end', marginBottom: 12 }}>
         {busy && <span className="hint">{busy}…</span>}
-        <button className="btn primary" disabled={!canStart} onClick={start}>글 만들기</button>
+        {asking && thin.length > 0 && <button className="btn" onClick={() => setAsking(false)}>장면 고치기</button>}
+        <button className="btn primary" disabled={!canStart} onClick={start}>{asking && thin.length > 0 ? '이대로 글 만들기' : '글 만들기'}</button>
       </div>
       <p className="hint">사진 속 아이가 나오는 글을 올리기 전에 학부모님께 게시 동의를 받았는지 확인해 주세요. 얼굴을 가려도 옷 · 이름표 · 가방 글자로 아이를 알아볼 수 있으니 사진 확인 칸에서 함께 봐 주세요.</p>
     </>

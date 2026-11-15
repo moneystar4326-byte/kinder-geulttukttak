@@ -26,6 +26,19 @@ export function sceneFromName(fileName: string) {
   return { order, title: title.slice(0, 100), needsTitle: hangul < 2 || DEVICE_NAME.test(title) };
 }
 
+// ---------- 짧은 장면 다시 묻기 (2026-11-16 사용자: "찰칵"처럼 짧게 넣으면 재료가 부족 → 구체적으로 다시 물어봄) ----------
+export const SHORT_SCENE_CHARS = 15; // 글 점검의 "장면이 짧아요" 안내와 같은 기준
+export const SCENE_MAX = 200; // 장면 + 더 적은 내용
+export const shortScene = (title: string) => title.replace(/\s/g, '').length < SHORT_SCENE_CHARS;
+export const sceneAnswered = (extra?: string) => (extra ?? '').replace(/\s/g, '').length >= 5;
+// 장면 칸에 더 적은 내용을 붙여 AI에게 보낼 장면 한 줄로 (마침표가 없으면 붙임)
+export function sceneWithDetail(title: string, extra?: string) {
+  const t = title.trim();
+  const x = (extra ?? '').trim();
+  if (!x) return t.slice(0, SCENE_MAX);
+  return `${/[.!?…]$/.test(t) ? t : `${t}.`} ${x}`.slice(0, SCENE_MAX);
+}
+
 // ---------- 아이 이름처럼 보이는 말 (경고용. 오탐은 "이름 아님"으로 넘김) ----------
 const SURNAMES = '김이박최정강조윤장임한오서신권황안송류유홍전고문양손배백허남심노하곽성차주우구민진지엄채원천방공현함변염여추도석선설마길위연명기라표';
 // 유치원판: 유치원 글에 자주 나오는 말 (선생님 · 반 이름 · 놀이 · 먹거리)을 이름으로 잡지 않게 더함
@@ -60,15 +73,25 @@ const AFTER_AGE = /\d+\s*(?:살|세)\s+([가-힣]{2,3}?)(?:이가|이는|이도|
 const VERB_END = /(던|는|을|된|하던|있는|없는)$/;
 // 장면 칸에 자주 쓰는 세 글자 낱말: 이름으로 잡으면 본문의 "선생님"이 "한 친구"로 바뀜 (태권판 리뷰 2026-11-08)
 const NOT_NAME = new Set(['선생님', '원장님', '원감님', '마지막', '여러분', '하나씩', '고마워', '친구들', '아이들', '어린이', '유치원', '다같이', '오늘도', '형님들', '동생들', '언니들', '오빠들']);
+// 이름일 수밖에 없는 모양: "민준이가" · "6살 규희" · "○○이 할머니" · "○○ 어린이"
+function strongNames(t: string): Set<string> {
+  const out = new Set<string>();
+  for (const m of t.matchAll(HONORIFIC)) if (!NOT_PERSON(m[1])) out.add(m[1]);
+  for (const n of childNames(t)) out.add(n);
+  for (const re of [RELATIVE, AFTER_AGE]) for (const m of t.matchAll(re)) if (!NOT_PERSON(m[1])) out.add(m[1]);
+  return out;
+}
 // notNames: 원장님 · 선생님이 [이름 아님]을 누른 말 (2026-11-16 백테스트: "배추잎"을 이름으로 보고 "한 친구 사이에"로 바꿈)
+// [이름 아님]은 성씨 글자로만 잡은 세 글자 낱말에만 통함. 이름일 수밖에 없는 모양("민준이가" · "6살 규희")은 눌러도 계속 가림 (잘못 눌러도 아이 이름이 나가지 않게)
 export function namesFromScenes(titles: string[], notNames: string[] = []): string[] {
   const out = new Set<string>();
+  const strong = new Set<string>();
   for (const raw of titles) {
     const t = raw.normalize('NFC');
     for (const n of suspectNames(t)) if (!VERB_END.test(n)) out.add(n); // "물 마시던 친구"의 "마시던"은 이름이 아님
-    for (const re of [RELATIVE, AFTER_AGE]) for (const m of t.matchAll(re)) if (!NOT_PERSON(m[1])) out.add(m[1]);
+    for (const n of strongNames(t)) if (!VERB_END.test(n)) { out.add(n); strong.add(n); }
   }
-  return [...out].filter((n) => !NOT_NAME.has(n) && !NOT_PERSON(n) && !notNames.includes(n));
+  return [...out].filter((n) => !NOT_NAME.has(n) && !NOT_PERSON(n) && (strong.has(n) || !notNames.includes(n)));
 }
 export function scenesNamesInBody(text: string, titles: string[], notNames: string[] = []): string[] {
   const t = text.normalize('NFC');

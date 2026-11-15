@@ -123,7 +123,7 @@ export function registerPhotoIpc(ctx: AppCtx) {
     if (!inFolder(file)) throw new Error('사진 폴더 밖의 파일이에요');
     return new Uint8Array(fs.readFileSync(file));
   });
-  handle('photos:create', z.object({ input: ArticleInputSchema, keywords: z.array(z.any()).max(50), photos: z.array(z.object({ path: z.string().max(1000), title: z.string().min(1).max(100) })).min(1).max(MAX_PHOTOS) }), ({ input, keywords, photos }) => {
+  handle('photos:create', z.object({ input: ArticleInputSchema, keywords: z.array(z.any()).max(50), photos: z.array(z.object({ path: z.string().max(1000), title: z.string().min(1).max(200) })).min(1).max(MAX_PHOTOS) }), ({ input, keywords, photos }) => {
     const p = db.getProfile();
     if (!p) throw new Error(`${APP.place} 정보를 먼저 저장해 주세요`);
     const rows = photos.map((x, i) => {
