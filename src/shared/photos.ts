@@ -26,6 +26,21 @@ export function sceneFromName(fileName: string) {
   return { order, title: title.slice(0, 100), needsTitle: hangul < 2 || DEVICE_NAME.test(title) };
 }
 
+// ---------- 같은 사진 하나로 (2026-11-16 사용자: 폴더 사진이 다 안 나옴 → 이름만 다르고 내용이 같은 사진이 있었음) ----------
+// 내용이 같은 사진은 처음 것만 목록에 두고, 나머지 파일 이름은 안내에 씀. 해시가 없는 사진(복사 중 · 읽기 실패)은 그대로
+export function dedupePhotos<T extends { hash: string; name: string }>(list: T[]): { photos: T[]; dups: { kept: string; same: string[] }[] } {
+  const first = new Map<string, T>();
+  const same = new Map<string, string[]>();
+  const photos: T[] = [];
+  for (const p of list) {
+    if (!p.hash) { photos.push(p); continue; }
+    const k = first.get(p.hash);
+    if (!k) { first.set(p.hash, p); photos.push(p); continue; }
+    same.set(p.hash, [...(same.get(p.hash) ?? []), p.name]);
+  }
+  return { photos, dups: [...same].map(([h, names]) => ({ kept: first.get(h)!.name, same: names })) };
+}
+
 // ---------- 짧은 장면 다시 묻기 (2026-11-16 사용자: "찰칵"처럼 짧게 넣으면 재료가 부족 → 구체적으로 다시 물어봄) ----------
 export const SHORT_SCENE_CHARS = 15; // 글 점검의 "장면이 짧아요" 안내와 같은 기준
 export const SCENE_MAX = 200; // 장면 + 더 적은 내용

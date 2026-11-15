@@ -6,7 +6,7 @@ import { call, local, type DojoProfile, type KeywordRow } from '../api';
 import { Field, Msg, useMsg } from '../components/ui';
 import { LockBanner } from '../components/Account';
 import { thumbnail } from '../photos/face';
-import { MAX_PHOTOS, sceneAnswered, sceneWithDetail, shortScene, suspectNames } from '../../shared/photos';
+import { dedupePhotos, MAX_PHOTOS, sceneAnswered, sceneWithDetail, shortScene, suspectNames } from '../../shared/photos';
 import { hintWords, pickKeywords } from '../../shared/keywords';
 import { autoPrefix } from '../../shared/areas';
 import { buildQuickInput } from '../../shared/quickInput';
@@ -35,6 +35,7 @@ export function PhotoArticle() {
   const { info, go } = useApp();
   const [folder, setFolder] = useState<{ dir: string; exists: boolean } | null>(null);
   const [photos, setPhotos] = useState<ScannedPhoto[]>([]);
+  const [dups, setDups] = useState<{ kept: string; same: string[] }[]>([]); // 내용이 같은 사진 (하나만 보여 줌)
   const [topic, setTopic] = useState(local.get('photo-topic', ''));
   const [titles, setTitles] = useState<Record<string, string>>(local.get('photo-titles', {}));
   // 고른 사진 · 순서 · 확인은 다른 메뉴에 다녀와도 그대로 (태권 글뚝딱 2.7.10에서 옮김). 저장하는 것은 사진 해시뿐 (사진 · 썸네일은 저장하지 않음)
@@ -60,9 +61,11 @@ export function PhotoArticle() {
   const scan = useCallback(async () => {
     const f = await call<{ dir: string; exists: boolean }>('photos:folder');
     setFolder(f);
-    if (!f.exists) { setPhotos([]); return; }
-    const list = await call<ScannedPhoto[]>('photos:scan');
+    if (!f.exists) { setPhotos([]); setDups([]); return; }
+    const d = dedupePhotos(await call<ScannedPhoto[]>('photos:scan'));
+    const list = d.photos;
     setPhotos(list);
+    setDups(d.dups);
     // 안 쓴 사진은 모두 자동 선택 (최대 장수까지). 이미 고른 순서는 유지
     setPicked((cur) => {
       const ok = list.filter((p) => p.hash && !p.problem);
@@ -184,7 +187,9 @@ export function PhotoArticle() {
         {!selected.length && <p className="muted">{folder?.dir ? '넣을 새 사진이 없어요. 폴더에 사진을 넣으면 여기에 나와요.' : '먼저 사진 폴더를 골라 주세요.'}</p>}
         {selected.map((p, i) => row(p, i))}
         {unused.length > 0 && <><h3 style={{ marginTop: 12 }}>고르지 않은 사진 {unused.length}장</h3>{unused.map((p) => row(p, null))}</>}
-        {usedList.length > 0 && <details style={{ marginTop: 12 }}><summary className="hint">이미 쓴 사진 {usedList.length}장</summary>{usedList.map((p) => row(p, null))}</details>}
+        {usedList.length > 0 && <p className="note info used-note" style={{ marginTop: 12 }}>이미 글에 쓴 사진 <b>{usedList.length}장</b>은 아래 [이미 쓴 사진]에 모아 두었어요. 같은 사진으로 다시 쓰려면 펼쳐서 체크해 주세요.</p>}
+        {usedList.length > 0 && <details style={{ marginTop: 8 }}><summary className="hint">이미 쓴 사진 {usedList.length}장</summary>{usedList.map((p) => row(p, null))}</details>}
+        {dups.length > 0 && <p className="note info dup-note" style={{ marginTop: 12 }}>이름만 다르고 내용이 같은 사진이 있어 하나만 보여 드려요: {dups.map((x) => `${x.kept} = ${x.same.join(', ')}`).join(' · ')}</p>}
         {problems.length > 0 && <ul className="flags" style={{ marginTop: 12 }}>{problems.map((p) => <li key={p.path}><span className="badge warn">확인</span> {p.name}: {PROBLEM[p.problem!]}</li>)}</ul>}
       </div>
 

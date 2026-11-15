@@ -309,3 +309,13 @@ test('"하다가" · "자다가" · "친구보다"의 "~다"는 이름이 아님
   assert.deepEqual(childNames('민준이가 모래성을 쌓았어요'), ['민준']);
   assert.deepEqual(suspectNames('밖에 나가서 놀다가 단체사진. 놀이터에서 술래잡기를 하다가 다 같이 모여 브이를 했어요'), []);
 });
+
+test('내용이 같은 사진은 하나만 두고 나머지 이름을 알려 줌 (2026-11-16 사용자: 폴더 사진이 다 안 나옴)', async () => {
+  const { dedupePhotos } = await import('../../src/shared/photos');
+  const r = dedupePhotos([
+    { name: 'a_04.jpg', hash: 'h1' }, { name: 'b.jpg', hash: 'h2' }, { name: 'c.jpg', hash: 'h1' }, { name: 'copying.jpg', hash: '' }, { name: 'd.jpg', hash: 'h1' },
+  ]);
+  assert.deepEqual(r.photos.map((p) => p.name), ['a_04.jpg', 'b.jpg', 'copying.jpg']);
+  assert.deepEqual(r.dups, [{ kept: 'a_04.jpg', same: ['c.jpg', 'd.jpg'] }]);
+  assert.deepEqual(dedupePhotos([{ name: 'x', hash: 'h' }]).dups, []);
+});
