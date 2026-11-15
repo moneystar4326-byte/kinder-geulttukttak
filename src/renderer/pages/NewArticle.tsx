@@ -8,7 +8,7 @@ import { ARTICLE_KINDS, AUDIENCES, CARD_STYLES, ENDINGS, TONES, type ArticleBrie
 import { fallbackKeyword, missingInputs } from '../../shared/validation';
 import { foreignKeyword, hintWords, pickKeywords, planCandidates } from '../../shared/keywords';
 import { autoPrefix, dongOf, prefixNames } from '../../shared/areas';
-import { buildQuickInput, emptyInput, needsMoreMemo, quickTopic, thinMemo } from '../../shared/quickInput';
+import { buildQuickInput, emptyInput, needsMoreMemo, quickTopic, thinMemo, thinMemoBlocked } from '../../shared/quickInput';
 import { quickKind } from '../../shared/quick';
 import { MicButton } from '../components/MicButton';
 import { APP, kindLabel, writerLabel, type Writer } from '../../shared/kinder';
@@ -250,7 +250,7 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
   // 재료가 적으면 만들기 전에 물음 2~3개 (2026-11-02). 메모를 고치면 물음은 사라짐
   const [quickAsks, setQuickAsks] = useState<{ memo: string; items: { question: string; answer: string }[] } | null>(null);
   const asksNow = quickAsks && quickAsks.memo === quick.trim() ? quickAsks : null;
-  const thinMemoOnly = !!asksNow && !asksNow.items.some((a) => a.answer.trim()) && quick.replace(/\s/g, '').length < 100;
+  const thinMemoOnly = !!asksNow && thinMemoBlocked(quick, asksNow.items.map((a) => a.answer));
   const [quickCards, setQuickCards] = useState<CardCountSetting | 0>(info.settings.cardCount ?? 'auto');
   const [quickPrefix, setQuickPrefixState] = useState(local.get('quick-prefix', true));
   // 태권 글뚝딱 2.2.11에서 옮김: 주변 장소가 비면 [동 유치원] 하나만 계속 붙는데 "돌아가며"로 안내돼 헷갈림
@@ -334,15 +334,15 @@ export function NewArticle({ jarvis, onJarvisDone }: { jarvis?: { text: string; 
             <b>재료를 조금만 더 알려 주세요. 글이 훨씬 구체적으로 나와요.</b>
             {asksNow.items.map((a, i) => (
               <Field key={i} label={a.question}>
-                <input value={a.answer} maxLength={500} placeholder="한 줄이면 돼요 (비워 둬도 돼요)" onChange={(e) => setQuickAsks({ ...asksNow, items: asksNow.items.map((x, j) => (j === i ? { ...x, answer: e.target.value } : x)) })} />
+                <input value={a.answer} maxLength={500} placeholder="한 줄이면 돼요" onChange={(e) => setQuickAsks({ ...asksNow, items: asksNow.items.map((x, j) => (j === i ? { ...x, answer: e.target.value } : x)) })} />
               </Field>
             ))}
             <p className="hint">있었던 일만 적어 주세요.</p>
-            {thinMemoOnly && <p className="hint"><b>답 없이 만들면 내용이 적은 짧은 안내 글이 돼요.</b> 한 칸만 적어도 글이 달라져요.</p>}
+            {thinMemoOnly && <p className="hint"><b>메모가 짧아서 물음에 하나 이상 답해 주셔야 글을 만들 수 있어요.</b> 한 칸만 적어도 돼요. 메모를 더 길게 적으셔도 돼요.</p>}
           </div>
         )}
         <div className="row" style={{ marginTop: 10 }}>
-          <button className="btn primary" disabled={!quick.trim() || !!busy || !profile} onClick={() => quickStart()}>{busy === 'quick-ask' ? '재료 살펴보는 중…' : busy === 'quick-kw' ? '키워드 고르는 중…' : busy === 'quick' ? '시작하는 중…' : asksNow ? '이대로 글 만들기' : '바로 글 만들기'}</button>
+          <button className="btn primary" disabled={!quick.trim() || !!busy || !profile || thinMemoOnly} onClick={() => quickStart()}>{busy === 'quick-ask' ? '재료 살펴보는 중…' : busy === 'quick-kw' ? '키워드 고르는 중…' : busy === 'quick' ? '시작하는 중…' : asksNow ? '이대로 글 만들기' : '바로 글 만들기'}</button>
           <span className="hint">지역: {profile?.region ?? '-'} · 문체: {profile?.tone ?? '-'} · 키워드: {naverReady ? '네이버 검색량으로 자동 선택' : `${fallbackKeyword(profile?.region ?? '', '주제')} (설정에 검색광고 키가 없음)`}</span>
         </div>
         <Msg m={msg.m} />

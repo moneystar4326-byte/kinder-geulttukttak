@@ -126,3 +126,10 @@ test('호흡 다듬기: 문제가 남으면 지적을 넣어 한 번만 더', as
   assert.equal(notes[0], undefined);
   assert.match(notes[1]!, /질문이 0개/);
 });
+
+test('메모가 짧고 답이 없으면 글을 만들지 않음, 답 하나나 긴 메모면 만듦', async () => {
+  const { thinMemoBlocked } = await import('../../src/shared/quickInput');
+  assert.equal(thinMemoBlocked('가을 소풍으로 보라매공원에 다녀왔어요', ['', ' ']), true);
+  assert.equal(thinMemoBlocked('가을 소풍으로 보라매공원에 다녀왔어요', ['', '낙엽을 주웠어요']), false);
+  assert.equal(thinMemoBlocked('가'.repeat(120), []), false);
+});

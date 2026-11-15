@@ -12,6 +12,10 @@ export const needsMoreMemo = (memo: string) => {
   return !!m && !['교육 정보', '모집 안내'].includes(quickKind(m)) && m.replace(/\s/g, '').length < 300;
 };
 
+// 메모가 짧은데 물음에 답이 하나도 없으면 글을 만들지 않음 (2026-11-16 사용자 확정: 소풍 한 줄 메모 → 170 · 354자, 답 없는 질문으로 끊긴 글)
+export const THIN_MEMO_CHARS = 100;
+export const thinMemoBlocked = (memo: string, answers: string[]) => memo.replace(/\s/g, '').length < THIN_MEMO_CHARS && !answers.some((a) => a.trim());
+
 export const emptyInput = (p?: DojoProfile | null): ArticleInput => ({
   kind: '수업 후기', audience: AUDIENCES[0], region: p?.region ?? '', topic: '',
   facts: { activities: '', coachingPoints: '', scenes: '', values: '', extra: '', photoNotes: '', event: { when: '', where: '', who: '', bring: '', apply: '' }, recruit: { who: '', trial: '' }, growth: { before: '', now: '', process: '' } },
