@@ -147,6 +147,7 @@ export async function generateArticle(deps: { db: Db; ai: TextAI; profile: DojoP
       const kept = keepPhotoLinks(prev, next);
       return photoLinkErrors(kept, photoIds).length ? prev : kept;
     };
+    if (process.env.GTD_DEBUG_DIR) require('node:fs').writeFileSync(require('node:path').join(process.env.GTD_DEBUG_DIR, `${Date.now()}-1-draft.json`), JSON.stringify(doc.sections)); // DEBUG_1-draftS
     const expands = 0;
     ctx.step('검증 중');
     db.setArticleStatus(articleId, 'validating');
@@ -154,8 +155,10 @@ export async function generateArticle(deps: { db: Db; ai: TextAI; profile: DojoP
     // 2026-11-05 사용자: 다시 쓸수록 표현이 평평해짐 → 분량 보완 · 전체 다듬기 · 2차 점검을 빼고, 사실과 다른 문장만 고침
     ctx.step('지어낸 문장 검사 중');
     doc = linked(await verifyDoc(ai, doc, profile, input, o, ctx.signal), doc);
+    if (process.env.GTD_DEBUG_DIR) require('node:fs').writeFileSync(require('node:path').join(process.env.GTD_DEBUG_DIR, `${Date.now()}-2-verify.json`), JSON.stringify(doc.sections)); // DEBUG_2-verifyS
     ctx.step('문장 호흡 다듬는 중');
     doc = linked(await warmDoc(ai, doc, profile, input, o, ctx.signal), doc);
+    if (process.env.GTD_DEBUG_DIR) require('node:fs').writeFileSync(require('node:path').join(process.env.GTD_DEBUG_DIR, `${Date.now()}-3-warm.json`), JSON.stringify(doc.sections)); // DEBUG_3-warmS
     // 사진 글: 장면 칸에 적힌 아이 이름이 글에 들어가면 코드가 "한 친구"로 바꿈 (안내를 해도 들어가는 일이 있음)
     if (input.photoScenes) doc = hideSceneNames(doc, input.photoScenes.map((s) => s.title), input.photoNotNames);
     ctx.step('사실 비교 점검 중');
@@ -237,7 +240,8 @@ export async function proofreadDoc(ai: TextAI, doc: ArticleDoc, input: ArticleIn
 const factWords = (text: string) => [...new Set(text.split(/[\s,.!?·()]+/).filter((w) => /^[가-힣A-Za-z]{2,}$/.test(w)).map((w) => (w.length > 2 ? w.slice(0, -1) : w)))];
 
 // 호흡 다듬기 결과를 쓸지 판단 (2026-11-05): 소제목 수가 같고, 없던 숫자가 없고, 숫자 · 검색어 · 재료 낱말을 잃지 않고, 분량이 너무 줄지 않을 때만
-export function acceptWarm(before: ArticleDoc, after: ArticleDoc['sections'], keywords: string[] = [], facts = ''): ArticleDoc | null {
+// minRatio: 사진 글은 0.8 (2026-11-16 백테스트: 다듬기가 장면 뒤 설명을 모두 지워 445 → 255자)
+export function acceptWarm(before: ArticleDoc, after: ArticleDoc['sections'], keywords: string[] = [], facts = '', minRatio = 0.5): ArticleDoc | null {
   if (after.length !== before.sections.length) return null;
   const next: ArticleDoc = { ...before, sections: after.map((s, i) => ({ ...s, id: before.sections[i].id, heading: before.sections[i].heading })) };
   const a = bodyText(before);
@@ -251,7 +255,7 @@ export function acceptWarm(before: ArticleDoc, after: ArticleDoc['sections'], ke
   // 반복을 지우므로 분량은 줄어도 되지만, 재료 낱말은 지켜야 함
   const had = factWords(facts).filter((w) => a.includes(w));
   if (had.filter((w) => !b.includes(w)).length > had.length * 0.15) return null;
-  if (countDoc(next).withoutSpaces < countDoc(before).withoutSpaces * 0.5) return null;
+  if (countDoc(next).withoutSpaces < countDoc(before).withoutSpaces * minRatio) return null;
   return next;
 }
 
@@ -259,11 +263,12 @@ export function acceptWarm(before: ArticleDoc, after: ArticleDoc['sections'], ke
 export async function warmDoc(ai: TextAI, doc: ArticleDoc, profile: DojoProfile, input: ArticleInput, o: CallOpts, signal: AbortSignal): Promise<ArticleDoc> {
   const keywords = [input.mainKeyword, ...input.subKeywords];
   const facts = bodyTextOfFacts(input);
+  const ratio = input.photoScenes ? 0.8 : 0.75; // 일반 글도 다듬기가 설명을 지워 424 → 294자 (같은 날 백테스트)
   try {
-    const first = acceptWarm(doc, await ai.warm(doc, profile, input, o), keywords, facts) ?? doc;
+    const first = acceptWarm(doc, await ai.warm(doc, profile, input, o), keywords, facts, ratio) ?? doc;
     const issues = styleIssues(first, input.kind, input.photoScenes ? 1 : 2);
     if (!issues.length) return first;
-    return acceptWarm(first, await ai.warm(first, profile, input, o, issues.join(' ')), keywords, facts) ?? first;
+    return acceptWarm(first, await ai.warm(first, profile, input, o, issues.join(' ')), keywords, facts, ratio) ?? first;
   } catch (e: any) {
     if (signal.aborted || e?.name === 'AbortError' || e?.code === 'cancelled') throw e;
     return doc;

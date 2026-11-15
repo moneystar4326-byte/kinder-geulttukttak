@@ -240,7 +240,7 @@ test('장면 칸의 아이 이름을 찾아 본문에 있으면 알림 (호칭 �
 
 test('사진 글 지시: 재료만큼 · 유치원 목소리(해요체 · 질문 · 40자) · 채우기 금지 · 이름 후보 전달', () => {
   const block = photoBlock({ photoScenes: [{ id: 'p01', title: '하원할 때 민서 할머니랑 찰칵' }] } as any);
-  assert.match(block, /장면마다 3~4문장/);
+  assert.match(block, /설명 한 문장은 꼭 붙인다/);
   assert.match(block, /해요체/);
   assert.match(block, /질문은 글 전체에 1~2개만/);
   assert.match(block, /40자 안팎/);
