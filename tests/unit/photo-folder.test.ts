@@ -194,11 +194,15 @@ test('사진 글 프롬프트와 분량: 재료만큼, 장면 소제목 줄에 �
   assert.match(block, /## \[p01\]/);
   assert.match(block, /사진을 볼 수 없다/);
   assert.equal(photoBlock({} as any), '');
-  assert.deepEqual(targetRangeForInput({ photoScenes: scenes }), [300, 560]); // 장면 2개 · 재료가 적어도 장면마다 설명 한두 문장 (2026-11-16)
-  const much = { photoScenes: scenes, facts: { story: '가'.repeat(400) } };
-  assert.deepEqual(targetRangeForInput(much), [520, 1200]);
-  assert.deepEqual(targetRangeForInput({ photoScenes: scenes, facts: { story: '가'.repeat(2000) } })[1], 1400);
-  assert.equal(minCharsForInput({ photoScenes: scenes }), 300);
+  // 2026-11-16 사용자: 새 글 작성처럼 → 장면 수 + 물음 답 수로, 최대 2,000자
+  assert.deepEqual(targetRangeForInput({ photoScenes: scenes }), [450, 675]);
+  const five = Array.from({ length: 5 }, (_, i) => ({ id: `p0${i + 1}`, title: '장면' }));
+  assert.deepEqual(targetRangeForInput({ photoScenes: five }), [900, 1200]);
+  const answered = { asks: [{ question: 'q', answer: '답' }, { question: 'q2', answer: '답2' }, { question: 'q3', answer: '' }] };
+  assert.deepEqual(targetRangeForInput({ photoScenes: five.slice(0, 3), brief: answered }), [700, 1050]);
+  const ten = Array.from({ length: 10 }, (_, i) => ({ id: `p${i}`, title: '장면' }));
+  assert.deepEqual(targetRangeForInput({ photoScenes: ten, brief: { asks: [{ answer: '1' }, { answer: '2' }, { answer: '3' }] } }), [1700, 2000]);
+  assert.equal(minCharsForInput({ photoScenes: scenes }), 450);
   assert.match(photoStory('주제', scenes), /장면 2: 왕관 만들기/);
 });
 
@@ -240,9 +244,11 @@ test('장면 칸의 아이 이름을 찾아 본문에 있으면 알림 (호칭 �
 
 test('사진 글 지시: 재료만큼 · 유치원 목소리(해요체 · 질문 · 40자) · 채우기 금지 · 이름 후보 전달', () => {
   const block = photoBlock({ photoScenes: [{ id: 'p01', title: '하원할 때 민서 할머니랑 찰칵' }] } as any);
-  assert.match(block, /설명 한 문장은 꼭 붙인다/);
+  assert.match(block, /설명 한두 문장/);
+  assert.match(block, /주제 설명 글감\]에서 골라/);
+  assert.match(block, /집에서 아이에게 물어볼 말/);
   assert.match(block, /해요체/);
-  assert.match(block, /질문은 글 전체에 1~2개만/);
+  assert.match(block, /질문은 글 전체에 2개/);
   assert.match(block, /40자 안팎/);
   assert.match(block, /이름일 수 있으니.*민서/);
   assert.doesNotMatch(block, /150~250자/);

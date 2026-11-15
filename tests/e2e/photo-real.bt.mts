@@ -9,7 +9,7 @@ import { openDb } from '../../src/main/db';
 import { NAVER_AUTO_TERMS_VERSION } from '../../src/shared/naverAuto';
 import type { PhotoState } from '../../src/shared/types';
 
-const [photoDir, topic, keyDir, outFile, extraArg] = process.argv.slice(2); // extraArg: 짧은 장면 물음에 적을 답 (| 로 나눔)
+const [photoDir, topic, keyDir, outFile, extraArg, askArg] = process.argv.slice(2); // extraArg: 짧은 장면 물음에 적을 답, askArg: 글 전체 물음에 적을 답 (둘 다 | 로 나눔)
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gtd-photo-real-'));
 for (const f of ['secrets.bin', 'Local State']) fs.copyFileSync(path.join(keyDir, f), path.join(dataDir, f));
 const seed = openDb(path.join(dataDir, 'app.db'));
@@ -31,7 +31,21 @@ try {
   while (await page.locator('button:has-text("이름 아님")').count()) await page.locator('button:has-text("이름 아님")').first().click();
   if (await page.locator('button:has-text("같이 쓰기")').count()) await page.click('button:has-text("같이 쓰기")');
   await page.locator('button:has-text("글 만들기")').click({ timeout: 15000 });
-  await page.waitForTimeout(3000);
+  // 물음을 받으려고 AI를 부르는 동안 기다림 → 물음 칸이 뜨거나 사진 확인 화면으로 넘어감
+  // 물음을 받으려고 AI를 부르는 동안 기다림 → 물음 칸이 뜨거나 글이 만들어지기 시작함 ("사진 확인" 글자는 안내문에도 있어서 쓰지 않음)
+  for (const t0 = Date.now(); ; ) {
+    if (await page.locator('.ask-more, .ask-scenes').count()) break;
+    if ((await call<any[]>('article:list').catch(() => [])).length) break;
+    if (Date.now() - t0 > 180000) throw new Error('물음 칸이 뜨지 않음');
+    await page.waitForTimeout(1000);
+  }
+  await page.waitForTimeout(500);
+  if (await page.locator('.ask-more').count()) {
+    result.asks = (await page.locator('.ask-more .field').allInnerTexts()).map((x) => x.trim().split(/\r?\n/)[0]);
+    const ans = (askArg ?? '').split('|');
+    const inputs = page.locator('.ask-more input');
+    for (let i = 0; i < await inputs.count(); i++) await inputs.nth(i).fill(ans[i] ?? '');
+  }
   if (await page.locator('.ask-scenes').count()) {
     result.asked = (await page.locator('.ask-scenes .field').allInnerTexts()).map((x) => x.trim().split(/\r?\n/)[0]);
     const ans = (extraArg ?? '').split('|');
@@ -40,6 +54,9 @@ try {
     const go = page.locator('button:has-text("이대로 글 만들기")');
     if (await go.isDisabled()) throw new Error('짧은 장면 물음에 답이 모자라 만들 수 없음');
     await go.click();
+    await page.waitForTimeout(3000);
+  } else if (await page.locator('.ask-more').count()) {
+    await page.locator('button:has-text("이대로 글 만들기")').click();
     await page.waitForTimeout(3000);
   }
   await page.waitForSelector('text=사진 확인', { timeout: 600000 });
@@ -57,7 +74,7 @@ try {
     if (Date.now() - t0 > 600000) throw new Error('글 만들기 시간 초과');
     await page.waitForTimeout(2000);
   }
-  result = { topic, title: v.version.title, sections: v.version.doc.sections, flags: v.version.doc.reviewFlags, main: v.article.input.mainKeyword, subs: v.article.input.subKeywords };
+  result = { ...result, topic, title: v.version.title, sections: v.version.doc.sections, flags: v.version.doc.reviewFlags, main: v.article.input.mainKeyword, subs: v.article.input.subKeywords };
 } catch (e: any) {
   result.error = String(e?.message ?? e).slice(0, 400);
   result.screen = (await page.locator('main, .content, body').first().innerText().catch(() => '')).slice(-1500);

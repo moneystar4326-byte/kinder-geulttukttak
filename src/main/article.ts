@@ -125,11 +125,13 @@ export async function generateArticle(deps: { db: Db; ai: TextAI; profile: DojoP
   db.setArticleStatus(articleId, 'generating');
   try {
     // 사진 글: 장면 칸에서 글 성격 · 주제 설명 글감을 먼저 정함 (자세히 쓰기와 같은 길 — 태권 글뚝딱 2.5.0에서 옮김). 실패해도 글은 만듦
-    if (photoIds && !input.brief) {
+    // 화면에서 물음 답만 담아 온 경우(사실 · 글감이 빔)도 정리하고, 원장님 · 선생님이 적은 답을 붙임 (2026-11-16)
+    if (photoIds && !input.brief?.facts?.length) {
       ctx.step('장면 정리 중');
       try {
+        const answered = (input.brief?.asks ?? []).filter((a) => a.answer?.trim());
         const brief = await ai.brief({ kind: input.kind, topic: input.topic, story: input.facts.story ?? '' }, o);
-        input = { ...input, brief };
+        input = { ...input, brief: answered.length ? { ...brief, asks: answered } : brief };
         db.updateArticleInput(articleId, input, art.keywords);
       } catch (e: any) { if (ctx.signal.aborted || e?.name === 'AbortError' || e?.code === 'cancelled') throw e; }
     }
