@@ -333,3 +333,13 @@ test('"수업 끝나고 할머니가"의 "끝나고"는 이름이 아님 (2026-1
   assert.equal(hideSceneNames(doc, titles).sections[0].paragraphs[0], '수업이 끝나고 할머니가 데리러 오셨어요. 수업을 마치고 할머니를 만났어요.');
   assert.deepEqual(namesFromScenes(['하원할 때 민서 할머니랑 찰칵', '6살 규희가 줄넘기 연습']).sort(), ['규희', '민서']);
 });
+
+test('물음 답의 "하나씩" · "터진 친구"는 이름이 아님 (2026-11-16 백테스트: 화면에서 글 만들기가 막힘)', () => {
+  assert.deepEqual(suspectNames('김밥을 친구에게 하나씩 나눠 주었어요'), []);
+  assert.deepEqual(suspectNames('모양이 터진 친구도 다시 꾹꾹 붙여 완성했어요'), []);
+  assert.deepEqual(suspectNames('넘어진 친구를 일으켜 주고, 다친 친구도 챙겼어요. 웃는 친구도 있었어요'), []);
+  // 이름은 계속 잡음
+  assert.deepEqual(suspectNames('민준 친구가 블록을 쌓았어요'), ['민준']);
+  assert.deepEqual(suspectNames('하은 친구랑 서윤이가 웃었어요').sort(), ['서윤', '하은']);
+  assert.deepEqual(namesFromScenes(['하원할 때 민서 할머니랑 찰칵', '6살 규희가 줄넘기 연습']).sort(), ['규희', '민서']);
+});

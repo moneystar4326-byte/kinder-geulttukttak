@@ -59,26 +59,33 @@ const SURNAMES = '김이박최정강조윤장임한오서신권황안송류유�
 // 유치원판: 유치원 글에 자주 나오는 말 (선생님 · 반 이름 · 놀이 · 먹거리)을 이름으로 잡지 않게 더함
 const COMMON = new Set(['아이', '아이들', '친구', '친구들', '학생', '학생들', '어린이', '어린이들', '우리', '모두', '선생님', '원장님', '원감님', '담임', '유아', '유아들', '원아', '원아들', '유치원', '단체', '오늘의', '한마음', '고무줄', '마무리', '하나둘', '장애물', '안정감', '성취감', '자신감', '장난감', '도시락', '주먹밥', '고구마', '도토리', '민들레', '방과후', '공놀이', '모래성', '송편을', '김장을', '김치를', '준비를', '정리를', '연습을', '선물을',
   '모든', '다른', '여러', '같은', '새로운', '어린', '작은', '많은', '처음', '함께', '단짝', '옆자리', '동생', '동생들', '형님', '형님들', '언니', '언니들', '오빠', '오빠들', '누나', '누나들', '친한', '몇몇', '다섯', '여섯', '일곱', '여덟', '아홉', '우리반', '옆반', '동갑', '귀여운', '씩씩한', '멋진', '또한', '이런', '그런', '저런', '어떤', '이번', '지난', '오늘', '모두의']);
-const HONORIFIC = /([가-힣]{2,4})\s*(어린이|학생|군|양|친구)(?=$|[\s,.!?은는이가을를의와과도])/g;
+const HONORIFIC = /([가-힣]{2,4})\s*(어린이|학생|군|양|친구)(?=$|[\s,.!?은는이가을를의와과도랑에한])/g;
 const ENDS_LIKE_JOSA = /[은는이가을를의와과도로에만한할된던서고며면게지요다기]$/; // 조사 · 어미로 끝나면 이름이 아닌 것으로 봄 (연습한 · 정확히 · 준비기)
 // 반 이름 ("햇살반", "7세반") · 높임 ("선생님") · 여럿 ("형님들")은 이름이 아님
 const NOT_PERSON = (w: string) => COMMON.has(w) || /(반|님|들)$/.test(w) || /^님/.test(w);
+// "○○ 친구"의 ○○가 꾸미는 말이면 이름이 아님: "터진 친구" · "다친 친구" · "넘어진 친구" · "웃는 친구" (2026-11-16 백테스트: 물음 답의 "모양이 터진 친구도"로 글 만들기가 막힘)
+// 끝 글자 받침이 ㄴ · ㄹ 인데 이름 글자가 아니면 꾸미는 말로 봄 ("민준 친구"는 이름 글자라 그대로 잡음)
+const MODIFIER = (w: string) => { const c = w.charCodeAt(w.length - 1) - 0xac00; return (c % 28 === 4 || c % 28 === 8) && !nameLike(w); };
+function honorificNames(t: string) {
+  return [...t.matchAll(HONORIFIC)].map((m) => m[1]).filter((w) => !NOT_PERSON(w) && !MODIFIER(w));
+}
 
 export function suspectNames(text: string): string[] {
   const t = text.normalize('NFC');
   const out = new Set<string>();
-  for (const m of t.matchAll(HONORIFIC)) if (!NOT_PERSON(m[1])) out.add(m[1]);
+  for (const n of honorificNames(t)) out.add(n);
   for (const w of t.split(/[^가-힣]+/)) {
     if (w.length === 3 && SURNAMES.includes(w[0]) && !ENDS_LIKE_JOSA.test(w) && !NOT_PERSON(w)) out.add(w);
   }
   // 유치원판: "민준이가", "지우는"처럼 이름 + 조사 (메모 검사와 같은 규칙)
   for (const n of childNames(t)) out.add(n);
-  return [...out];
+  // 글 만들 때 검사(namesFromScenes)와 같은 낱말을 뺌 (2026-11-16 백테스트: 화면 검사만 "하나씩"을 이름으로 봄)
+  return [...out].filter((n) => !NOT_NAME.has(n) && !VERB_END.test(n));
 }
 // 생성된 본문은 호칭이 붙은 것만 봄 (본문의 세 글자 낱말은 거의 이름이 아님)
 export function namesInBody(text: string): string[] {
   const out = new Set<string>();
-  for (const m of text.normalize('NFC').matchAll(HONORIFIC)) if (!NOT_PERSON(m[1])) out.add(m[1]);
+  for (const n of honorificNames(text.normalize('NFC'))) out.add(n);
   return [...out];
 }
 
@@ -91,7 +98,7 @@ const NOT_NAME = new Set(['선생님', '원장님', '원감님', '마지막', '�
 // 이름일 수밖에 없는 모양: "민준이가" · "6살 규희" · "○○이 할머니" · "○○ 어린이"
 function strongNames(t: string): Set<string> {
   const out = new Set<string>();
-  for (const m of t.matchAll(HONORIFIC)) if (!NOT_PERSON(m[1])) out.add(m[1]);
+  for (const n of honorificNames(t)) out.add(n);
   for (const n of childNames(t)) out.add(n);
   // "○○이 할머니" · "6살 ○○"도 이름 글자로 된 말만 (2026-11-16 시험: "수업 끝나고 할머니가"의 "끝나고"를 이름으로 보고 "수업이 한 친구 할머니가"로 바꿈)
   for (const re of [RELATIVE, AFTER_AGE]) for (const m of t.matchAll(re)) if (!NOT_PERSON(m[1]) && nameLike(m[1])) out.add(m[1]);
