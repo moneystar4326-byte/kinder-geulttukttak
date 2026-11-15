@@ -133,3 +133,11 @@ test('메모가 짧고 답이 없으면 글을 만들지 않음, 답 하나나 �
   assert.equal(thinMemoBlocked('가을 소풍으로 보라매공원에 다녀왔어요', ['', '낙엽을 주웠어요']), false);
   assert.equal(thinMemoBlocked('가'.repeat(120), []), false);
 });
+
+test('예고 · 정리 · 뜻풀이 문장을 찾아 다듬기에 넘김 (2026-11-16 사용자: 사진 글 흐름이 어색함)', async () => {
+  const { styleIssues } = await import('../../src/shared/overused');
+  const doc = (t: string) => ({ sections: [{ id: 's1', heading: '', paragraphs: [t] }] });
+  for (const bad of ['학부모님께 작은 일상을 전해 드려요.', '사진과 함께 오늘의 이야기를 만나 보셨나요?', '오늘은 줄넘기 이야기를 함께 나눠요.', '놀이할 때 쓴 물건을 제자리에 돌려놓는 일이에요.', '직접 정리해 보는 것도 일상에서 해 보는 경험이에요.', '하원은 하루의 생활에서 가정으로 자리를 옮기는 때예요.'])
+    assert.ok(styleIssues(doc(bad), '수업 후기', 0).some((x) => x.startsWith('정리만 하는 문장')), bad);
+  assert.ok(!styleIssues(doc('줄넘기를 다 하고 나서는 스스로 줄을 감았어요.'), '수업 후기', 0).some((x) => x.startsWith('정리만 하는 문장')));
+});
