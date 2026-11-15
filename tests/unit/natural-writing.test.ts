@@ -116,15 +116,20 @@ test('말투 점검: 질문 수와 "~했어요" 연속을 셈', () => {
   assert.equal(styleIssues(para('설명 글이에요.'), '교육 정보').length, 0);
 });
 
-test('호흡 다듬기: 문제가 남으면 지적을 넣어 한 번만 더', async () => {
+test('마지막 다듬기: 뜻풀이가 남으면 지적을 넣어 한 번만 더, 질문 수로는 다시 고치지 않음 (2026-11-16)', async () => {
   const { warmDoc } = await import('../../src/main/article');
-  const notes: (string | undefined)[] = [];
-  const doc = { titleCandidates: ['t'], tags: [], photoSuggestions: [], reviewFlags: [], sections: [{ id: 's1', heading: '', paragraphs: ['놀이를 했어요.'] }] };
-  const ai: any = { warm: async (_d: unknown, _p: unknown, _i: unknown, _o: unknown, note?: string) => (notes.push(note), [{ id: 's1', heading: '', paragraphs: ['놀이를 즐겼어요.'] }]) };
-  await warmDoc(ai, doc as any, DEMO_PROFILE, { ...DEMO_INPUT, mainKeyword: '', subKeywords: [] }, {}, new AbortController().signal);
-  assert.equal(notes.length, 2);
-  assert.equal(notes[0], undefined);
-  assert.match(notes[1]!, /질문이 0개/);
+  const doc = { titleCandidates: ['t'], tags: [], photoSuggestions: [], reviewFlags: [], sections: [{ id: 's1', heading: '', paragraphs: ['줄넘기를 정리했어요. 기특했어요.'] }] };
+  const run = async (out: string) => {
+    const notes: (string | undefined)[] = [];
+    const ai: any = { warm: async (_d: unknown, _p: unknown, _i: unknown, _o: unknown, note?: string) => (notes.push(note), [{ id: 's1', heading: '', paragraphs: [out] }]) };
+    await warmDoc(ai, doc as any, DEMO_PROFILE, { ...DEMO_INPUT, mainKeyword: '', subKeywords: [] }, {}, new AbortController().signal);
+    return notes;
+  };
+  const a = await run('줄넘기를 정리했어요. 물건을 제자리에 돌려놓는 일이에요. 참 기특했어요.');
+  assert.equal(a.length, 2);
+  assert.equal(a[0], undefined);
+  assert.match(a[1]!, /정리만 하는 문장/);
+  assert.equal((await run('줄넘기를 정리했어요. 그 모습이 참 기특했어요.')).length, 1); // 질문이 없어도 다시 고치지 않음
 });
 
 test('메모가 짧고 답이 없으면 글을 만들지 않음, 답 하나나 긴 메모면 만듦', async () => {
@@ -134,10 +139,11 @@ test('메모가 짧고 답이 없으면 글을 만들지 않음, 답 하나나 �
   assert.equal(thinMemoBlocked('가'.repeat(120), []), false);
 });
 
-test('예고 · 정리 · 뜻풀이 문장을 찾아 다듬기에 넘김 (2026-11-16 사용자: 사진 글 흐름이 어색함)', async () => {
+test('뜻풀이 문장을 찾아 다듬기에 넘기고, 학부모님께 건네는 인사는 그대로 둠 (2026-11-16 사용자: [더 따뜻하게] 말투가 자연스러움)', async () => {
   const { styleIssues } = await import('../../src/shared/overused');
   const doc = (t: string) => ({ sections: [{ id: 's1', heading: '', paragraphs: [t] }] });
-  for (const bad of ['학부모님께 작은 일상을 전해 드려요.', '사진과 함께 오늘의 이야기를 만나 보셨나요?', '오늘은 줄넘기 이야기를 함께 나눠요.', '놀이할 때 쓴 물건을 제자리에 돌려놓는 일이에요.', '직접 정리해 보는 것도 일상에서 해 보는 경험이에요.', '하원은 하루의 생활에서 가정으로 자리를 옮기는 때예요.'])
+  for (const bad of ['놀이할 때 쓴 물건을 제자리에 돌려놓는 일이에요.', '직접 정리해 보는 것도 일상에서 해 보는 경험이에요.', '하원은 하루의 생활에서 가정으로 자리를 옮기는 때예요.'])
     assert.ok(styleIssues(doc(bad), '수업 후기', 0).some((x) => x.startsWith('정리만 하는 문장')), bad);
-  assert.ok(!styleIssues(doc('줄넘기를 다 하고 나서는 스스로 줄을 감았어요.'), '수업 후기', 0).some((x) => x.startsWith('정리만 하는 문장')));
+  for (const ok of ['줄넘기를 다 하고 나서는 스스로 줄을 감았어요.', '학부모님께 작은 일상을 전해 드려요.', '사진과 함께 오늘의 이야기를 만나 보셨나요?'])
+    assert.ok(!styleIssues(doc(ok), '수업 후기', 0).some((x) => x.startsWith('정리만 하는 문장')), ok);
 });

@@ -2,7 +2,7 @@
 // 유치원판: 아이들이 만 3~5세라 얼굴 가림은 찾은 얼굴 모두 기본으로 켜고, 원장님 · 선생님이 사진마다 확인해야 넣을 수 있어요.
 // 사진 자체는 OpenAI로 보내지 않아요 (AI에는 장면 글자만 가요)
 import type { ArticleDoc, PhotoRegion } from './types';
-import { childNames } from './validation';
+import { childNames, nameLike } from './validation';
 
 // 사진으로 글쓰기 메뉴. 숨기려면 false
 export const PHOTO_MENU_ON = true;
@@ -93,7 +93,8 @@ function strongNames(t: string): Set<string> {
   const out = new Set<string>();
   for (const m of t.matchAll(HONORIFIC)) if (!NOT_PERSON(m[1])) out.add(m[1]);
   for (const n of childNames(t)) out.add(n);
-  for (const re of [RELATIVE, AFTER_AGE]) for (const m of t.matchAll(re)) if (!NOT_PERSON(m[1])) out.add(m[1]);
+  // "○○이 할머니" · "6살 ○○"도 이름 글자로 된 말만 (2026-11-16 시험: "수업 끝나고 할머니가"의 "끝나고"를 이름으로 보고 "수업이 한 친구 할머니가"로 바꿈)
+  for (const re of [RELATIVE, AFTER_AGE]) for (const m of t.matchAll(re)) if (!NOT_PERSON(m[1]) && nameLike(m[1])) out.add(m[1]);
   return out;
 }
 // notNames: 원장님 · 선생님이 [이름 아님]을 누른 말 (2026-11-16 백테스트: "배추잎"을 이름으로 보고 "한 친구 사이에"로 바꿈)

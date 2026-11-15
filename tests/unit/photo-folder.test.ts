@@ -319,3 +319,11 @@ test('내용이 같은 사진은 하나만 두고 나머지 이름을 알려 줌
   assert.deepEqual(r.dups, [{ kept: 'a_04.jpg', same: ['c.jpg', 'd.jpg'] }]);
   assert.deepEqual(dedupePhotos([{ name: 'x', hash: 'h' }]).dups, []);
 });
+
+test('"수업 끝나고 할머니가"의 "끝나고"는 이름이 아님 (2026-11-16 시험: "수업이 한 친구 할머니가"로 깨짐)', () => {
+  const titles = ['수업마치고 할머니랑 찰칵. 수업 끝나고 할머니가 픽업왔는데 한 친구가 너무 반가워하는 모습에'];
+  assert.deepEqual(namesFromScenes(titles), []);
+  const doc = { sections: [{ heading: '', paragraphs: ['수업이 끝나고 할머니가 데리러 오셨어요. 수업을 마치고 할머니를 만났어요.'] }] };
+  assert.equal(hideSceneNames(doc, titles).sections[0].paragraphs[0], '수업이 끝나고 할머니가 데리러 오셨어요. 수업을 마치고 할머니를 만났어요.');
+  assert.deepEqual(namesFromScenes(['하원할 때 민서 할머니랑 찰칵', '6살 규희가 줄넘기 연습']).sort(), ['규희', '민서']);
+});

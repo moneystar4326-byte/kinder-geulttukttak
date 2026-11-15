@@ -146,7 +146,7 @@ const SURNAME = new Set([...'김이박최정강조윤장임한오서신권황안
 const NOT_NAME = new Set(['아이', '다시', '서로', '이제', '하나', '우유', '수영', '하원', '주제', '시소', '수유', '이유', '유아', '영아', '아기', '가지', '오이', '동시', '미소', '이미', '지원', '연주', '경기', '주인', '소원', '선수', '수업', '이미지', '아이들']);
 const BATCHIM = (ch: string) => { const c = ch.charCodeAt(0) - 0xac00; return c >= 0 && c < 11172 && c % 28 !== 0; };
 // "~다"로 끝나는 말은 이름이 아님: "하다가" · "자다가" · "보다가" · "친구보다" (2026-11-16 사진 글 시험: "술래잡기를 하다가"의 "하다"를 이름으로 봄)
-const nameLike = (n: string) => !NOT_NAME.has(n) && !n.endsWith('다') && (n.length === 2 ? [...n].every((c) => NAME_SYL.has(c)) : SURNAME.has(n[0]) && [...n.slice(1)].every((c) => NAME_SYL.has(c)));
+export const nameLike = (n: string) => !NOT_NAME.has(n) && !n.endsWith('다') && (n.length === 2 ? [...n].every((c) => NAME_SYL.has(c)) : SURNAME.has(n[0]) && [...n.slice(1)].every((c) => NAME_SYL.has(c)));
 const END = '(?=[\\s.,!?~]|$)';
 export function childNames(memo: string) {
   const out = new Set<string>();

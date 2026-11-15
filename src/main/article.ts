@@ -266,7 +266,8 @@ export async function warmDoc(ai: TextAI, doc: ArticleDoc, profile: DojoProfile,
   const ratio = input.photoScenes ? 0.8 : 0.75; // 일반 글도 다듬기가 설명을 지워 424 → 294자 (같은 날 백테스트)
   try {
     const first = acceptWarm(doc, await ai.warm(doc, profile, input, o), keywords, facts, ratio) ?? doc;
-    const issues = styleIssues(first, input.kind, input.photoScenes ? 1 : 2);
+    // 따뜻하게 다시 쓴 글은 질문 수 · 문장 길이로 다시 고치지 않음 (체크리스트처럼 딱딱해짐). 몰린 말 · 뜻풀이 · 정리 문장만 한 번 더
+    const issues = styleIssues(first, input.kind, 0).filter((x) => !x.startsWith('너무 긴 문장') && !x.startsWith('질문이'));
     if (!issues.length) return first;
     return acceptWarm(first, await ai.warm(first, profile, input, o, issues.join(' ')), keywords, facts, ratio) ?? first;
   } catch (e: any) {
