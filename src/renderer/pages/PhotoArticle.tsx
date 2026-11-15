@@ -66,12 +66,13 @@ export function PhotoArticle() {
     const list = d.photos;
     setPhotos(list);
     setDups(d.dups);
-    // 안 쓴 사진은 모두 자동 선택 (최대 장수까지). 이미 고른 순서는 유지
+    // 폴더 사진은 모두 자동 선택 (최대 장수까지). 이미 고른 순서는 유지
+    // 2026-11-16 사용자: [이미 쓴 사진] 구분은 필요 없음 → 글에 쓴 사진도 다른 사진과 똑같이 보여 주고 고름
     setPicked((cur) => {
       const ok = list.filter((p) => p.hash && !p.problem);
       const have = new Set(ok.map((p) => p.hash));
       const next = cur.filter((h) => have.has(h));
-      for (const p of ok) if (!p.used && !next.includes(p.hash) && !offRef.current.has(p.hash) && next.length < MAX_PHOTOS) next.push(p.hash);
+      for (const p of ok) if (!next.includes(p.hash) && !offRef.current.has(p.hash) && next.length < MAX_PHOTOS) next.push(p.hash);
       return next;
     });
   }, []);
@@ -99,8 +100,7 @@ export function PhotoArticle() {
   const byHash = useMemo(() => new Map(photos.filter((p) => p.hash).map((p) => [p.hash, p])), [photos]);
   const selected = picked.map((h) => byHash.get(h)).filter(Boolean) as ScannedPhoto[];
   const titleOf = (p: ScannedPhoto) => titles[p.hash] ?? (p.needsTitle ? '' : p.title);
-  const unused = photos.filter((p) => p.hash && !p.problem && !p.used && !picked.includes(p.hash));
-  const usedList = photos.filter((p) => p.hash && !p.problem && p.used && !picked.includes(p.hash));
+  const unused = photos.filter((p) => p.hash && !p.problem && !picked.includes(p.hash));
   const problems = photos.filter((p) => p.problem);
 
   const days = [...new Set(selected.map(dayOf))].sort();
@@ -187,8 +187,6 @@ export function PhotoArticle() {
         {!selected.length && <p className="muted">{folder?.dir ? '넣을 새 사진이 없어요. 폴더에 사진을 넣으면 여기에 나와요.' : '먼저 사진 폴더를 골라 주세요.'}</p>}
         {selected.map((p, i) => row(p, i))}
         {unused.length > 0 && <><h3 style={{ marginTop: 12 }}>고르지 않은 사진 {unused.length}장</h3>{unused.map((p) => row(p, null))}</>}
-        {usedList.length > 0 && <p className="note info used-note" style={{ marginTop: 12 }}>이미 글에 쓴 사진 <b>{usedList.length}장</b>은 아래 [이미 쓴 사진]에 모아 두었어요. 같은 사진으로 다시 쓰려면 펼쳐서 체크해 주세요.</p>}
-        {usedList.length > 0 && <details style={{ marginTop: 8 }}><summary className="hint">이미 쓴 사진 {usedList.length}장</summary>{usedList.map((p) => row(p, null))}</details>}
         {dups.length > 0 && <p className="note info dup-note" style={{ marginTop: 12 }}>이름만 다르고 내용이 같은 사진이 있어 하나만 보여 드려요: {dups.map((x) => `${x.kept} = ${x.same.join(', ')}`).join(' · ')}</p>}
         {problems.length > 0 && <ul className="flags" style={{ marginTop: 12 }}>{problems.map((p) => <li key={p.path}><span className="badge warn">확인</span> {p.name}: {PROBLEM[p.problem!]}</li>)}</ul>}
       </div>
