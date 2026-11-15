@@ -66,7 +66,7 @@ export function photoBlockers(ctx: AppCtx, articleId: string, doc: ArticleDoc | 
   const blockers = photoFileProblems(all);
   if (doc) {
     blockers.push(...photoLinkErrors(liveDoc(doc, all), all.filter((x) => !x.excluded).map((x) => x.id)));
-    const names = [...new Set([...namesInBody(bodyText(doc)), ...scenesNamesInBody(bodyText(doc), all.map((x) => x.title))])];
+    const names = [...new Set([...namesInBody(bodyText(doc)), ...scenesNamesInBody(bodyText(doc), all.map((x) => x.title), ctx.db.getArticle(articleId)?.input.photoNotNames)])];
     if (names.length) blockers.push(`글에 아이 이름으로 보이는 말이 있어요: ${names.join(', ')}. 지우거나 고친 뒤 넣어 주세요.`);
   }
   return blockers;

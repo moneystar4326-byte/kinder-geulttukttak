@@ -194,11 +194,11 @@ test('사진 글 프롬프트와 분량: 재료만큼, 장면 소제목 줄에 �
   assert.match(block, /## \[p01\]/);
   assert.match(block, /사진을 볼 수 없다/);
   assert.equal(photoBlock({} as any), '');
-  assert.deepEqual(targetRangeForInput({ photoScenes: scenes }), [200, 450]); // 재료가 적으면 짧은 글
+  assert.deepEqual(targetRangeForInput({ photoScenes: scenes }), [300, 560]); // 장면 2개 · 재료가 적어도 장면마다 설명 한두 문장 (2026-11-16)
   const much = { photoScenes: scenes, facts: { story: '가'.repeat(400) } };
   assert.deepEqual(targetRangeForInput(much), [520, 1200]);
   assert.deepEqual(targetRangeForInput({ photoScenes: scenes, facts: { story: '가'.repeat(2000) } })[1], 1400);
-  assert.equal(minCharsForInput({ photoScenes: scenes }), 200);
+  assert.equal(minCharsForInput({ photoScenes: scenes }), 300);
   assert.match(photoStory('주제', scenes), /장면 2: 왕관 만들기/);
 });
 
@@ -240,9 +240,9 @@ test('장면 칸의 아이 이름을 찾아 본문에 있으면 알림 (호칭 �
 
 test('사진 글 지시: 재료만큼 · 유치원 목소리(해요체 · 질문 · 40자) · 채우기 금지 · 이름 후보 전달', () => {
   const block = photoBlock({ photoScenes: [{ id: 'p01', title: '하원할 때 민서 할머니랑 찰칵' }] } as any);
-  assert.match(block, /재료만큼만/);
+  assert.match(block, /장면마다 3~4문장/);
   assert.match(block, /해요체/);
-  assert.match(block, /질문은 글 전체에 2~3개/);
+  assert.match(block, /질문은 글 전체에 1~2개만/);
   assert.match(block, /40자 안팎/);
   assert.match(block, /이름일 수 있으니.*민서/);
   assert.doesNotMatch(block, /150~250자/);
@@ -265,4 +265,23 @@ test('동물 가림: 한 사진 안에서는 겹치지 않고, 사진마다 시�
   assert.equal(new Set(one).size, n);
   assert.notEqual(animalIndex(0, 0, n), animalIndex(0, 1, n));
   assert.ok(ANIMAL_COVER_SCALE * 1.6 > 1.2 && ANIMAL_COVER_SCALE <= 1, '얼굴(칸의 1/1.6)은 덮되 칸 밖으로 넘치지 않음');
+});
+
+test('"사진 찍어 줄게…"처럼 사진으로 시작하는 장면은 기기 이름이 아님 (2026-11-16 백테스트)', () => {
+  assert.equal(sceneFromName('02_사진 찍어 줄게 하니 브이.jpg').needsTitle, false);
+  assert.equal(sceneFromName('사진 1.jpg').needsTitle, true);
+  assert.equal(sceneFromName('사진_20261103.jpg').needsTitle, true);
+  assert.equal(sceneFromName('KakaoTalk_20261103_123.jpg').needsTitle, true);
+});
+
+test('[이름 아님]을 누른 말은 "한 친구"로 바꾸지 않음 (2026-11-16 백테스트: "배추잎 사이에" → "한 친구 사이에")', () => {
+  const titles = ['배추잎 사이에 양념 넣기가 어려워 선생님이 잎을 살짝 들어 줌'];
+  const doc = { sections: [{ heading: '', paragraphs: ['배추잎 사이에 양념을 넣었어요.'] }] };
+  const guessed = namesFromScenes(titles);
+  if (guessed.length) {
+    assert.equal(hideSceneNames(doc, titles, guessed).sections[0].paragraphs[0], '배추잎 사이에 양념을 넣었어요.');
+    assert.deepEqual(scenesNamesInBody('배추잎 사이에', titles, guessed), []);
+  }
+  // 이름은 여전히 가림
+  assert.match(hideSceneNames({ sections: [{ heading: '', paragraphs: ['규희가 줄넘기를 했어요.'] }] }, ['6살 규희가 줄넘기 연습'], []).sections[0].paragraphs[0], /^한 친구가/);
 });

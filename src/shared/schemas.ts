@@ -211,6 +211,7 @@ export const ArticleInputSchema = z.object({
   greetings: z.boolean().optional(),
   titlePrefix: s(60).optional(),
   photoScenes: z.array(z.object({ id: s(10), title: s(100) })).max(10).optional(),
+  photoNotNames: z.array(s(20)).max(30).optional(),
   writer: Writer.optional(),
   writerSign: z.boolean().optional(),
   brief: z.object({

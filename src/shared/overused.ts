@@ -32,11 +32,12 @@ export const overusedLine = (doc: Pick<ArticleDoc, 'sections'>) => {
 const SUMMARY = /(했던|있었던|하는|되는|이어지는|담긴)\s*(체험|활동|자리|시간|구성|이야기|행사)(이에요|예요|이랍니다|랍니다)|빼놓을 수 없/;
 
 // 글 말투 점검 (2026-11-05 사용자가 고른 글: 질문 2~3개 + 어미 섞기). 질문 수 · "~했어요" 연속만 셈
-export function styleIssues(doc: Pick<ArticleDoc, 'sections'>, kind?: string) {
+// minQ: 사진 글은 1개 (2026-11-16 백테스트: 2개를 채우려고 "낙엽으로 무엇을 만들었을까요?"처럼 장면 칸에 답이 있는 질문을 만듦)
+export function styleIssues(doc: Pick<ArticleDoc, 'sections'>, kind?: string, minQ = 2) {
   const issues: string[] = [];
   const body = bodyText(doc);
   const questions = (body.match(/[?？]/g) ?? []).length;
-  if (kind !== '교육 정보' && questions < 2) issues.push(`질문이 ${questions}개예요. 재료로 답할 수 있는 질문을 2~3개로 맞춘다.`);
+  if (kind !== '교육 정보' && questions < minQ) issues.push(`질문이 ${questions}개예요. 재료로 답할 수 있는 질문을 ${minQ}~3개로 맞춘다.`);
   if (questions > 3) issues.push(`질문이 ${questions}개예요. 3개 이하로 줄인다.`);
   let run = 0;
   let longest = 0;

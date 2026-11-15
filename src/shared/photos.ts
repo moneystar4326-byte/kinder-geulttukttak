@@ -13,7 +13,8 @@ export const OUTPUT_LONG_SIDE = 2048;
 
 // ---------- 파일 이름 → 장면 제목 ----------
 const COPY_MARK = /(\s*\(\d+\)|\s*-\s*복사본(\s*\(\d+\))?|\s+복사본|\s*-\s*copy(\s*\(\d+\))?)$/i;
-const DEVICE_NAME = /^(img|dsc|dscn|dcim|pxl|mvimg|photo|image|kakaotalk|screenshot|스크린샷|사진|제목\s*없음|새\s*폴더)([\s_-]|\d|$)/i;
+// 기기 이름 뒤에 숫자가 오거나 그것만 있을 때만 (2026-11-16 백테스트: "사진 찍어 줄게 하니 브이"를 장면 없는 사진으로 봄)
+const DEVICE_NAME = /^(img|dsc|dscn|dcim|pxl|mvimg|photo|image|kakaotalk|screenshot|스크린샷|사진|제목\s*없음|새\s*폴더)([\s_-]*\d|\s*$)/i;
 
 export function sceneFromName(fileName: string) {
   let base = fileName.replace(/\.[^.]+$/, '').normalize('NFC').trim();
@@ -59,23 +60,24 @@ const AFTER_AGE = /\d+\s*(?:살|세)\s+([가-힣]{2,3}?)(?:이가|이는|이도|
 const VERB_END = /(던|는|을|된|하던|있는|없는)$/;
 // 장면 칸에 자주 쓰는 세 글자 낱말: 이름으로 잡으면 본문의 "선생님"이 "한 친구"로 바뀜 (태권판 리뷰 2026-11-08)
 const NOT_NAME = new Set(['선생님', '원장님', '원감님', '마지막', '여러분', '하나씩', '고마워', '친구들', '아이들', '어린이', '유치원', '다같이', '오늘도', '형님들', '동생들', '언니들', '오빠들']);
-export function namesFromScenes(titles: string[]): string[] {
+// notNames: 원장님 · 선생님이 [이름 아님]을 누른 말 (2026-11-16 백테스트: "배추잎"을 이름으로 보고 "한 친구 사이에"로 바꿈)
+export function namesFromScenes(titles: string[], notNames: string[] = []): string[] {
   const out = new Set<string>();
   for (const raw of titles) {
     const t = raw.normalize('NFC');
     for (const n of suspectNames(t)) if (!VERB_END.test(n)) out.add(n); // "물 마시던 친구"의 "마시던"은 이름이 아님
     for (const re of [RELATIVE, AFTER_AGE]) for (const m of t.matchAll(re)) if (!NOT_PERSON(m[1])) out.add(m[1]);
   }
-  return [...out].filter((n) => !NOT_NAME.has(n) && !NOT_PERSON(n));
+  return [...out].filter((n) => !NOT_NAME.has(n) && !NOT_PERSON(n) && !notNames.includes(n));
 }
-export function scenesNamesInBody(text: string, titles: string[]): string[] {
+export function scenesNamesInBody(text: string, titles: string[], notNames: string[] = []): string[] {
   const t = text.normalize('NFC');
-  return namesFromScenes(titles).filter((n) => new RegExp(`(?<![가-힣])${n}(?:이가|이는|이도|이의|이|가|은|는|을|를|의|와|과|도|에게|한테)?(?![가-힣])`).test(t));
+  return namesFromScenes(titles, notNames).filter((n) => new RegExp(`(?<![가-힣])${n}(?:이가|이는|이도|이의|이|가|은|는|을|를|의|와|과|도|에게|한테)?(?![가-힣])`).test(t));
 }
 
 // AI가 장면 칸의 이름을 그대로 쓰면 코드가 "한 친구"로 바꿈 (앞의 나이도 함께). 안내를 해도 이름이 들어가는 일이 있어서
-export function hideSceneNames<T extends { sections: { heading?: string; paragraphs: string[] }[] }>(doc: T, titles: string[]): T {
-  const names = namesFromScenes(titles);
+export function hideSceneNames<T extends { sections: { heading?: string; paragraphs: string[] }[] }>(doc: T, titles: string[], notNames: string[] = []): T {
+  const names = namesFromScenes(titles, notNames);
   if (!names.length) return doc;
   const one = (t: string) => names.reduce((s, n) => s.replace(new RegExp(`(?:\\d+\\s*(?:살|세)\\s+)?(?<![가-힣])${n}(이가|이는|이도|이의|이|가|은|는|을|를|의|와|과|도|에게|한테)?(?![가-힣])`, 'g'), (_m, j?: string) => {
     const josa = (j ?? '').replace(/^이(?=[가는도의])/, '');

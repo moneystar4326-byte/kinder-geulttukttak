@@ -59,10 +59,13 @@ export const thinMaterial = (input?: CountInput) => THIN_KIND(input) && material
 const smallMaterial = (input?: CountInput) => THIN_KIND(input) && materialChars(input) < SMALL_CHARS;
 export const storyAnswers = (input?: CountInput) => (input?.brief?.asks ?? []).filter((a) => a.answer?.trim()).length;
 // 사진 글 (태권 글뚝딱 2026-11-05에서 옮김): 장면 칸에 적은 만큼만 씀. 자유롭게 찍은 사진은 짧은 소식 글로 (장면당 몇 자를 채우게 하면 반복 · 일반 설명이 생김)
-const PHOTO_MIN = 200;
+// 2026-11-16 유치원판 백테스트: 장면 한 줄씩이면 190 · 245자라 블로그 글로 너무 얇음 → 장면마다 설명 한두 문장을 붙일 만큼 (장면 수로 바닥을 둠)
+const PHOTO_MIN = 300;
 const photoRange = (input: CountInput): readonly [number, number] => {
   const m = materialChars(input);
-  return [Math.max(PHOTO_MIN, Math.round(m * 1.3)), Math.min(1400, Math.max(450, m * 3))];
+  const n = input.photoScenes?.length ?? 1;
+  const lo = Math.max(PHOTO_MIN, Math.round(m * 1.3), 100 * n + 100);
+  return [lo, Math.min(1400, Math.max(lo + 250, m * 3, 180 * n + 200))];
 };
 // 이야기 · 행사 글은 분량 보완 없음, 교육 정보만 기존 기준
 export const minCharsForInput = (input: CountInput) => (input.photoScenes ? photoRange(input)[0] : !hasStory(input) && input.kind === '교육 정보' ? minCharsFor(input.kind) : STORY_MIN);

@@ -94,6 +94,7 @@ export interface ArticleInput {
   writer?: Writer; // 이 글을 쓰는 사람. 고른 때의 이름 · 반을 그대로 담음
   writerSign?: boolean; // 글 끝에 글쓴이 한 줄 (코드가 붙임)
   brief?: ArticleBrief; // 자세히 쓰기: 재료를 읽고 정한 글 성격 · 사실 · 주제 설명 글감 (2026-10-28)
+  photoNotNames?: string[]; // 사진 글: [이름 아님]을 누른 말 (이름으로 가리지 않음)
   photoScenes?: { id: string; title: string }[]; // 사진 폴더로 쓴 글: 사진 번호와 장면 제목 (있으면 사진 글)
 }
 

@@ -124,7 +124,8 @@ export function PhotoArticle() {
         } catch { /* 키워드 조회가 안 돼도 글은 만듦 */ }
       }
       const titlePrefix = autoPrefix(profile?.region ?? '', profile?.nearbyAreas ?? [], (await call<unknown[]>('article:list').catch(() => [])).length);
-      const input = { ...buildQuickInput({ memo, profile, main, subs, withCards: false, titlePrefix, writer, writerSign }), topic: memo.slice(0, 200) };
+      const said = [memo, ...selected.map((p) => titleOf(p))].join(' ');
+      const input = { ...buildQuickInput({ memo, profile, main, subs, withCards: false, titlePrefix, writer, writerSign }), topic: memo.slice(0, 200), photoNotNames: namesOk.filter((n) => said.includes(n)).slice(0, 30) };
       const art = await call<{ id: string }>('photos:create', { input, keywords: chosen, photos: selected.map((p) => ({ path: p.path, title: titleOf(p).trim() })) });
       try { await call('article:generate', art.id); } catch (e) { await call('article:delete', art.id).catch(() => {}); throw e; }
       for (const k of ['photo-topic', 'photo-titles', 'photo-picked', 'photo-off', 'photo-names-ok', 'photo-mix-for']) local.del(k); // 글을 만들면 다음 글은 새로 시작 (이름 확인이 다음 글로 넘어가지 않게)

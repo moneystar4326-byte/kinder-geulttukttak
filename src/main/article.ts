@@ -157,7 +157,7 @@ export async function generateArticle(deps: { db: Db; ai: TextAI; profile: DojoP
     ctx.step('문장 호흡 다듬는 중');
     doc = linked(await warmDoc(ai, doc, profile, input, o, ctx.signal), doc);
     // 사진 글: 장면 칸에 적힌 아이 이름이 글에 들어가면 코드가 "한 친구"로 바꿈 (안내를 해도 들어가는 일이 있음)
-    if (input.photoScenes) doc = hideSceneNames(doc, input.photoScenes.map((s) => s.title));
+    if (input.photoScenes) doc = hideSceneNames(doc, input.photoScenes.map((s) => s.title), input.photoNotNames);
     ctx.step('사실 비교 점검 중');
     // 점검 실패는 표시만 하고 넘어가되, 멈추기를 눌렀으면 저장하지 않고 멈춤 (2026-10-18 버그 점검)
     const aiFlags = await ai.review(doc, profile, input, o).catch((e) => {
@@ -261,7 +261,7 @@ export async function warmDoc(ai: TextAI, doc: ArticleDoc, profile: DojoProfile,
   const facts = bodyTextOfFacts(input);
   try {
     const first = acceptWarm(doc, await ai.warm(doc, profile, input, o), keywords, facts) ?? doc;
-    const issues = styleIssues(first, input.kind);
+    const issues = styleIssues(first, input.kind, input.photoScenes ? 1 : 2);
     if (!issues.length) return first;
     return acceptWarm(first, await ai.warm(first, profile, input, o, issues.join(' ')), keywords, facts) ?? first;
   } catch (e: any) {
